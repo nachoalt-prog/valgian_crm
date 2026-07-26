@@ -14,7 +14,18 @@ if (!connectionString) {
   throw new Error("DATABASE_URL no está definida");
 }
 
-const queryClient = postgres(connectionString);
+// En dev, Next.js re-evalúa este módulo en cada hot-reload sin cerrar el pool
+// anterior — sin cachear en globalThis, cada recarga abre una conexión nueva
+// hasta agotar max_connections de Postgres (nos pasó varias veces esta sesión).
+declare global {
+  var __valgianQueryClient: ReturnType<typeof postgres> | undefined;
+}
+
+const queryClient = globalThis.__valgianQueryClient ?? postgres(connectionString);
+
+if (process.env.NODE_ENV !== "production") {
+  globalThis.__valgianQueryClient = queryClient;
+}
 
 export const db = drizzle(queryClient, { schema });
 
