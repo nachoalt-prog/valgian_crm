@@ -1,0 +1,520 @@
+{
+  "id": "a436a703-761d-4c28-bb40-874e4ee878f9",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.HERRAMIENTAS": {
+      "name": "HERRAMIENTAS",
+      "schema": "",
+      "columns": {
+        "ID": {
+          "name": "ID",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "CODIGO": {
+          "name": "CODIGO",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "NOMBRE": {
+          "name": "NOMBRE",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "SLUG": {
+          "name": "SLUG",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "COMODIN": {
+          "name": "COMODIN",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.INTERFACES_MENUES": {
+      "name": "INTERFACES_MENUES",
+      "schema": "",
+      "columns": {
+        "ID": {
+          "name": "ID",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "ID_INTERFAZ": {
+          "name": "ID_INTERFAZ",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ID_MENU": {
+          "name": "ID_MENU",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "INTERFACES_MENUES_ID_INTERFAZ_INTERFAZ_ID_fk": {
+          "name": "INTERFACES_MENUES_ID_INTERFAZ_INTERFAZ_ID_fk",
+          "tableFrom": "INTERFACES_MENUES",
+          "tableTo": "INTERFAZ",
+          "columnsFrom": [
+            "ID_INTERFAZ"
+          ],
+          "columnsTo": [
+            "ID"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "INTERFACES_MENUES_ID_MENU_MENUES_ID_fk": {
+          "name": "INTERFACES_MENUES_ID_MENU_MENUES_ID_fk",
+          "tableFrom": "INTERFACES_MENUES",
+          "tableTo": "MENUES",
+          "columnsFrom": [
+            "ID_MENU"
+          ],
+          "columnsTo": [
+            "ID"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.INTERFAZ": {
+      "name": "INTERFAZ",
+      "schema": "",
+      "columns": {
+        "ID": {
+          "name": "ID",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "CODIGO": {
+          "name": "CODIGO",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "NOMBRE": {
+          "name": "NOMBRE",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "FUENTE": {
+          "name": "FUENTE",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "COLOR_PRIMARIO": {
+          "name": "COLOR_PRIMARIO",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "COLOR_SECUNDARIO": {
+          "name": "COLOR_SECUNDARIO",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.MENUES": {
+      "name": "MENUES",
+      "schema": "",
+      "columns": {
+        "ID": {
+          "name": "ID",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "CODIGO": {
+          "name": "CODIGO",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "NOMBRE": {
+          "name": "NOMBRE",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "COMODIN": {
+          "name": "COMODIN",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.MENUES_OPCIONES": {
+      "name": "MENUES_OPCIONES",
+      "schema": "",
+      "columns": {
+        "ID": {
+          "name": "ID",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "ID_MENU": {
+          "name": "ID_MENU",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ID_HERRAMIENTA": {
+          "name": "ID_HERRAMIENTA",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "CODIGO": {
+          "name": "CODIGO",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "NOMBRE": {
+          "name": "NOMBRE",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ICONO": {
+          "name": "ICONO",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ORDEN": {
+          "name": "ORDEN",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "COMODIN": {
+          "name": "COMODIN",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "MENUES_OPCIONES_ID_MENU_MENUES_ID_fk": {
+          "name": "MENUES_OPCIONES_ID_MENU_MENUES_ID_fk",
+          "tableFrom": "MENUES_OPCIONES",
+          "tableTo": "MENUES",
+          "columnsFrom": [
+            "ID_MENU"
+          ],
+          "columnsTo": [
+            "ID"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "MENUES_OPCIONES_ID_HERRAMIENTA_HERRAMIENTAS_ID_fk": {
+          "name": "MENUES_OPCIONES_ID_HERRAMIENTA_HERRAMIENTAS_ID_fk",
+          "tableFrom": "MENUES_OPCIONES",
+          "tableTo": "HERRAMIENTAS",
+          "columnsFrom": [
+            "ID_HERRAMIENTA"
+          ],
+          "columnsTo": [
+            "ID"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.PERFILES": {
+      "name": "PERFILES",
+      "schema": "",
+      "columns": {
+        "ID": {
+          "name": "ID",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "CODIGO": {
+          "name": "CODIGO",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "NOMBRE": {
+          "name": "NOMBRE",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ID_INTERFAZ": {
+          "name": "ID_INTERFAZ",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "COMODIN": {
+          "name": "COMODIN",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "PERFILES_ID_INTERFAZ_INTERFAZ_ID_fk": {
+          "name": "PERFILES_ID_INTERFAZ_INTERFAZ_ID_fk",
+          "tableFrom": "PERFILES",
+          "tableTo": "INTERFAZ",
+          "columnsFrom": [
+            "ID_INTERFAZ"
+          ],
+          "columnsTo": [
+            "ID"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.PERMISOS": {
+      "name": "PERMISOS",
+      "schema": "",
+      "columns": {
+        "ID": {
+          "name": "ID",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "ID_PERFIL": {
+          "name": "ID_PERFIL",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ID_HERRAMIENTA": {
+          "name": "ID_HERRAMIENTA",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "VER": {
+          "name": "VER",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "GESTIONAR": {
+          "name": "GESTIONAR",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "PERMISOS_ID_PERFIL_PERFILES_ID_fk": {
+          "name": "PERMISOS_ID_PERFIL_PERFILES_ID_fk",
+          "tableFrom": "PERMISOS",
+          "tableTo": "PERFILES",
+          "columnsFrom": [
+            "ID_PERFIL"
+          ],
+          "columnsTo": [
+            "ID"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "PERMISOS_ID_HERRAMIENTA_HERRAMIENTAS_ID_fk": {
+          "name": "PERMISOS_ID_HERRAMIENTA_HERRAMIENTAS_ID_fk",
+          "tableFrom": "PERMISOS",
+          "tableTo": "HERRAMIENTAS",
+          "columnsFrom": [
+            "ID_HERRAMIENTA"
+          ],
+          "columnsTo": [
+            "ID"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.USUARIOS": {
+      "name": "USUARIOS",
+      "schema": "",
+      "columns": {
+        "ID": {
+          "name": "ID",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "ID_PERFIL": {
+          "name": "ID_PERFIL",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "USERNAME": {
+          "name": "USERNAME",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "PASSWORD_HASH": {
+          "name": "PASSWORD_HASH",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "TOKEN": {
+          "name": "TOKEN",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "TOKEN_EXPIRACION": {
+          "name": "TOKEN_EXPIRACION",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "AVATAR_PATH": {
+          "name": "AVATAR_PATH",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "COMODIN": {
+          "name": "COMODIN",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "USUARIOS_USERNAME_UNIQUE": {
+          "name": "USUARIOS_USERNAME_UNIQUE",
+          "columns": [
+            {
+              "expression": "USERNAME",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "USUARIOS_ID_PERFIL_PERFILES_ID_fk": {
+          "name": "USUARIOS_ID_PERFIL_PERFILES_ID_fk",
+          "tableFrom": "USUARIOS",
+          "tableTo": "PERFILES",
+          "columnsFrom": [
+            "ID_PERFIL"
+          ],
+          "columnsTo": [
+            "ID"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

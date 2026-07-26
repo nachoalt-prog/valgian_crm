@@ -1,0 +1,77 @@
+CREATE TABLE "HERRAMIENTAS" (
+	"ID" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"CODIGO" text NOT NULL,
+	"NOMBRE" text NOT NULL,
+	"SLUG" text,
+	"COMODIN" jsonb
+);
+--> statement-breakpoint
+CREATE TABLE "INTERFACES_MENUES" (
+	"ID" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"ID_INTERFAZ" uuid,
+	"ID_MENU" uuid
+);
+--> statement-breakpoint
+CREATE TABLE "INTERFAZ" (
+	"ID" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"CODIGO" text NOT NULL,
+	"NOMBRE" text NOT NULL,
+	"FUENTE" text,
+	"COLOR_PRIMARIO" text,
+	"COLOR_SECUNDARIO" text
+);
+--> statement-breakpoint
+CREATE TABLE "MENUES" (
+	"ID" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"CODIGO" text NOT NULL,
+	"NOMBRE" text NOT NULL,
+	"COMODIN" jsonb
+);
+--> statement-breakpoint
+CREATE TABLE "MENUES_OPCIONES" (
+	"ID" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"ID_MENU" uuid,
+	"ID_HERRAMIENTA" uuid,
+	"CODIGO" text NOT NULL,
+	"NOMBRE" text NOT NULL,
+	"ICONO" text,
+	"ORDEN" integer,
+	"COMODIN" jsonb
+);
+--> statement-breakpoint
+CREATE TABLE "PERFILES" (
+	"ID" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"CODIGO" text NOT NULL,
+	"NOMBRE" text NOT NULL,
+	"ID_INTERFAZ" uuid,
+	"COMODIN" jsonb
+);
+--> statement-breakpoint
+CREATE TABLE "PERMISOS" (
+	"ID" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"ID_PERFIL" uuid,
+	"ID_HERRAMIENTA" uuid,
+	"VER" boolean,
+	"GESTIONAR" boolean
+);
+--> statement-breakpoint
+CREATE TABLE "USUARIOS" (
+	"ID" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"ID_PERFIL" uuid,
+	"USERNAME" text NOT NULL,
+	"PASSWORD_HASH" text NOT NULL,
+	"TOKEN" text,
+	"TOKEN_EXPIRACION" timestamp with time zone,
+	"AVATAR_PATH" text,
+	"COMODIN" jsonb
+);
+--> statement-breakpoint
+ALTER TABLE "INTERFACES_MENUES" ADD CONSTRAINT "INTERFACES_MENUES_ID_INTERFAZ_INTERFAZ_ID_fk" FOREIGN KEY ("ID_INTERFAZ") REFERENCES "public"."INTERFAZ"("ID") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "INTERFACES_MENUES" ADD CONSTRAINT "INTERFACES_MENUES_ID_MENU_MENUES_ID_fk" FOREIGN KEY ("ID_MENU") REFERENCES "public"."MENUES"("ID") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "MENUES_OPCIONES" ADD CONSTRAINT "MENUES_OPCIONES_ID_MENU_MENUES_ID_fk" FOREIGN KEY ("ID_MENU") REFERENCES "public"."MENUES"("ID") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "MENUES_OPCIONES" ADD CONSTRAINT "MENUES_OPCIONES_ID_HERRAMIENTA_HERRAMIENTAS_ID_fk" FOREIGN KEY ("ID_HERRAMIENTA") REFERENCES "public"."HERRAMIENTAS"("ID") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "PERFILES" ADD CONSTRAINT "PERFILES_ID_INTERFAZ_INTERFAZ_ID_fk" FOREIGN KEY ("ID_INTERFAZ") REFERENCES "public"."INTERFAZ"("ID") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "PERMISOS" ADD CONSTRAINT "PERMISOS_ID_PERFIL_PERFILES_ID_fk" FOREIGN KEY ("ID_PERFIL") REFERENCES "public"."PERFILES"("ID") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "PERMISOS" ADD CONSTRAINT "PERMISOS_ID_HERRAMIENTA_HERRAMIENTAS_ID_fk" FOREIGN KEY ("ID_HERRAMIENTA") REFERENCES "public"."HERRAMIENTAS"("ID") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "USUARIOS" ADD CONSTRAINT "USUARIOS_ID_PERFIL_PERFILES_ID_fk" FOREIGN KEY ("ID_PERFIL") REFERENCES "public"."PERFILES"("ID") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+CREATE UNIQUE INDEX "USUARIOS_USERNAME_UNIQUE" ON "USUARIOS" USING btree ("USERNAME");

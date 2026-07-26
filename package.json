@@ -1,0 +1,22 @@
+{
+  "name": "valgian-crm",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@11.17.0",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "db:generate": "pnpm --filter @valgian/db db:generate",
+    "db:migrate": "pnpm --filter @valgian/db db:migrate",
+    "db:seed": "pnpm --filter @valgian/core db:seed",
+    "db:seed:config": "pnpm --filter @valgian/core db:seed:config",
+    "db:seed:demo": "pnpm --filter @valgian/core db:seed:demo"
+  },
+  "devDependencies": {
+    "turbo": "^2.10.7",
+    "typescript": "^5.7.2"
+  }
+}

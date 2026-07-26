@@ -1,0 +1,17 @@
+CREATE TABLE "PRODUCTOS" (
+	"ID" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"MODULO" text,
+	"CODIGO" text NOT NULL,
+	"NOMBRE" text NOT NULL,
+	"COMODIN" jsonb
+);
+--> statement-breakpoint
+CREATE TABLE "SUB_PRODUCTOS" (
+	"ID" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"ID_PRODUCTO" uuid,
+	"CODIGO" text NOT NULL,
+	"NOMBRE" text NOT NULL,
+	"COMODIN" jsonb
+);
+--> statement-breakpoint
+ALTER TABLE "SUB_PRODUCTOS" ADD CONSTRAINT "SUB_PRODUCTOS_ID_PRODUCTO_PRODUCTOS_ID_fk" FOREIGN KEY ("ID_PRODUCTO") REFERENCES "public"."PRODUCTOS"("ID") ON DELETE no action ON UPDATE no action;
