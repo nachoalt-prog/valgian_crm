@@ -1,4 +1,4 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import {
   db,
   closeDb,
@@ -11,6 +11,9 @@ import {
   bandejas,
   bandejasFiltros,
   bandejasPerfiles,
+  herramientas,
+  layoutsLegajo,
+  layoutsLegajoSolapas,
 } from "@valgian/db";
 
 /**
@@ -98,6 +101,35 @@ async function ensureBandejaPerfil(idBandeja: string, idPerfil: string) {
   return creada;
 }
 
+async function getHerramientaPorCodigo(codigo: string) {
+  const [herramienta] = await db.select().from(herramientas).where(eq(herramientas.codigo, codigo));
+  if (!herramienta) throw new Error(`No existe HERRAMIENTAS.CODIGO = "${codigo}" — corré el seed principal primero.`);
+  return herramienta;
+}
+
+async function ensureLayout(codigo: string, nombre: string) {
+  const [existente] = await db.select().from(layoutsLegajo).where(eq(layoutsLegajo.codigo, codigo));
+  if (existente) return existente;
+
+  const [creado] = await db.insert(layoutsLegajo).values({ codigo, nombre }).returning();
+  return creado;
+}
+
+async function ensureLayoutSolapa(idLayout: string, orden: number, nombre: string, idHerramienta: string | null, visible: boolean) {
+  const [existente] = await db
+    .select()
+    .from(layoutsLegajoSolapas)
+    .where(and(eq(layoutsLegajoSolapas.idLayout, idLayout), eq(layoutsLegajoSolapas.orden, orden)));
+  if (existente) return existente;
+
+  const [creada] = await db.insert(layoutsLegajoSolapas).values({ idLayout, orden, nombre, idHerramienta, visible }).returning();
+  return creada;
+}
+
+async function ensureBandejaLayout(idBandeja: string, idLayout: string) {
+  await db.update(bandejas).set({ idLayout }).where(and(eq(bandejas.id, idBandeja), isNull(bandejas.idLayout)));
+}
+
 const BANDEJA_LEGAJOS_QUERY = `
 SELECT
   L."ID" AS id,
@@ -167,6 +199,17 @@ async function main() {
 
   const perfilAdmin = await getPerfilAdmin();
   await ensureBandejaPerfil(bandejaLegajos.id, perfilAdmin.id);
+
+  const herramientaLegajoDatos = await getHerramientaPorCodigo("LEGAJO_DAT_1");
+  const herramientaLegajoClientes = await getHerramientaPorCodigo("LEGAJO_CLI_1");
+
+  const layoutDefault = await ensureLayout("layout_legajo_default_1", "Layout Legajo Default 1");
+  await ensureLayoutSolapa(layoutDefault.id, 1, "Datos", herramientaLegajoDatos.id, true);
+  await ensureLayoutSolapa(layoutDefault.id, 2, "Clientes", herramientaLegajoClientes.id, true);
+  await ensureLayoutSolapa(layoutDefault.id, 3, "Solapa 3", null, true);
+  // El resto de las solapas (4 a 10) no tienen fila — quedan ocultas y vacías por defecto.
+
+  await ensureBandejaLayout(bandejaLegajos.id, layoutDefault.id);
 
   console.log("Seed de configuración modelo aplicado (idempotente).");
 }

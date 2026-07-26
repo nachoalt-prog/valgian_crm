@@ -4,7 +4,7 @@ Todo lo que está identificado pero no resuelto todavía, sin importar de qué s
 
 ## Dominio
 
-- **ABM visual para BANDEJAS/FILTROS**: hoy se cargan únicamente por seed — armar `BANDEJAS.QUERY`/`COLUMNAS` y `FILTROS.QUERY` implica escribir SQL a mano. Falta un editor que permita construir esto desde la UI. (`domain/bandejas.md`)
+- **Editor visual de QUERY/COLUMNAS en el ABM de Bandejas/Filtros**: el ABM ya existe (`/dashboard/bandejas-admin`, `/dashboard/filtros`), pero `BANDEJAS.QUERY`/`COLUMNAS` y `FILTROS.QUERY` se cargan como SQL/JSON crudo en un textarea — no hay un query-builder visual. Queda como mejora futura, no bloqueante. (`domain/bandejas.md`)
 
 ## Infraestructura
 

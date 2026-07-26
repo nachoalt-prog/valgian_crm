@@ -235,6 +235,13 @@ async function main() {
   const herramientaPermisos = await ensureHerramienta("permisos", "Permisos", "permisos.gestionar");
   const herramientaProductos = await ensureHerramienta("productos", "Productos y Sub-productos", "productos.gestionar");
   const herramientaBandejas = await ensureHerramienta("bandejas", "Bandejas", "bandejas.ver");
+  const herramientaFiltros = await ensureHerramienta("filtros", "Filtros", "filtros.gestionar");
+  const herramientaBandejasAdmin = await ensureHerramienta("bandejas_admin", "Bandejas (ABM)", "bandejas_admin.gestionar");
+  const herramientaLayoutsLegajo = await ensureHerramienta("layouts_legajo", "Layouts de Legajo", "layouts_legajo.gestionar");
+  // Estas dos no se navegan desde el sidebar — se cargan embebidas dentro de un
+  // LAYOUTS_LEGAJO dentro del modal de legajo abierto desde Bandejas.
+  const herramientaLegajoDatos = await ensureHerramienta("LEGAJO_DAT_1", "Datos de Legajo", "legajo_dat_1.gestionar");
+  const herramientaLegajoClientes = await ensureHerramienta("LEGAJO_CLI_1", "ABM de Clientes (Legajo)", "legajo_cli_1.gestionar");
 
   // Admin tiene acceso de gestión completo a todas las herramientas — la existencia
   // de la fila en PERMISOS ya implica acceso de lectura (no hay columna VER).
@@ -246,6 +253,11 @@ async function main() {
     herramientaPermisos,
     herramientaProductos,
     herramientaBandejas,
+    herramientaFiltros,
+    herramientaBandejasAdmin,
+    herramientaLayoutsLegajo,
+    herramientaLegajoDatos,
+    herramientaLegajoClientes,
   ]) {
     await ensurePermisoGestion(perfilAdmin.id, h.id);
   }
@@ -260,6 +272,9 @@ async function main() {
   await ensureMenuOpcion(menuConfiguracion.id, herramientaInterfaces.id, "interfaces", "Interfaces", "icon.interfaces", 3);
   await ensureMenuOpcion(menuConfiguracion.id, herramientaPermisos.id, "permisos", "Permisos", "icon.permisos", 4);
   await ensureMenuOpcion(menuConfiguracion.id, herramientaProductos.id, "productos", "Productos", "icon.productos", 5);
+  await ensureMenuOpcion(menuConfiguracion.id, herramientaFiltros.id, "filtros", "Filtros", "icon.filtros", 6);
+  await ensureMenuOpcion(menuConfiguracion.id, herramientaBandejasAdmin.id, "bandejas_admin", "Bandejas", "icon.bandejas", 7);
+  await ensureMenuOpcion(menuConfiguracion.id, herramientaLayoutsLegajo.id, "layouts_legajo", "Layouts de Legajo", "icon.layouts", 8);
   await ensureMenuOpcion(menuHerramientas.id, herramientaBandejas.id, "bandejas", "Bandejas", "icon.bandejas", 1);
 
   await ensureInterfazMenu(interfazDefault.id, menuPrincipal.id);

@@ -60,6 +60,9 @@ Siguiendo el mismo criterio que ADR 0009 (lógica de negocio configurable vive e
 
 El SQL de `BANDEJAS.QUERY`/`FILTROS.QUERY` es contenido de confianza (autorado por quien arma la bandeja, mismo nivel que `ACCIONES.COMANDO`) — pero los **valores que tipea el usuario en el formulario de búsqueda siempre se pasan parametrizados** (placeholders con bind, nunca interpolación de string). Esto no es negociable: mezclar SQL de confianza con datos de usuario sin parametrizar abre una inyección SQL, aunque la estructura de la query sea de confianza.
 
-## Alcance actual
+## Herramientas de administración
 
-Hoy `FILTROS`/`BANDEJAS`/`BANDEJAS_FILTROS`/`BANDEJAS_PERFILES` se cargan únicamente por seed — no hay un ABM visual para armarlas desde la UI (implica escribir el `QUERY`/`COLUMNAS` a mano). Un editor que permita construir esto sin SQL manual queda pendiente — ver `open-issues.md`.
+- **`/dashboard/filtros`** (`HERRAMIENTAS.CODIGO = 'filtros'`): ABM de `FILTROS` — código, nombre, tipo, y el `QUERY` de opciones (solo visible cuando `TIPO='select'`).
+- **`/dashboard/bandejas-admin`** (`HERRAMIENTAS.CODIGO = 'bandejas_admin'`, distinto de `'bandejas'` — la herramienta de búsqueda): ABM de `BANDEJAS` (código, nombre, `QUERY`, `COLUMNAS`), y en el panel de detalle de cada bandeja: qué `FILTROS` tiene vinculados (con su `CAMPO`/`ORDEN`) y qué `PERFILES` la ven (`BANDEJAS_PERFILES`, checklist).
+
+`QUERY`/`COLUMNAS`/`FILTROS.QUERY` se editan como SQL/JSON crudo en un textarea — no hay todavía un query-builder visual (ver `open-issues.md`).

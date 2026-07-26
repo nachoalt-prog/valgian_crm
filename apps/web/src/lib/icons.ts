@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, ListTree, Palette, KeyRound, Package, Inbox, type LucideIcon, Circle } from "lucide-react";
+import { LayoutDashboard, Users, ListTree, Palette, KeyRound, Package, Inbox, Filter, LayoutTemplate, type LucideIcon, Circle } from "lucide-react";
 
 /**
  * MENUES_OPCIONES.ICONO guarda una clave propia y estable (no el nombre de un
@@ -13,6 +13,8 @@ const ICON_MAP: Record<string, LucideIcon> = {
   "icon.permisos": KeyRound,
   "icon.productos": Package,
   "icon.bandejas": Inbox,
+  "icon.filtros": Filter,
+  "icon.layouts": LayoutTemplate,
 };
 
 export const ICON_KEYS = Object.keys(ICON_MAP);

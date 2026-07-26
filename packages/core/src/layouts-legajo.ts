@@ -1,0 +1,57 @@
+import { and, eq } from "drizzle-orm";
+import { db, layoutsLegajo, layoutsLegajoSolapas, bandejas, herramientas } from "@valgian/db";
+import { getPermisoParaHerramienta } from "./permissions";
+
+export interface SolapaLegajo {
+  id: string;
+  orden: number;
+  nombre: string;
+  herramientaCodigo: string | null;
+  canGestionar: boolean;
+}
+
+export interface LayoutLegajo {
+  id: string;
+  codigo: string;
+  nombre: string;
+  solapas: SolapaLegajo[];
+}
+
+/**
+ * Resuelve qué LAYOUTS_LEGAJO corresponde a una bandeja, y filtra sus solapas
+ * según los permisos del perfil actual — una solapa con herramienta asignada
+ * pero sin fila en PERMISOS para esa herramienta queda directamente afuera
+ * (mismo criterio que el resto de la app: sin PERMISOS, sin acceso).
+ */
+export async function getLayoutParaBandeja(bandejaId: string, perfilId: string): Promise<LayoutLegajo | null> {
+  const [bandeja] = await db.select({ idLayout: bandejas.idLayout }).from(bandejas).where(eq(bandejas.id, bandejaId));
+  if (!bandeja?.idLayout) return null;
+
+  const [layout] = await db.select().from(layoutsLegajo).where(eq(layoutsLegajo.id, bandeja.idLayout));
+  if (!layout) return null;
+
+  const solapasRaw = await db
+    .select({
+      id: layoutsLegajoSolapas.id,
+      orden: layoutsLegajoSolapas.orden,
+      nombre: layoutsLegajoSolapas.nombre,
+      herramientaCodigo: herramientas.codigo,
+    })
+    .from(layoutsLegajoSolapas)
+    .leftJoin(herramientas, eq(herramientas.id, layoutsLegajoSolapas.idHerramienta))
+    .where(and(eq(layoutsLegajoSolapas.idLayout, layout.id), eq(layoutsLegajoSolapas.visible, true)))
+    .orderBy(layoutsLegajoSolapas.orden);
+
+  const solapas: SolapaLegajo[] = [];
+  for (const s of solapasRaw) {
+    if (!s.herramientaCodigo) {
+      solapas.push({ id: s.id, orden: s.orden ?? 0, nombre: s.nombre, herramientaCodigo: null, canGestionar: false });
+      continue;
+    }
+    const permiso = await getPermisoParaHerramienta(perfilId, s.herramientaCodigo);
+    if (!permiso) continue;
+    solapas.push({ id: s.id, orden: s.orden ?? 0, nombre: s.nombre, herramientaCodigo: s.herramientaCodigo, canGestionar: permiso.gestionar });
+  }
+
+  return { id: layout.id, codigo: layout.codigo, nombre: layout.nombre, solapas };
+}

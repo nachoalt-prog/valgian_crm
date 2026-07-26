@@ -282,6 +282,10 @@ export const bandejas = pgTable("BANDEJAS", {
   query: text("QUERY"),
   // Qué alias de QUERY se muestran como columnas del listado, en qué orden y con qué label.
   columnas: jsonb("COLUMNAS"),
+  // Qué LAYOUTS_LEGAJO se despliega al abrir un resultado de esta bandeja — una
+  // bandeja usa un único layout, por eso es una columna acá y no una tabla de
+  // relación (ver domain/layouts-legajo.md).
+  idLayout: uuid("ID_LAYOUT").references(() => layoutsLegajo.id),
 });
 
 export const bandejasFiltros = pgTable("BANDEJAS_FILTROS", {
@@ -301,4 +305,29 @@ export const bandejasPerfiles = pgTable(
     idPerfil: uuid("ID_PERFIL").references(() => perfiles.id),
   },
   (table) => [uniqueIndex("BANDEJAS_PERFILES_BANDEJA_PERFIL_UNIQUE").on(table.idBandeja, table.idPerfil)],
+);
+
+/**
+ * Layouts de legajo: qué solapas (hasta 10) se muestran al abrir un legajo
+ * desde una bandeja, y qué herramienta se carga dentro de cada una — ver
+ * domain/layouts-legajo.md.
+ */
+
+export const layoutsLegajo = pgTable("LAYOUTS_LEGAJO", {
+  id: uuid("ID").primaryKey().defaultRandom(),
+  codigo: text("CODIGO").notNull(),
+  nombre: text("NOMBRE").notNull(),
+});
+
+export const layoutsLegajoSolapas = pgTable(
+  "LAYOUTS_LEGAJO_SOLAPAS",
+  {
+    id: uuid("ID").primaryKey().defaultRandom(),
+    idLayout: uuid("ID_LAYOUT").references(() => layoutsLegajo.id),
+    orden: integer("ORDEN"),
+    nombre: text("NOMBRE").notNull(),
+    idHerramienta: uuid("ID_HERRAMIENTA").references(() => herramientas.id),
+    visible: boolean("VISIBLE"),
+  },
+  (table) => [uniqueIndex("LAYOUTS_LEGAJO_SOLAPAS_LAYOUT_ORDEN_UNIQUE").on(table.idLayout, table.orden)],
 );

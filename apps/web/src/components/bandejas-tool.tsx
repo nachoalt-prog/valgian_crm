@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { BandejasPanel } from "@/components/bandejas-panel";
 import { BandejaFiltros } from "@/components/bandeja-filtros";
 import { BandejaResultados } from "@/components/bandeja-resultados";
+import { LegajoLayoutModal } from "@/components/legajo-layout-modal";
 import { getBandejaConfigAction, buscarBandejaAction } from "@/app/dashboard/bandejas/actions";
 import type { BandejaResumen, BandejaConfig } from "@valgian/core";
 
@@ -20,6 +21,7 @@ export function BandejasTool({ bandejasIniciales }: BandejasToolProps) {
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
+  const [legajoAbierto, setLegajoAbierto] = useState<string | null>(null);
 
   const handleSelectBandeja = useCallback(async (id: string) => {
     setSelectedBandejaId(id);
@@ -66,8 +68,13 @@ export function BandejasTool({ bandejasIniciales }: BandejasToolProps) {
   }, []);
 
   function handleOpen(row: Record<string, unknown>) {
-    setAviso(`Abrir detalle: pantalla pendiente (fila "${row.id ?? ""}").`);
-    setTimeout(() => setAviso(null), 3500);
+    const id = row.id;
+    if (typeof id !== "string") {
+      setAviso("No se pudo abrir: la fila no tiene ID.");
+      setTimeout(() => setAviso(null), 3500);
+      return;
+    }
+    setLegajoAbierto(id);
   }
 
   return (
@@ -109,6 +116,17 @@ export function BandejasTool({ bandejasIniciales }: BandejasToolProps) {
           </>
         )}
       </div>
+
+      {legajoAbierto && selectedBandejaId && (
+        <LegajoLayoutModal
+          open={!!legajoAbierto}
+          onOpenChange={(o) => {
+            if (!o) setLegajoAbierto(null);
+          }}
+          bandejaId={selectedBandejaId}
+          legajoId={legajoAbierto}
+        />
+      )}
     </div>
   );
 }
