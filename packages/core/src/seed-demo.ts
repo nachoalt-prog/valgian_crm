@@ -159,7 +159,7 @@ const ACOMPANANTES: AcompananteDemo[] = [
 
 async function main() {
   const admin = await getAdminUsuario();
-  const estrategiaLegajos = await getEstrategiaPorCodigo("legajos");
+  const estrategiaLegajos = await getEstrategiaPorCodigo("STD_LEGAJO_1");
   const estadoInicial = await getEstadoInicial(estrategiaLegajos.id);
 
   const caracterTitular = await getCaracterPorCodigo("titular");

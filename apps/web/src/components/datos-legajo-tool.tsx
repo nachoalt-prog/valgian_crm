@@ -9,6 +9,8 @@ import type { LegajoDetalle } from "@valgian/core";
 interface DatosLegajoToolProps {
   idLegajo: string;
   canGestionar: boolean;
+  revision?: number;
+  onCambio?: () => void;
 }
 
 function formatearFecha(fecha: Date | string | null): string {
@@ -16,7 +18,7 @@ function formatearFecha(fecha: Date | string | null): string {
   return new Date(fecha).toLocaleString("es-AR");
 }
 
-export function DatosLegajoTool({ idLegajo, canGestionar }: DatosLegajoToolProps) {
+export function DatosLegajoTool({ idLegajo, canGestionar, revision, onCambio }: DatosLegajoToolProps) {
   const [legajo, setLegajo] = useState<LegajoDetalle | null | undefined>(undefined);
 
   useEffect(() => {
@@ -27,11 +29,14 @@ export function DatosLegajoTool({ idLegajo, canGestionar }: DatosLegajoToolProps
     return () => {
       cancelado = true;
     };
-  }, [idLegajo]);
+  }, [idLegajo, revision]);
 
   async function guardarNumero(numero: string) {
     const result = await updateLegajoNumeroAction(idLegajo, numero);
-    if (!result.error) setLegajo((prev) => (prev ? { ...prev, numero } : prev));
+    if (!result.error) {
+      setLegajo((prev) => (prev ? { ...prev, numero } : prev));
+      onCambio?.();
+    }
     return result;
   }
 

@@ -183,6 +183,18 @@ export const estimulos = pgTable("ESTIMULOS", {
   comodin: jsonb("COMODIN"),
 });
 
+// Qué perfiles pueden aplicar qué estímulos — gobierna el selector de
+// SP_APLICAR_ESTIMULO en la herramienta "Gestión de Entidad".
+export const perfilesEstimulos = pgTable(
+  "PERFILES_ESTIMULOS",
+  {
+    id: uuid("ID").primaryKey().defaultRandom(),
+    idPerfil: uuid("ID_PERFIL").references(() => perfiles.id),
+    idEstimulo: uuid("ID_ESTIMULO").references(() => estimulos.id),
+  },
+  (table) => [uniqueIndex("PERFILES_ESTIMULOS_PERFIL_ESTIMULO_UNIQUE").on(table.idPerfil, table.idEstimulo)],
+);
+
 export const acciones = pgTable("ACCIONES", {
   id: uuid("ID").primaryKey().defaultRandom(),
   idEstrategia: uuid("ID_ESTRATEGIA").references(() => estrategias.id),
@@ -221,7 +233,12 @@ export const transicionesAcciones = pgTable("TRANSICIONES_ACCIONES", {
 
 export const historial = pgTable("HISTORIAL", {
   id: uuid("ID").primaryKey().defaultRandom(),
-  idTransicion: uuid("ID_TRANSICION").references(() => transiciones.id),
+  // Se graba el estado_0/estimulo/estado_1 tal cual ocurrieron, no la FK a
+  // TRANSICIONES — así queda registrado el camino real sin impedir que la
+  // transición usada se modifique o borre a futuro (ver domain/motor-de-estados.md).
+  idEstado0: uuid("ID_ESTADO_0").references(() => estados.id),
+  idEstimulo: uuid("ID_ESTIMULO").references(() => estimulos.id),
+  idEstado1: uuid("ID_ESTADO_1").references(() => estados.id),
   idEntidad: uuid("ID_ENTIDAD").references(() => entidades.id),
   idRelacion: uuid("ID_RELACION"),
   observacion: text("OBSERVACION"),

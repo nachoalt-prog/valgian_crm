@@ -57,6 +57,20 @@
       "when": 1785085880900,
       "tag": "0007_secret_silver_surfer",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1785093210867,
+      "tag": "0008_colorful_elektra",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1785093228231,
+      "tag": "0009_rainy_matthew_murdock",
+      "breakpoints": true
     }
   ]
 }

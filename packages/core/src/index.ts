@@ -19,3 +19,7 @@ export * from "./legajos";
 export * from "./clientes";
 export * from "./layouts-legajo";
 export * from "./layouts-legajo-admin";
+export * from "./entidades";
+export * from "./perfiles-estimulos";
+export * from "./motor-estados";
+export * from "./historial";

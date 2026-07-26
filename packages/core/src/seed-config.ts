@@ -14,6 +14,9 @@ import {
   herramientas,
   layoutsLegajo,
   layoutsLegajoSolapas,
+  estimulos,
+  transiciones,
+  perfilesEstimulos,
 } from "@valgian/db";
 
 /**
@@ -130,6 +133,36 @@ async function ensureBandejaLayout(idBandeja: string, idLayout: string) {
   await db.update(bandejas).set({ idLayout }).where(and(eq(bandejas.id, idBandeja), isNull(bandejas.idLayout)));
 }
 
+async function ensureEstimulo(idEstrategia: string, codigo: string, nombre: string) {
+  const [existente] = await db.select().from(estimulos).where(and(eq(estimulos.idEstrategia, idEstrategia), eq(estimulos.codigo, codigo)));
+  if (existente) return existente;
+
+  const [creado] = await db.insert(estimulos).values({ idEstrategia, codigo, nombre }).returning();
+  return creado;
+}
+
+async function ensureTransicion(idEstrategia: string, idEstado0: string, idEstimulo: string, idEstado1: string) {
+  const [existente] = await db
+    .select()
+    .from(transiciones)
+    .where(and(eq(transiciones.idEstrategia, idEstrategia), eq(transiciones.idEstado0, idEstado0), eq(transiciones.idEstimulo, idEstimulo)));
+  if (existente) return existente;
+
+  const [creada] = await db.insert(transiciones).values({ idEstrategia, idEstado0, idEstimulo, idEstado1 }).returning();
+  return creada;
+}
+
+async function ensurePerfilEstimulo(idPerfil: string, idEstimulo: string) {
+  const [existente] = await db
+    .select()
+    .from(perfilesEstimulos)
+    .where(and(eq(perfilesEstimulos.idPerfil, idPerfil), eq(perfilesEstimulos.idEstimulo, idEstimulo)));
+  if (existente) return existente;
+
+  const [creada] = await db.insert(perfilesEstimulos).values({ idPerfil, idEstimulo }).returning();
+  return creada;
+}
+
 const BANDEJA_LEGAJOS_QUERY = `
 SELECT
   L."ID" AS id,
@@ -162,8 +195,17 @@ async function main() {
   await ensureCaracter("pariente", "Pariente");
 
   const entidadLegajos = await getEntidadPorCodigo("legajos");
-  const estrategiaLegajos = await ensureEstrategia("legajos", "Legajos", entidadLegajos.id);
-  await ensureEstado(estrategiaLegajos.id, "alta", "Alta", true, false);
+  const estrategiaLegajos = await ensureEstrategia("STD_LEGAJO_1", "Estrategia estándar legajos 1", entidadLegajos.id);
+  const estadoActivo = await ensureEstado(estrategiaLegajos.id, "activo", "Activo", true, false);
+  const estadoBaja = await ensureEstado(estrategiaLegajos.id, "baja", "Baja", false, true);
+
+  const estimuloGestion = await ensureEstimulo(estrategiaLegajos.id, "gestion", "Gestión");
+  const estimuloBajaLegajo = await ensureEstimulo(estrategiaLegajos.id, "baja", "Baja");
+  const estimuloReactivar = await ensureEstimulo(estrategiaLegajos.id, "reactivar", "Reactivar");
+
+  await ensureTransicion(estrategiaLegajos.id, estadoActivo.id, estimuloGestion.id, estadoActivo.id);
+  await ensureTransicion(estrategiaLegajos.id, estadoActivo.id, estimuloBajaLegajo.id, estadoBaja.id);
+  await ensureTransicion(estrategiaLegajos.id, estadoBaja.id, estimuloReactivar.id, estadoActivo.id);
 
   // Cada FILTRO acá tiene su propio label — aunque compartan TIPO ("texto_like"),
   // son filtros semánticamente distintos, no el mismo filtro reusado. La reusabilidad
@@ -174,7 +216,7 @@ async function main() {
     "select_estados_legajos",
     "Estado",
     "select",
-    `SELECT "ID" AS value, "NOMBRE" AS label FROM "ESTADOS" WHERE "ID_ESTRATEGIA" = (SELECT "ID" FROM "ESTRATEGIAS" WHERE "CODIGO" = 'legajos') ORDER BY "NOMBRE"`,
+    `SELECT "ID" AS value, "NOMBRE" AS label FROM "ESTADOS" WHERE "ID_ESTRATEGIA" = (SELECT "ID" FROM "ESTRATEGIAS" WHERE "CODIGO" = 'STD_LEGAJO_1') ORDER BY "NOMBRE"`,
   );
   const filtroFechaAlta = await ensureFiltro("fecha_alta", "Fecha de Alta", "fecha_rango", null);
   const filtroUsuarios = await ensureFiltro(
@@ -200,14 +242,23 @@ async function main() {
   const perfilAdmin = await getPerfilAdmin();
   await ensureBandejaPerfil(bandejaLegajos.id, perfilAdmin.id);
 
+  // Admin puede aplicar los 3 estímulos de STD_LEGAJO_1 — sin esto, la herramienta
+  // "Gestión de Entidad" no le mostraría ningún estímulo aunque tenga permiso sobre ella.
+  await ensurePerfilEstimulo(perfilAdmin.id, estimuloGestion.id);
+  await ensurePerfilEstimulo(perfilAdmin.id, estimuloBajaLegajo.id);
+  await ensurePerfilEstimulo(perfilAdmin.id, estimuloReactivar.id);
+
   const herramientaLegajoDatos = await getHerramientaPorCodigo("LEGAJO_DAT_1");
   const herramientaLegajoClientes = await getHerramientaPorCodigo("LEGAJO_CLI_1");
+  const herramientaGestionEntidad = await getHerramientaPorCodigo("GESTION_ENTIDAD_1");
+  const herramientaHistorial = await getHerramientaPorCodigo("HISTORIAL_1");
 
   const layoutDefault = await ensureLayout("layout_legajo_default_1", "Layout Legajo Default 1");
   await ensureLayoutSolapa(layoutDefault.id, 1, "Datos", herramientaLegajoDatos.id, true);
   await ensureLayoutSolapa(layoutDefault.id, 2, "Clientes", herramientaLegajoClientes.id, true);
-  await ensureLayoutSolapa(layoutDefault.id, 3, "Solapa 3", null, true);
-  // El resto de las solapas (4 a 10) no tienen fila — quedan ocultas y vacías por defecto.
+  await ensureLayoutSolapa(layoutDefault.id, 3, "Gestión", herramientaGestionEntidad.id, true);
+  await ensureLayoutSolapa(layoutDefault.id, 4, "Historial", herramientaHistorial.id, true);
+  // El resto de las solapas (5 a 10) no tienen fila — quedan ocultas y vacías por defecto.
 
   await ensureBandejaLayout(bandejaLegajos.id, layoutDefault.id);
 

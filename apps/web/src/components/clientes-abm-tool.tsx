@@ -32,9 +32,11 @@ interface Catalogos {
 interface ClientesAbmToolProps {
   idLegajo: string;
   canGestionar: boolean;
+  revision?: number;
+  onCambio?: () => void;
 }
 
-export function ClientesAbmTool({ idLegajo, canGestionar }: ClientesAbmToolProps) {
+export function ClientesAbmTool({ idLegajo, canGestionar, revision, onCambio }: ClientesAbmToolProps) {
   const [clientes, setClientes] = useState<ClienteConNombres[] | null>(null);
   const [catalogos, setCatalogos] = useState<Catalogos | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -48,20 +50,30 @@ export function ClientesAbmTool({ idLegajo, canGestionar }: ClientesAbmToolProps
 
   useEffect(() => {
     let cancelado = false;
-    Promise.all([listClientesPorLegajoAction(idLegajo), getCatalogosClienteAction()]).then(([cli, cat]) => {
-      if (!cancelado) {
-        setClientes(cli);
-        setCatalogos(cat);
-      }
+    getCatalogosClienteAction().then((cat) => {
+      if (!cancelado) setCatalogos(cat);
     });
     return () => {
       cancelado = true;
     };
-  }, [idLegajo]);
+  }, []);
+
+  useEffect(() => {
+    let cancelado = false;
+    listClientesPorLegajoAction(idLegajo).then((cli) => {
+      if (!cancelado) setClientes(cli);
+    });
+    return () => {
+      cancelado = true;
+    };
+  }, [idLegajo, revision]);
 
   async function handleCrear(data: ClienteInput) {
     const result = await createClienteAction(data);
-    if (!result.error) await recargar();
+    if (!result.error) {
+      await recargar();
+      onCambio?.();
+    }
     return result;
   }
 
@@ -75,6 +87,7 @@ export function ClientesAbmTool({ idLegajo, canGestionar }: ClientesAbmToolProps
     setDeleteConfirm(null);
     if (selectedId === deleteConfirm.id) setSelectedId(null);
     await recargar();
+    onCambio?.();
   }
 
   async function actualizarCampo(cliente: ClienteConNombres, cambios: Partial<ClienteInput>) {
@@ -91,7 +104,10 @@ export function ClientesAbmTool({ idLegajo, canGestionar }: ClientesAbmToolProps
       ...cambios,
     };
     const result = await updateClienteAction(cliente.id, data);
-    if (!result.error) await recargar();
+    if (!result.error) {
+      await recargar();
+      onCambio?.();
+    }
     return result;
   }
 

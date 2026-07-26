@@ -33,6 +33,7 @@ const RUTA_POR_CODIGO: Record<string, string> = {
   filtros: "/dashboard/filtros",
   bandejas_admin: "/dashboard/bandejas-admin",
   layouts_legajo: "/dashboard/layouts-legajo",
+  perfiles_estimulos: "/dashboard/perfiles-estimulos",
 };
 
 export function AppSidebar({ menu, titulo }: { menu: MenuGrupo[]; titulo?: string | null }) {

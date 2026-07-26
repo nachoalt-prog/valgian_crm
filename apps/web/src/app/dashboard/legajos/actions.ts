@@ -1,6 +1,6 @@
 "use server";
 
-import { getLegajoDetalle, updateLegajoNumero, getPermisoParaHerramienta } from "@valgian/core";
+import { getLegajoDetalle, updateLegajoNumero, getEntidadPorCodigo, getPermisoParaHerramienta } from "@valgian/core";
 import { getCurrentSession } from "@/lib/current-user";
 
 const HERRAMIENTA_CODIGO = "LEGAJO_DAT_1";
@@ -38,4 +38,10 @@ export async function updateLegajoNumeroAction(id: string, numero: string) {
   if (check.error || !check.usuarioId) return { error: check.error ?? "No autenticado." };
 
   return updateLegajoNumero(id, numero, check.usuarioId);
+}
+
+/** ID de ENTIDADES para "legajos" — lo usan las herramientas genéricas del motor de estados. */
+export async function getEntidadLegajoAction() {
+  const entidad = await getEntidadPorCodigo("legajos");
+  return { data: entidad?.id ?? null };
 }

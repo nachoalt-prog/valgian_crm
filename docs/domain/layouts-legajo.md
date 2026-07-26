@@ -33,7 +33,7 @@ Una bandeja mapea a **un único** layout — por eso vive como columna nullable 
 
 Una `HERRAMIENTA` asignada a una solapa no es necesariamente una página navegable por sidebar — puede ser una herramienta que **solo** se usa embebida dentro de un layout de legajo (ej. `LEGAJO_DAT_1`, `LEGAJO_CLI_1`). El mapeo `HERRAMIENTAS.CODIGO → componente React` vive en código (`apps/web/src/lib/legajo-herramientas.ts`), mismo criterio de indirección que `lib/icons.ts` (ADR 0011): la clave es estable, el componente real puede cambiar de nombre/archivo sin tocar la base.
 
-El componente recibe `{ idLegajo, canGestionar }` como props — el legajo sobre el que se está parado, y si el perfil actual puede editar (ver más abajo). El usuario logueado se resuelve dentro de cada action vía sesión, no se pasa como prop.
+El componente recibe `{ idLegajo, idEntidad, canGestionar }` como props — el legajo sobre el que se está parado, el `ID` de `ENTIDADES` para "legajos" (lo necesitan las herramientas genéricas de motor de estados; las demás lo ignoran), y si el perfil actual puede editar (ver más abajo). El usuario logueado se resuelve dentro de cada action vía sesión, no se pasa como prop. `idEntidad` lo resuelve `legajo-layout-modal.tsx` una sola vez (vía `getEntidadLegajoAction`) y lo pasa a todas las herramientas de la solapa activa.
 
 ## Permisos por solapa
 
@@ -45,8 +45,10 @@ Una solapa sin `ID_HERRAMIENTA` (vacía) siempre se muestra si `VISIBLE=true`, s
 
 - **`LEGAJO_DAT_1`** ("Datos de Legajo"): vista simple de campos del legajo, con botón de edición por campo. `NUMERO` es editable; `ESTADO` es de solo lectura (el motor de estados todavía no tiene los Stored Procedures de transición — ver ADR 0009 y `domain/motor-de-estados.md` — cambiarlo a mano dejaría el dato inconsistente con `HISTORIAL`). `ALTA_FECHA`/`AUDIT_FECHA` y sus usuarios son de auditoría, tampoco editables.
 - **`LEGAJO_CLI_1`** ("ABM de Clientes"): maestro-detalle acotado a los `CLIENTES` del legajo actual — lista a la izquierda, campos editables uno por uno a la derecha (mismo patrón de `LEGAJO_DAT_1`).
+- **`GESTION_ENTIDAD_1`** ("Gestión de Entidad"): la que le da uso real al motor de estados — selector de estímulos aplicables desde el estado actual (filtrado por `PERFILES_ESTIMULOS`), observación, y botón "Gestionar" que ejecuta `SP_APLICAR_ESTIMULO`. Ver `domain/motor-de-estados.md`.
+- **`HISTORIAL_1`** ("Historial"): listado de solo lectura de `HISTORIAL` filtrado por `ID_ENTIDAD`/`ID_RELACION`, ordenado por `AUDIT_FECHA` descendente. Columnas: Estado INI, Estímulo, Estado FIN (nombres resueltos, no UUIDs), Fecha (`dd/mm/yyyy hh:mm`), Usuario, Status de acciones (`OK` si `ACCIONES_STATUS` es null, si no el mensaje de `ACCIONES_ERROR`) y Observación (con wrap de texto — puede ser largo).
 
-Ninguna de las dos tiene entrada en `MENUES_OPCIONES` — no son navegables por sidebar, solo se llega a ellas a través de un layout de legajo.
+Ninguna de las cuatro tiene entrada en `MENUES_OPCIONES` — no son navegables por sidebar, solo se llega a ellas a través de un layout de legajo.
 
 ## ABM
 
@@ -56,4 +58,4 @@ El campo `BANDEJAS.ID_LAYOUT` se edita desde el ABM de Bandejas (`/dashboard/ban
 
 ## Seed
 
-El seed de configuración modelo (`seed-config.ts`) crea `Layout Legajo Default 1` con: solapa 1 "Datos" (`LEGAJO_DAT_1`), solapa 2 "Clientes" (`LEGAJO_CLI_1`), solapa 3 "Solapa 3" (vacía, visible), y setea `BANDEJAS.ID_LAYOUT` de la bandeja `legajos` apuntando a este layout. Las solapas 4 a 10 no tienen fila.
+El seed de configuración modelo (`seed-config.ts`) crea `Layout Legajo Default 1` con: solapa 1 "Datos" (`LEGAJO_DAT_1`), solapa 2 "Clientes" (`LEGAJO_CLI_1`), solapa 3 "Gestión" (`GESTION_ENTIDAD_1`), solapa 4 "Historial" (`HISTORIAL_1`), y setea `BANDEJAS.ID_LAYOUT` de la bandeja `legajos` apuntando a este layout. Las solapas 5 a 10 no tienen fila. El mismo seed crea la estrategia `STD_LEGAJO_1` (ver `domain/motor-de-estados.md`) y le da al perfil admin los 3 estímulos vía `PERFILES_ESTIMULOS` — sin eso, "Gestión de Entidad" no mostraría ningún estímulo aunque el admin tenga permiso sobre la herramienta.
