@@ -1,12 +1,24 @@
 import { sql } from "drizzle-orm";
-import { pgTable, uuid, text, boolean, integer, timestamp, jsonb, uniqueIndex } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  uuid,
+  text,
+  boolean,
+  integer,
+  doublePrecision,
+  timestamp,
+  jsonb,
+  uniqueIndex,
+  type AnyPgColumn,
+} from "drizzle-orm/pg-core";
 
 /**
  * Naming: los nombres de tabla/columna siguen MAYÚSCULAS_CON_GUION_BAJO
  * tal cual domain/infraestructura.md y domain/core.md — implica identificadores
  * quoteados en el SQL generado. Nullability: todo nullable salvo PK, CODIGO,
  * NOMBRE (regla temporal acordada, domain/core.md "Convenciones generales"),
- * más USERNAME/PASSWORD_HASH en USUARIOS (login no funciona sin esto).
+ * más USERNAME/PASSWORD_HASH en USUARIOS (login no funciona sin esto) y
+ * NUMERO en LEGAJOS/CUENTAS (identificador de negocio, mismo criterio).
  */
 
 export const interfaz = pgTable("INTERFAZ", {
@@ -276,6 +288,19 @@ export const clientes = pgTable("CLIENTES", {
   auditUsuario: uuid("AUDIT_USUARIO").references(() => usuarios.id),
 });
 
+export const cuentas = pgTable("CUENTAS", {
+  id: uuid("ID").primaryKey().defaultRandom(),
+  idLegajo: uuid("ID_LEGAJO").references(() => legajos.id),
+  numero: text("NUMERO").notNull(),
+  idProducto: uuid("ID_PRODUCTO").references(() => productos.id),
+  idEstado: uuid("ID_ESTADO").references(() => estados.id),
+  altaFecha: timestamp("ALTA_FECHA", { withTimezone: true }),
+  altaUsuario: uuid("ALTA_USUARIO").references(() => usuarios.id),
+  auditFecha: timestamp("AUDIT_FECHA", { withTimezone: true }),
+  auditUsuario: uuid("AUDIT_USUARIO").references(() => usuarios.id),
+  comodin: jsonb("COMODIN"),
+});
+
 /**
  * Bandejas: buscador configurable (filtros y columnas dinámicos según la
  * bandeja elegida) sobre legajos, clientes o trámites — ver domain/bandejas.md.
@@ -303,6 +328,10 @@ export const bandejas = pgTable("BANDEJAS", {
   // bandeja usa un único layout, por eso es una columna acá y no una tabla de
   // relación (ver domain/layouts-legajo.md).
   idLayout: uuid("ID_LAYOUT").references(() => layoutsLegajo.id),
+  // 'legajo' (default, abre LegajoLayoutModal con ID_LAYOUT) | 'tramite' (abre
+  // el modal de trámites directo, ignora ID_LAYOUT) — qué componente monta el
+  // botón "Abrir" (ver domain/tramites.md).
+  tipoApertura: text("TIPO_APERTURA"),
 });
 
 export const bandejasFiltros = pgTable("BANDEJAS_FILTROS", {
@@ -347,4 +376,99 @@ export const layoutsLegajoSolapas = pgTable(
     visible: boolean("VISIBLE"),
   },
   (table) => [uniqueIndex("LAYOUTS_LEGAJO_SOLAPAS_LAYOUT_ORDEN_UNIQUE").on(table.idLayout, table.orden)],
+);
+
+/**
+ * Trámites: formularios configurables (por tipo de trámite) que se pueden
+ * iniciar y gestionar sobre cualquier registro (legajo, cliente, cuenta) —
+ * reutiliza el motor de estados (ESTRATEGIAS/ESTADOS/ESTIMULOS/TRANSICIONES)
+ * para su propio ciclo de vida. Ver domain/tramites.md.
+ */
+
+export const categoriasTiposTramite = pgTable("CATEGORIAS_TIPOS_TRAMITE", {
+  id: uuid("ID").primaryKey().defaultRandom(),
+  codigo: text("CODIGO").notNull(),
+  nombre: text("NOMBRE").notNull(),
+});
+
+export const tiposTramite = pgTable("TIPOS_TRAMITE", {
+  id: uuid("ID").primaryKey().defaultRandom(),
+  codigo: text("CODIGO").notNull(),
+  nombre: text("NOMBRE").notNull(),
+  comodin: jsonb("COMODIN"),
+  idCategoria: uuid("ID_CATEGORIA").references(() => categoriasTiposTramite.id),
+  idEstrategia: uuid("ID_ESTRATEGIA").references(() => estrategias.id),
+  // A qué entidad se asocian los trámites de este tipo (legajos/clientes/cuentas).
+  idEntidad: uuid("ID_ENTIDAD").references(() => entidades.id),
+  // Nombre de una función SQL fn(uuid[]) RETURNS uuid[] — filtra (y puede
+  // reordenar) los candidatos de "Aplicar a" en el ABM. Null = sin filtro.
+  filtro: text("FILTRO"),
+  // Código de componente React a usar en vez del dibujado automático de
+  // TIPOS_TRAMITE_CAMPOS (mismo patrón que HERRAMIENTAS). Null = 'default'.
+  componente: text("COMPONENTE"),
+});
+
+export const tiposCampos = pgTable("TIPOS_CAMPOS", {
+  id: uuid("ID").primaryKey().defaultRandom(),
+  codigo: text("CODIGO").notNull(),
+  nombre: text("NOMBRE").notNull(),
+});
+
+export const tiposTramiteCampos = pgTable("TIPOS_TRAMITE_CAMPOS", {
+  id: uuid("ID").primaryKey().defaultRandom(),
+  codigo: text("CODIGO").notNull(),
+  nombre: text("NOMBRE").notNull(),
+  idTipoTramite: uuid("ID_TIPO_TRAMITE").references(() => tiposTramite.id),
+  idTipoCampo: uuid("ID_TIPO_CAMPO").references(() => tiposCampos.id),
+  orden: integer("ORDEN"),
+  obligatorio: boolean("OBLIGATORIO"),
+  visible: boolean("VISIBLE"),
+  editable: boolean("EDITABLE"),
+  longitudMax: integer("LONGITUD_MAX"),
+  numMin: integer("NUM_MIN"),
+  numMax: integer("NUM_MAX"),
+  numStep: integer("NUM_STEP"),
+  // Agrupa radio buttons — dentro de un mismo TIPOS_TRAMITE_CAMPOS.ID_TIPO_TRAMITE,
+  // los campos con el mismo RADIO_GROUP se comportan como un único grupo excluyente.
+  radioGroup: integer("RADIO_GROUP"),
+  placeholder: text("PLACEHOLDER"),
+  ayuda: text("AYUDA"),
+  mascara: text("MASCARA"),
+  regex: text("REGEX"),
+  // SQL de confianza (ADR 0009) que devuelve las opciones de SELECT/SELECT_MULTIPLE.
+  listaValores: text("LISTA_VALORES"),
+});
+
+export const tramites = pgTable("TRAMITES", {
+  id: uuid("ID").primaryKey().defaultRandom(),
+  idTipoTramite: uuid("ID_TIPO_TRAMITE").references(() => tiposTramite.id),
+  idEstado: uuid("ID_ESTADO").references(() => estados.id),
+  // Junto a TIPOS_TRAMITE.ID_ENTIDAD (vía idTipoTramite) ubica el registro real.
+  idRegistro: uuid("ID_REGISTRO"),
+  comodin: jsonb("COMODIN"),
+  altaFecha: timestamp("ALTA_FECHA", { withTimezone: true }),
+  altaUsuario: uuid("ALTA_USUARIO").references(() => usuarios.id),
+  auditFecha: timestamp("AUDIT_FECHA", { withTimezone: true }),
+  auditUsuario: uuid("AUDIT_USUARIO").references(() => usuarios.id),
+  idTramitePadre: uuid("ID_TRAMITE_PADRE").references((): AnyPgColumn => tramites.id),
+});
+
+export const tramitesCamposDatos = pgTable(
+  "TRAMITES_CAMPOS_DATOS",
+  {
+    id: uuid("ID").primaryKey().defaultRandom(),
+    idTramite: uuid("ID_TRAMITE").references(() => tramites.id),
+    idTipoTramiteCampo: uuid("ID_TIPO_TRAMITE_CAMPO").references(() => tiposTramiteCampos.id),
+    valorTexto: text("VALOR_TEXTO"),
+    valorNumero: doublePrecision("VALOR_NUMERO"),
+    valorFecha: timestamp("VALOR_FECHA", { withTimezone: true }),
+    valorBooleano: boolean("VALOR_BOOLEANO"),
+    // Sin FK todavía — no existe tabla de archivos adjuntos (queda para una
+    // etapa futura, ver domain/tramites.md).
+    idArchivoAdjunto: uuid("ID_ARCHIVO_ADJUNTO"),
+  },
+  (table) => [
+    // "para cada trámite, un solo registro por tipo de campo" — habilita upsert limpio.
+    uniqueIndex("TRAMITES_CAMPOS_DATOS_TRAMITE_CAMPO_UNIQUE").on(table.idTramite, table.idTipoTramiteCampo),
+  ],
 );

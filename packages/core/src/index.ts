@@ -23,3 +23,5 @@ export * from "./entidades";
 export * from "./perfiles-estimulos";
 export * from "./motor-estados";
 export * from "./historial";
+export * from "./tipos-tramite";
+export * from "./tramites";

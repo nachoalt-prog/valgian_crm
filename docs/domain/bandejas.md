@@ -16,13 +16,17 @@ Buscador configurable: se elige una bandeja (a la izquierda) y se muestra su for
 
 ### BANDEJAS
 
-| Campo    | Tipo                                                     |
-| -------- | --------------------------------------------------------- |
-| ID       | UUID, PK                                                   |
-| CODIGO   | string                                                     |
-| NOMBRE   | string                                                     |
-| QUERY    | text, nullable — SQL base de la bandeja (ver más abajo)    |
-| COLUMNAS | jsonb, nullable — columnas visibles del listado            |
+| Campo         | Tipo                                                     |
+| ------------- | --------------------------------------------------------- |
+| ID            | UUID, PK                                                   |
+| CODIGO        | string                                                     |
+| NOMBRE        | string                                                     |
+| QUERY         | text, nullable — SQL base de la bandeja (ver más abajo)    |
+| COLUMNAS      | jsonb, nullable — columnas visibles del listado            |
+| ID_LAYOUT     | FK → LAYOUTS_LEGAJO, nullable — ver `domain/layouts-legajo.md` |
+| TIPO_APERTURA | string, nullable — qué componente monta el botón "Abrir"   |
+
+**`TIPO_APERTURA`**: `'legajo'` (o `null`, default histórico) abre `LegajoLayoutModal` usando `ID_LAYOUT`; `'tramite'` abre el modal de trámites directo, ignorando `ID_LAYOUT` — ver `domain/tramites.md`. Es una discriminación simple en el frontend (`bandejas-tool.tsx`), no un registro de componentes: con solo dos formas de apertura hoy, no se justificó un patrón tipo `LEGAJO_HERRAMIENTAS`.
 
 ### BANDEJAS_FILTROS
 

@@ -11,7 +11,7 @@ Aplican a todas las tablas del sistema salvo indicación contraria — ver tambi
 - **Auditoría de modificación**: `AUDIT_FECHA` (timestamp), `AUDIT_USUARIO` (FK → USUARIOS).
 - **COMODIN** (`jsonb`, nullable): presente en varias tablas de catálogo como espacio abierto para extensibilidad por cliente, sin propósito fijo predefinido. Resuelve la extensibilidad por cliente mencionada en ADR 0002 (JSONB en campos puntuales, no cambios de schema).
 - **Naming**: tablas en MAYÚSCULAS_CON_GUION_BAJO, en plural. Catálogos de "tipos" siguen el patrón `TIPOS_<CONCEPTO>` en singular (`TIPOS_TELEFONO`, `TIPOS_EMAIL`, `TIPOS_DOCUMENTO`).
-- **Nullability por defecto**: todo campo es nullable salvo el UUID de PK, `CODIGO`, `NOMBRE` y `LEGAJOS.NUMERO`. Regla temporal, sujeta a ajuste caso por caso a medida que se implementan los ABMs.
+- **Nullability por defecto**: todo campo es nullable salvo el UUID de PK, `CODIGO`, `NOMBRE` y `NUMERO` en `LEGAJOS`/`CUENTAS` (identificador de negocio, mismo criterio en ambas). Regla temporal, sujeta a ajuste caso por caso a medida que se implementan los ABMs.
 - **Integridad referencial**: no hay `ON DELETE CASCADE` en ningún FK del sistema — comportamiento default `RESTRICT`, no se puede borrar un registro referenciado desde otra tabla. La política de baja lógica vs. física en los ABMs sigue sin definir (ver `open-issues.md`).
 
 ## Ubicación geográfica
@@ -180,18 +180,20 @@ Cadena de configuración de producto → instancia real por legajo.
 
 ### CUENTAS
 
-| Campo           | Tipo                                            |
-| --------------- | ----------------------------------------------- |
-| ID              | UUID, PK                                        |
-| ID_LEGAJO       | FK → LEGAJOS                                    |
-| ID_SUB_PRODUCTO | FK → SUB_PRODUCTOS                              |
-| ID_ESTADO       | FK → ESTADOS (ver `domain/motor-de-estados.md`) |
-| ALTA_FECHA      | timestamp                                       |
-| ALTA_USUARIO    | FK → USUARIOS                                   |
-| AUDIT_FECHA     | timestamp                                       |
-| AUDIT_USUARIO   | FK → USUARIOS                                   |
+| Campo         | Tipo                                            |
+| ------------- | ------------------------------------------------ |
+| ID            | UUID, PK                                         |
+| ID_LEGAJO     | FK → LEGAJOS                                     |
+| NUMERO        | string                                           |
+| ID_PRODUCTO   | FK → PRODUCTOS                                   |
+| ID_ESTADO     | FK → ESTADOS (ver `domain/motor-de-estados.md`)  |
+| ALTA_FECHA    | timestamp                                        |
+| ALTA_USUARIO  | FK → USUARIOS                                    |
+| AUDIT_FECHA   | timestamp                                        |
+| AUDIT_USUARIO | FK → USUARIOS                                    |
+| COMODIN       | jsonb, nullable                                  |
 
-**Extensiones por tipo de producto**: cada tipo de producto real (ej. préstamos) tiene su propia tabla de extensión 1 a 1 contra `CUENTAS` (ej. `XP_CUENTAS`), con los campos puntuales de ese tipo. El prefijo de la tabla sale de `PRODUCTOS.MODULO`. No hay ninguna extensión creada todavía.
+Tabla creada deliberadamente mínima (schema-only, sin ABM ni seed todavía) como base para la fase de Trámites (ver `domain/tramites.md`, que sí referencia `CUENTAS` como una de las entidades sobre las que puede aplicarse un trámite). Referencia `PRODUCTOS` directo, no `SUB_PRODUCTOS` — la idea original de extensiones 1 a 1 por tipo de producto (`XP_CUENTAS`, etc.) queda pendiente de retomar cuando se implemente el ABM real, ver `open-issues.md`.
 
 ## Entidades (catálogo transversal)
 

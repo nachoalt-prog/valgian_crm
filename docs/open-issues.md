@@ -5,6 +5,8 @@ Todo lo que está identificado pero no resuelto todavía, sin importar de qué s
 ## Dominio
 
 - **Editor visual de QUERY/COLUMNAS en el ABM de Bandejas/Filtros**: el ABM ya existe (`/dashboard/bandejas-admin`, `/dashboard/filtros`), pero `BANDEJAS.QUERY`/`COLUMNAS` y `FILTROS.QUERY` se cargan como SQL/JSON crudo en un textarea — no hay un query-builder visual. Queda como mejora futura, no bloqueante. (`domain/bandejas.md`)
+- **`CUENTAS` sin ABM ni extensiones por producto**: la tabla existe (schema-only) desde la fase de Trámites, pero no tiene ABM, seed de datos, ni la estrategia/entidad del motor de estados wireada — y la idea original de tablas de extensión 1 a 1 por tipo de producto (`XP_CUENTAS`) no se retomó. (`domain/core.md`)
+- **Adjuntos en Trámites**: `TIPOS_CAMPOS.CODIGO = 'FILE'` y `TRAMITES_CAMPOS_DATOS.ID_ARCHIVO_ADJUNTO` existen en el schema, pero no hay tabla `ARCHIVOS_ADJUNTOS` ni carga/guardado real todavía — el Modal de Trámites muestra un placeholder para campos tipo `FILE`. (`domain/tramites.md`)
 
 ## Infraestructura
 

@@ -3,9 +3,9 @@ import { db, entidades, estados, estimulos, transiciones, perfilesEstimulos } fr
 
 const IDENTIFICADOR_VALIDO = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 
-function validarIdentificador(nombre: string): void {
+export function validarIdentificador(nombre: string): void {
   if (!IDENTIFICADOR_VALIDO.test(nombre)) {
-    throw new Error(`Nombre de tabla inválido: "${nombre}".`);
+    throw new Error(`Nombre de tabla o función inválido: "${nombre}".`);
   }
 }
 
@@ -42,18 +42,17 @@ export interface EstimulosDisponiblesResult {
 }
 
 /**
- * Estímulos aplicables desde el estado actual de un registro, filtrados a los
- * que el perfil puede aplicar según PERFILES_ESTIMULOS — ver domain/motor-de-estados.md.
+ * Estímulos vinculados a TRANSICIONES desde `idEstado`, filtrados a los que el
+ * perfil puede aplicar según PERFILES_ESTIMULOS. Compartido entre cualquier
+ * entidad con motor de estados (Gestión de Entidad, trámites) — lo único que
+ * cambia entre ellas es CÓMO se resuelve el estado actual.
  */
-export async function getEstimulosDisponibles(idEntidad: string, idRelacion: string, perfilId: string): Promise<EstimulosDisponiblesResult> {
-  const estadoActual = await getEstadoActual(idEntidad, idRelacion);
-  if (!estadoActual) return { estadoActual: null, estimulos: [] };
-
+export async function getEstimulosDesdeEstado(idEstado: string, perfilId: string): Promise<EstimuloDisponible[]> {
   const transicionesDesdeEstado = await db
     .select({ id: estimulos.id, codigo: estimulos.codigo, nombre: estimulos.nombre })
     .from(transiciones)
     .innerJoin(estimulos, eq(estimulos.id, transiciones.idEstimulo))
-    .where(eq(transiciones.idEstado0, estadoActual.id));
+    .where(eq(transiciones.idEstado0, idEstado));
 
   const disponibles: EstimuloDisponible[] = [];
   for (const e of transicionesDesdeEstado) {
@@ -64,6 +63,18 @@ export async function getEstimulosDisponibles(idEntidad: string, idRelacion: str
     if (permiso) disponibles.push(e);
   }
 
+  return disponibles;
+}
+
+/**
+ * Estímulos aplicables desde el estado actual de un registro, filtrados a los
+ * que el perfil puede aplicar según PERFILES_ESTIMULOS — ver domain/motor-de-estados.md.
+ */
+export async function getEstimulosDisponibles(idEntidad: string, idRelacion: string, perfilId: string): Promise<EstimulosDisponiblesResult> {
+  const estadoActual = await getEstadoActual(idEntidad, idRelacion);
+  if (!estadoActual) return { estadoActual: null, estimulos: [] };
+
+  const disponibles = await getEstimulosDesdeEstado(estadoActual.id, perfilId);
   return { estadoActual, estimulos: disponibles };
 }
 

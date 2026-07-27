@@ -47,8 +47,9 @@ Una solapa sin `ID_HERRAMIENTA` (vacía) siempre se muestra si `VISIBLE=true`, s
 - **`LEGAJO_CLI_1`** ("ABM de Clientes"): maestro-detalle acotado a los `CLIENTES` del legajo actual — lista a la izquierda, campos editables uno por uno a la derecha (mismo patrón de `LEGAJO_DAT_1`).
 - **`GESTION_ENTIDAD_1`** ("Gestión de Entidad"): la que le da uso real al motor de estados — selector de estímulos aplicables desde el estado actual (filtrado por `PERFILES_ESTIMULOS`), observación, y botón "Gestionar" que ejecuta `SP_APLICAR_ESTIMULO`. Ver `domain/motor-de-estados.md`.
 - **`HISTORIAL_1`** ("Historial"): listado de solo lectura de `HISTORIAL` filtrado por `ID_ENTIDAD`/`ID_RELACION`, ordenado por `AUDIT_FECHA` descendente. Columnas: Estado INI, Estímulo, Estado FIN (nombres resueltos, no UUIDs), Fecha (`dd/mm/yyyy hh:mm`), Usuario, Status de acciones (`OK` si `ACCIONES_STATUS` es null, si no el mensaje de `ACCIONES_ERROR`) y Observación (con wrap de texto — puede ser largo).
+- **`TRAMITES_1`** ("Trámites"): ABM completo de trámites (lanzar nuevos + listado + filtros) sobre el legajo actual, sus clientes y sus cuentas. Ver `domain/tramites.md`.
 
-Ninguna de las cuatro tiene entrada en `MENUES_OPCIONES` — no son navegables por sidebar, solo se llega a ellas a través de un layout de legajo.
+Ninguna de las cinco tiene entrada en `MENUES_OPCIONES` — no son navegables por sidebar, solo se llega a ellas a través de un layout de legajo.
 
 ## ABM
 
@@ -58,4 +59,4 @@ El campo `BANDEJAS.ID_LAYOUT` se edita desde el ABM de Bandejas (`/dashboard/ban
 
 ## Seed
 
-El seed de configuración modelo (`seed-config.ts`) crea `Layout Legajo Default 1` con: solapa 1 "Datos" (`LEGAJO_DAT_1`), solapa 2 "Clientes" (`LEGAJO_CLI_1`), solapa 3 "Gestión" (`GESTION_ENTIDAD_1`), solapa 4 "Historial" (`HISTORIAL_1`), y setea `BANDEJAS.ID_LAYOUT` de la bandeja `legajos` apuntando a este layout. Las solapas 5 a 10 no tienen fila. El mismo seed crea la estrategia `STD_LEGAJO_1` (ver `domain/motor-de-estados.md`) y le da al perfil admin los 3 estímulos vía `PERFILES_ESTIMULOS` — sin eso, "Gestión de Entidad" no mostraría ningún estímulo aunque el admin tenga permiso sobre la herramienta.
+El seed de configuración modelo (`seed-config.ts`) crea `Layout Legajo Default 1` con: solapa 1 "Datos" (`LEGAJO_DAT_1`), solapa 2 "Clientes" (`LEGAJO_CLI_1`), solapa 3 "Gestión" (`GESTION_ENTIDAD_1`), solapa 4 "Historial" (`HISTORIAL_1`), solapa 5 "Trámites" (`TRAMITES_1`), y setea `BANDEJAS.ID_LAYOUT` de la bandeja `legajos` apuntando a este layout. Las solapas 6 a 10 no tienen fila. El mismo seed crea la estrategia `STD_LEGAJO_1` (ver `domain/motor-de-estados.md`) y le da al perfil admin los 3 estímulos vía `PERFILES_ESTIMULOS` — sin eso, "Gestión de Entidad" no mostraría ningún estímulo aunque el admin tenga permiso sobre la herramienta. La estrategia `STD_TRAMITE_1` y sus `PERFILES_ESTIMULOS` se crean igual, para trámites — ver `domain/tramites.md`.

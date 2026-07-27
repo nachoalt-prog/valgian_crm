@@ -17,6 +17,9 @@ import {
   estimulos,
   transiciones,
   perfilesEstimulos,
+  categoriasTiposTramite,
+  tiposTramite,
+  tiposCampos,
 } from "@valgian/db";
 
 /**
@@ -83,10 +86,13 @@ async function ensureBandeja(codigo: string, nombre: string, query: string, colu
 }
 
 async function ensureBandejaFiltro(idBandeja: string, idFiltro: string, campo: string, orden: number) {
+  // Un mismo FILTRO puede repetirse en la misma bandeja pegado a otro CAMPO
+  // (ej. "select_usuarios" para alta_usuario_id Y audit_usuario_id) — la
+  // idempotencia tiene que considerar el CAMPO, no solo bandeja+filtro.
   const [existente] = await db
     .select()
     .from(bandejasFiltros)
-    .where(and(eq(bandejasFiltros.idBandeja, idBandeja), eq(bandejasFiltros.idFiltro, idFiltro)));
+    .where(and(eq(bandejasFiltros.idBandeja, idBandeja), eq(bandejasFiltros.idFiltro, idFiltro), eq(bandejasFiltros.campo, campo)));
   if (existente) return existente;
 
   const [creada] = await db.insert(bandejasFiltros).values({ idBandeja, idFiltro, campo, orden }).returning();
@@ -133,6 +139,10 @@ async function ensureBandejaLayout(idBandeja: string, idLayout: string) {
   await db.update(bandejas).set({ idLayout }).where(and(eq(bandejas.id, idBandeja), isNull(bandejas.idLayout)));
 }
 
+async function ensureBandejaTipoApertura(idBandeja: string, tipoApertura: string) {
+  await db.update(bandejas).set({ tipoApertura }).where(and(eq(bandejas.id, idBandeja), isNull(bandejas.tipoApertura)));
+}
+
 async function ensureEstimulo(idEstrategia: string, codigo: string, nombre: string) {
   const [existente] = await db.select().from(estimulos).where(and(eq(estimulos.idEstrategia, idEstrategia), eq(estimulos.codigo, codigo)));
   if (existente) return existente;
@@ -161,6 +171,14 @@ async function ensurePerfilEstimulo(idPerfil: string, idEstimulo: string) {
 
   const [creada] = await db.insert(perfilesEstimulos).values({ idPerfil, idEstimulo }).returning();
   return creada;
+}
+
+async function ensureTipoCampo(codigo: string, nombre: string) {
+  const [existente] = await db.select().from(tiposCampos).where(eq(tiposCampos.codigo, codigo));
+  if (existente) return existente;
+
+  const [creado] = await db.insert(tiposCampos).values({ codigo, nombre }).returning();
+  return creado;
 }
 
 const BANDEJA_LEGAJOS_QUERY = `
@@ -211,10 +229,15 @@ async function main() {
   // son filtros semánticamente distintos, no el mismo filtro reusado. La reusabilidad
   // real de un FILTRO entra en juego cuando OTRA bandeja lo pega a un CAMPO distinto
   // (ej. "select_usuarios" reusado ahí con otro alias) — ver domain/bandejas.md.
+  // "fecha_alta" y "select_usuarios" quedan con nombre genérico a propósito —
+  // son reusables tal cual por la bandeja de Trámites más abajo (mismo FILTRO,
+  // distinto CAMPO de la bandeja). Los demás SÍ son específicos del dominio de
+  // legajos (la query de filtroEstado hardcodea STD_LEGAJO_1, y "Titular" solo
+  // existe en legajos/clientes), así que llevan la aclaración en el nombre.
   const filtroNumero = await ensureFiltro("numero_legajo", "Nro. Legajo", "texto_like", null);
   const filtroEstado = await ensureFiltro(
     "select_estados_legajos",
-    "Estado",
+    "Estado (Legajo)",
     "select",
     `SELECT "ID" AS value, "NOMBRE" AS label FROM "ESTADOS" WHERE "ID_ESTRATEGIA" = (SELECT "ID" FROM "ESTRATEGIAS" WHERE "CODIGO" = 'STD_LEGAJO_1') ORDER BY "NOMBRE"`,
   );
@@ -225,9 +248,9 @@ async function main() {
     "select",
     `SELECT "ID" AS value, "USERNAME" AS label FROM "USUARIOS" ORDER BY "USERNAME"`,
   );
-  const filtroApellidoTitular = await ensureFiltro("apellido_titular", "Apellido del Titular", "texto_like", null);
-  const filtroNombreTitular = await ensureFiltro("nombre_titular", "Nombre del Titular", "texto_like", null);
-  const filtroDocumentoTitular = await ensureFiltro("documento_titular", "Nro. Documento del Titular", "texto_like", null);
+  const filtroApellidoTitular = await ensureFiltro("apellido_titular", "Apellido del Titular (Legajo)", "texto_like", null);
+  const filtroNombreTitular = await ensureFiltro("nombre_titular", "Nombre del Titular (Legajo)", "texto_like", null);
+  const filtroDocumentoTitular = await ensureFiltro("documento_titular", "Nro. Documento del Titular (Legajo)", "texto_like", null);
 
   const bandejaLegajos = await ensureBandeja("legajos", "Legajos", BANDEJA_LEGAJOS_QUERY, BANDEJA_LEGAJOS_COLUMNAS);
 
@@ -252,15 +275,106 @@ async function main() {
   const herramientaLegajoClientes = await getHerramientaPorCodigo("LEGAJO_CLI_1");
   const herramientaGestionEntidad = await getHerramientaPorCodigo("GESTION_ENTIDAD_1");
   const herramientaHistorial = await getHerramientaPorCodigo("HISTORIAL_1");
+  const herramientaTramites = await getHerramientaPorCodigo("TRAMITES_1");
 
   const layoutDefault = await ensureLayout("layout_legajo_default_1", "Layout Legajo Default 1");
   await ensureLayoutSolapa(layoutDefault.id, 1, "Datos", herramientaLegajoDatos.id, true);
   await ensureLayoutSolapa(layoutDefault.id, 2, "Clientes", herramientaLegajoClientes.id, true);
   await ensureLayoutSolapa(layoutDefault.id, 3, "Gestión", herramientaGestionEntidad.id, true);
   await ensureLayoutSolapa(layoutDefault.id, 4, "Historial", herramientaHistorial.id, true);
-  // El resto de las solapas (5 a 10) no tienen fila — quedan ocultas y vacías por defecto.
+  await ensureLayoutSolapa(layoutDefault.id, 5, "Trámites", herramientaTramites.id, true);
+  // El resto de las solapas (6 a 10) no tienen fila — quedan ocultas y vacías por defecto.
 
   await ensureBandejaLayout(bandejaLegajos.id, layoutDefault.id);
+
+  // --- Trámites ---
+
+  const entidadTramites = await getEntidadPorCodigo("tramites");
+  const estrategiaTramites = await ensureEstrategia("STD_TRAMITE_1", "Estrategia estándar trámites 1", entidadTramites.id);
+  const estadoIniciado = await ensureEstado(estrategiaTramites.id, "iniciado", "Iniciado", true, false);
+  const estadoResuelto = await ensureEstado(estrategiaTramites.id, "resuelto", "Resuelto", false, true);
+
+  const estimuloActualizar = await ensureEstimulo(estrategiaTramites.id, "actualizar", "Actualizar");
+  const estimuloResolver = await ensureEstimulo(estrategiaTramites.id, "resolver", "Resolver");
+  const estimuloReabrir = await ensureEstimulo(estrategiaTramites.id, "reabrir", "Reabrir");
+
+  await ensureTransicion(estrategiaTramites.id, estadoIniciado.id, estimuloActualizar.id, estadoIniciado.id);
+  await ensureTransicion(estrategiaTramites.id, estadoIniciado.id, estimuloResolver.id, estadoResuelto.id);
+  await ensureTransicion(estrategiaTramites.id, estadoResuelto.id, estimuloReabrir.id, estadoIniciado.id);
+
+  // Mismo motivo que con STD_LEGAJO_1: sin esto el Modal de Trámites no le
+  // mostraría ningún estímulo al admin aunque tenga permiso sobre la herramienta.
+  await ensurePerfilEstimulo(perfilAdmin.id, estimuloActualizar.id);
+  await ensurePerfilEstimulo(perfilAdmin.id, estimuloResolver.id);
+  await ensurePerfilEstimulo(perfilAdmin.id, estimuloReabrir.id);
+
+  await ensureTipoCampo("INPUT_TEXT", "Texto");
+  await ensureTipoCampo("INPUT_DATETIME", "Fecha y hora");
+  await ensureTipoCampo("INPUT_EMAIL", "Email");
+  await ensureTipoCampo("INPUT_NUMBER", "Número");
+  await ensureTipoCampo("INPUT_TEL", "Teléfono");
+  await ensureTipoCampo("INPUT_RANGE", "Rango numérico");
+  await ensureTipoCampo("INPUT_CHECKBOX", "Casilla de verificación");
+  await ensureTipoCampo("INPUT_RADIO", "Opción única (radio)");
+  await ensureTipoCampo("FILE", "Archivo");
+  await ensureTipoCampo("SELECT", "Desplegable");
+  await ensureTipoCampo("SELECT_MULTIPLE", "Desplegable múltiple");
+
+  const filtroTipoTramite = await ensureFiltro(
+    "select_tipos_tramite",
+    "Tipo de Trámite",
+    "select",
+    `SELECT "ID" AS value, "NOMBRE" AS label FROM "TIPOS_TRAMITE" ORDER BY "NOMBRE"`,
+  );
+  const filtroEstadoTramite = await ensureFiltro(
+    "select_estados_tramites",
+    "Estado (Trámite)",
+    "select",
+    `SELECT "ID" AS value, "NOMBRE" AS label FROM "ESTADOS" WHERE "ID_ESTRATEGIA" = (SELECT "ID" FROM "ESTRATEGIAS" WHERE "CODIGO" = 'STD_TRAMITE_1') ORDER BY "NOMBRE"`,
+  );
+  const filtroFechaAudit = await ensureFiltro("fecha_audit", "Fecha de Gestión", "fecha_rango", null);
+
+  const BANDEJA_TRAMITES_QUERY = `
+SELECT
+  T."ID" AS id,
+  TT."NOMBRE" AS tipo_tramite,
+  TT."ID" AS tipo_tramite_id,
+  E."NOMBRE" AS estado,
+  E."ID" AS estado_id,
+  T."ID_REGISTRO" AS registro_id,
+  COALESCE(L."NUMERO", CL."APELLIDO" || ', ' || CL."NOMBRE", CU."NUMERO") AS registro,
+  T."ALTA_FECHA" AS alta_fecha,
+  T."ALTA_USUARIO" AS alta_usuario_id,
+  T."AUDIT_FECHA" AS audit_fecha,
+  T."AUDIT_USUARIO" AS audit_usuario_id
+FROM "TRAMITES" T
+JOIN "TIPOS_TRAMITE" TT ON TT."ID" = T."ID_TIPO_TRAMITE"
+JOIN "ENTIDADES" ENT ON ENT."ID" = TT."ID_ENTIDAD"
+LEFT JOIN "ESTADOS" E ON E."ID" = T."ID_ESTADO"
+LEFT JOIN "LEGAJOS" L ON ENT."CODIGO" = 'legajos' AND L."ID" = T."ID_REGISTRO"
+LEFT JOIN "CLIENTES" CL ON ENT."CODIGO" = 'clientes' AND CL."ID" = T."ID_REGISTRO"
+LEFT JOIN "CUENTAS" CU ON ENT."CODIGO" = 'cuentas' AND CU."ID" = T."ID_REGISTRO"
+`.trim();
+
+  const BANDEJA_TRAMITES_COLUMNAS = [
+    { campo: "tipo_tramite", label: "Tipo de Trámite" },
+    { campo: "registro", label: "Sobre" },
+    { campo: "estado", label: "Estado", tipo: "badge" },
+    { campo: "alta_fecha", label: "Alta", tipo: "fecha" },
+    { campo: "audit_fecha", label: "Última gestión", tipo: "fecha" },
+  ];
+
+  const bandejaTramites = await ensureBandeja("tramites", "Trámites", BANDEJA_TRAMITES_QUERY, BANDEJA_TRAMITES_COLUMNAS);
+  await ensureBandejaTipoApertura(bandejaTramites.id, "tramite");
+
+  await ensureBandejaFiltro(bandejaTramites.id, filtroTipoTramite.id, "tipo_tramite_id", 1);
+  await ensureBandejaFiltro(bandejaTramites.id, filtroEstadoTramite.id, "estado_id", 2);
+  await ensureBandejaFiltro(bandejaTramites.id, filtroFechaAlta.id, "alta_fecha", 3);
+  await ensureBandejaFiltro(bandejaTramites.id, filtroUsuarios.id, "alta_usuario_id", 4);
+  await ensureBandejaFiltro(bandejaTramites.id, filtroFechaAudit.id, "audit_fecha", 5);
+  await ensureBandejaFiltro(bandejaTramites.id, filtroUsuarios.id, "audit_usuario_id", 6);
+
+  await ensureBandejaPerfil(bandejaTramites.id, perfilAdmin.id);
 
   console.log("Seed de configuración modelo aplicado (idempotente).");
 }

@@ -5,8 +5,16 @@ import { BandejasPanel } from "@/components/bandejas-panel";
 import { BandejaFiltros } from "@/components/bandeja-filtros";
 import { BandejaResultados } from "@/components/bandeja-resultados";
 import { LegajoLayoutModal } from "@/components/legajo-layout-modal";
+import { TramiteModal } from "@/components/tramite-modal";
 import { getBandejaConfigAction, buscarBandejaAction } from "@/app/dashboard/bandejas/actions";
+import { getPermisoTramitesAction } from "@/app/dashboard/tramites/actions";
 import type { BandejaResumen, BandejaConfig } from "@valgian/core";
+
+interface TramiteAbierto {
+  idTramite: string;
+  idTipoTramite: string;
+  idRegistro: string;
+}
 
 interface BandejasToolProps {
   bandejasIniciales: BandejaResumen[];
@@ -22,6 +30,8 @@ export function BandejasTool({ bandejasIniciales }: BandejasToolProps) {
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [legajoAbierto, setLegajoAbierto] = useState<string | null>(null);
+  const [tramiteAbierto, setTramiteAbierto] = useState<TramiteAbierto | null>(null);
+  const [canGestionarTramites, setCanGestionarTramites] = useState(false);
 
   const handleSelectBandeja = useCallback(async (id: string) => {
     setSelectedBandejaId(id);
@@ -37,6 +47,9 @@ export function BandejasTool({ bandejasIniciales }: BandejasToolProps) {
       return;
     }
     setConfig(result.data ?? null);
+    if (result.data?.tipoApertura === "tramite") {
+      getPermisoTramitesAction().then((res) => setCanGestionarTramites(res.data));
+    }
   }, []);
 
   const handleChange = useCallback((campo: string, valor: string) => {
@@ -74,6 +87,19 @@ export function BandejasTool({ bandejasIniciales }: BandejasToolProps) {
       setTimeout(() => setAviso(null), 3500);
       return;
     }
+
+    if (config?.tipoApertura === "tramite") {
+      const idTipoTramite = row.tipo_tramite_id;
+      if (typeof idTipoTramite !== "string") {
+        setAviso("No se pudo abrir: la fila no tiene tipo_tramite_id.");
+        setTimeout(() => setAviso(null), 3500);
+        return;
+      }
+      const idRegistro = row.registro_id;
+      setTramiteAbierto({ idTramite: id, idTipoTramite, idRegistro: typeof idRegistro === "string" ? idRegistro : "" });
+      return;
+    }
+
     setLegajoAbierto(id);
   }
 
@@ -125,6 +151,21 @@ export function BandejasTool({ bandejasIniciales }: BandejasToolProps) {
           }}
           bandejaId={selectedBandejaId}
           legajoId={legajoAbierto}
+        />
+      )}
+
+      {tramiteAbierto && (
+        <TramiteModal
+          key={tramiteAbierto.idTramite}
+          open={!!tramiteAbierto}
+          onOpenChange={(o) => {
+            if (!o) setTramiteAbierto(null);
+          }}
+          idTipoTramite={tramiteAbierto.idTipoTramite}
+          idRegistro={tramiteAbierto.idRegistro}
+          idTramite={tramiteAbierto.idTramite}
+          canGestionar={canGestionarTramites}
+          onGestionado={handleSearch}
         />
       )}
     </div>

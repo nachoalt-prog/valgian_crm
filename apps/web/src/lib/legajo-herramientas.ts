@@ -3,6 +3,7 @@ import { DatosLegajoTool } from "@/components/datos-legajo-tool";
 import { ClientesAbmTool } from "@/components/clientes-abm-tool";
 import { GestionEntidadTool } from "@/components/gestion-entidad-tool";
 import { HistorialTool } from "@/components/historial-tool";
+import { TramitesAbmTool } from "@/components/tramites-abm-tool";
 
 export interface LegajoHerramientaProps {
   idLegajo: string;
@@ -30,4 +31,5 @@ export const LEGAJO_HERRAMIENTAS: Record<string, ComponentType<LegajoHerramienta
   LEGAJO_CLI_1: ClientesAbmTool,
   GESTION_ENTIDAD_1: GestionEntidadTool,
   HISTORIAL_1: HistorialTool,
+  TRAMITES_1: TramitesAbmTool,
 };

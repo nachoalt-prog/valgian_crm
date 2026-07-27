@@ -58,6 +58,9 @@ export interface BandejaConfig {
   nombre: string;
   columnas: ColumnaBandeja[];
   filtros: FiltroBandeja[];
+  // 'legajo' (o null, default histórico) abre LegajoLayoutModal; 'tramite' abre
+  // el modal de trámites directo — ver domain/tramites.md.
+  tipoApertura: string | null;
 }
 
 export async function getBandejaConfig(bandejaId: string): Promise<BandejaConfig> {
@@ -100,6 +103,7 @@ export async function getBandejaConfig(bandejaId: string): Promise<BandejaConfig
     nombre: bandeja.nombre,
     columnas: (bandeja.columnas as ColumnaBandeja[] | null) ?? [],
     filtros: filtrosConOpciones,
+    tipoApertura: bandeja.tipoApertura,
   };
 }
 

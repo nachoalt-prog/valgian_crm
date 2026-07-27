@@ -245,6 +245,7 @@ async function main() {
   const herramientaLegajoClientes = await ensureHerramienta("LEGAJO_CLI_1", "ABM de Clientes (Legajo)", "legajo_cli_1.gestionar");
   const herramientaGestionEntidad = await ensureHerramienta("GESTION_ENTIDAD_1", "Gestión de Entidad", "gestion_entidad_1.gestionar");
   const herramientaHistorial = await ensureHerramienta("HISTORIAL_1", "Historial", "historial_1.gestionar");
+  const herramientaTramites = await ensureHerramienta("TRAMITES_1", "Trámites", "tramites_1.gestionar");
 
   // Admin tiene acceso de gestión completo a todas las herramientas — la existencia
   // de la fila en PERMISOS ya implica acceso de lectura (no hay columna VER).
@@ -264,6 +265,7 @@ async function main() {
     herramientaLegajoClientes,
     herramientaGestionEntidad,
     herramientaHistorial,
+    herramientaTramites,
   ]) {
     await ensurePermisoGestion(perfilAdmin.id, h.id);
   }
@@ -305,6 +307,8 @@ async function main() {
 
   await ensureEntidad("legajos", "LEGAJOS");
   await ensureEntidad("clientes", "CLIENTES");
+  await ensureEntidad("cuentas", "CUENTAS");
+  await ensureEntidad("tramites", "TRAMITES");
 
   console.log("Seed aplicado (idempotente).");
   if (usuarioCreado) {

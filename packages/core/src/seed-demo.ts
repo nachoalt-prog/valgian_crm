@@ -1,5 +1,25 @@
-import { eq, and } from "drizzle-orm";
-import { db, closeDb, usuarios, caracteres, generos, tiposDocumento, provincias, estrategias, estados, legajos, clientes } from "@valgian/db";
+import { eq, and, sql } from "drizzle-orm";
+import {
+  db,
+  closeDb,
+  usuarios,
+  caracteres,
+  generos,
+  tiposDocumento,
+  provincias,
+  estrategias,
+  estados,
+  estimulos,
+  legajos,
+  clientes,
+  tramites,
+  entidades,
+  categoriasTiposTramite,
+  tiposTramite,
+  tiposCampos,
+  tiposTramiteCampos,
+} from "@valgian/db";
+import { gestionarTramite, mapearValorCampo, type DatoTramiteInput } from "./tramites";
 
 const ADMIN_USERNAME = "admin";
 
@@ -50,6 +70,51 @@ async function getEstrategiaPorCodigo(codigo: string) {
   return estrategia;
 }
 
+async function getEstimuloPorCodigo(idEstrategia: string, codigo: string) {
+  const [estimulo] = await db.select().from(estimulos).where(and(eq(estimulos.idEstrategia, idEstrategia), eq(estimulos.codigo, codigo)));
+  if (!estimulo) throw new Error(`No existe ESTIMULOS.CODIGO = "${codigo}" para esa estrategia — corré el seed de configuración primero.`);
+  return estimulo;
+}
+
+async function getLegajoPorNumero(numero: string) {
+  const [legajo] = await db.select().from(legajos).where(eq(legajos.numero, numero));
+  if (!legajo) throw new Error(`No existe LEGAJOS.NUMERO = "${numero}" — corré este mismo seed antes de la sección de trámites.`);
+  return legajo;
+}
+
+async function getTitularDelLegajo(idLegajo: string) {
+  const [titular] = await db.select().from(clientes).where(and(eq(clientes.idLegajo, idLegajo), eq(clientes.esTitular, true)));
+  if (!titular) throw new Error(`No existe un cliente titular para el legajo ${idLegajo}.`);
+  return titular;
+}
+
+/** Idempotente por (ID_TIPO_TRAMITE, ID_REGISTRO) — no hay unique real en TRAMITES, pero alcanza para el seed. */
+async function ensureTramiteDemo(params: {
+  idTipoTramite: string;
+  idRegistro: string;
+  datos: DatoTramiteInput[];
+  idEstimulo: string;
+  idUsuario: string;
+  observacion?: string;
+}) {
+  const [existente] = await db
+    .select()
+    .from(tramites)
+    .where(and(eq(tramites.idTipoTramite, params.idTipoTramite), eq(tramites.idRegistro, params.idRegistro)));
+  if (existente) return existente;
+
+  const resultado = await gestionarTramite({
+    idTipoTramite: params.idTipoTramite,
+    idRegistro: params.idRegistro,
+    datos: params.datos,
+    idEstimulo: params.idEstimulo,
+    idUsuario: params.idUsuario,
+    observacion: params.observacion ?? null,
+  });
+  if (resultado.error) throw new Error(`Error creando trámite demo: ${resultado.error}`);
+  return { id: resultado.data!.idTramite };
+}
+
 async function getEstadoInicial(idEstrategia: string) {
   const [estado] = await db
     .select()
@@ -59,6 +124,65 @@ async function getEstadoInicial(idEstrategia: string) {
     throw new Error(`No existe un ESTADOS.ES_INICIAL para esa estrategia — corré el seed de configuración primero.`);
   }
   return estado;
+}
+
+async function getEntidadPorCodigo(codigo: string) {
+  const [entidad] = await db.select().from(entidades).where(eq(entidades.codigo, codigo));
+  if (!entidad) throw new Error(`No existe ENTIDADES.CODIGO = "${codigo}" — corré el seed principal primero.`);
+  return entidad;
+}
+
+async function getTipoCampoPorCodigo(codigo: string) {
+  const [tipo] = await db.select().from(tiposCampos).where(eq(tiposCampos.codigo, codigo));
+  if (!tipo) throw new Error(`No existe TIPOS_CAMPOS.CODIGO = "${codigo}" — corré el seed de configuración primero.`);
+  return tipo;
+}
+
+async function ensureCategoriaTipoTramite(codigo: string, nombre: string) {
+  const [existente] = await db.select().from(categoriasTiposTramite).where(eq(categoriasTiposTramite.codigo, codigo));
+  if (existente) return existente;
+
+  const [creada] = await db.insert(categoriasTiposTramite).values({ codigo, nombre }).returning();
+  return creada;
+}
+
+async function ensureTipoTramite(params: {
+  codigo: string;
+  nombre: string;
+  idCategoria: string;
+  idEstrategia: string;
+  idEntidad: string;
+  filtro?: string;
+}) {
+  const [existente] = await db.select().from(tiposTramite).where(eq(tiposTramite.codigo, params.codigo));
+  if (existente) return existente;
+
+  const [creado] = await db.insert(tiposTramite).values(params).returning();
+  return creado;
+}
+
+async function ensureTipoTramiteCampo(params: {
+  codigo: string;
+  nombre: string;
+  idTipoTramite: string;
+  idTipoCampo: string;
+  orden: number;
+  obligatorio?: boolean;
+  placeholder?: string;
+  numMin?: number;
+  listaValores?: string;
+}) {
+  const [existente] = await db
+    .select()
+    .from(tiposTramiteCampos)
+    .where(and(eq(tiposTramiteCampos.idTipoTramite, params.idTipoTramite), eq(tiposTramiteCampos.codigo, params.codigo)));
+  if (existente) return existente;
+
+  const [creado] = await db
+    .insert(tiposTramiteCampos)
+    .values({ ...params, visible: true, editable: true })
+    .returning();
+  return creado;
 }
 
 async function ensureLegajo(numero: string, idEstado: string, idUsuarioAudit: string) {
@@ -213,7 +337,201 @@ async function main() {
     });
   }
 
-  console.log("Seed de prueba aplicado (idempotente): 10 legajos, 20 clientes.");
+  // --- Trámites de prueba ---
+
+  await db.execute(sql`
+    CREATE OR REPLACE FUNCTION fn_filtro_tramite_cli_titular_1(ids uuid[])
+    RETURNS uuid[]
+    LANGUAGE sql
+    AS $$
+      SELECT COALESCE(array_agg("ID"), ARRAY[]::uuid[])
+      FROM "CLIENTES"
+      WHERE "ID" = ANY(ids) AND "ES_TITULAR" = true;
+    $$;
+  `);
+
+  const entidadLegajos = await getEntidadPorCodigo("legajos");
+  const entidadClientes = await getEntidadPorCodigo("clientes");
+  const estrategiaTramites = await getEstrategiaPorCodigo("STD_TRAMITE_1");
+
+  const categoriaSobreLegajos = await ensureCategoriaTipoTramite("sobre_legajos", "Sobre Legajos");
+  const categoriaSobreClientes = await ensureCategoriaTipoTramite("sobre_clientes", "Sobre Clientes");
+
+  const tipoCampoTexto = await getTipoCampoPorCodigo("INPUT_TEXT");
+  const tipoCampoFecha = await getTipoCampoPorCodigo("INPUT_DATETIME");
+  const tipoCampoSelect = await getTipoCampoPorCodigo("SELECT");
+  const tipoCampoCheckbox = await getTipoCampoPorCodigo("INPUT_CHECKBOX");
+  const tipoCampoTel = await getTipoCampoPorCodigo("INPUT_TEL");
+  const tipoCampoNumero = await getTipoCampoPorCodigo("INPUT_NUMBER");
+  const tipoCampoEmail = await getTipoCampoPorCodigo("INPUT_EMAIL");
+  const tipoCampoSelectMultiple = await getTipoCampoPorCodigo("SELECT_MULTIPLE");
+
+  const tipoTramiteLegajo = await ensureTipoTramite({
+    codigo: "TEST_LEGAJO_1",
+    nombre: "Prueba legajo 1",
+    idCategoria: categoriaSobreLegajos.id,
+    idEstrategia: estrategiaTramites.id,
+    idEntidad: entidadLegajos.id,
+  });
+  const campoAsunto = await ensureTipoTramiteCampo({
+    codigo: "asunto",
+    nombre: "Asunto",
+    idTipoTramite: tipoTramiteLegajo.id,
+    idTipoCampo: tipoCampoTexto.id,
+    orden: 1,
+    obligatorio: true,
+    placeholder: "Asunto del trámite",
+  });
+  await ensureTipoTramiteCampo({
+    codigo: "fecha_limite",
+    nombre: "Fecha límite",
+    idTipoTramite: tipoTramiteLegajo.id,
+    idTipoCampo: tipoCampoFecha.id,
+    orden: 2,
+  });
+  const campoPrioridad = await ensureTipoTramiteCampo({
+    codigo: "prioridad",
+    nombre: "Prioridad",
+    idTipoTramite: tipoTramiteLegajo.id,
+    idTipoCampo: tipoCampoSelect.id,
+    orden: 3,
+    listaValores: `SELECT * FROM (VALUES ('alta','Alta'), ('media','Media'), ('baja','Baja')) AS v(value, label)`,
+  });
+  const campoUrgente = await ensureTipoTramiteCampo({
+    codigo: "urgente",
+    nombre: "Urgente",
+    idTipoTramite: tipoTramiteLegajo.id,
+    idTipoCampo: tipoCampoCheckbox.id,
+    orden: 4,
+  });
+
+  const tipoTramiteCliente = await ensureTipoTramite({
+    codigo: "TEST_CLI_1",
+    nombre: "Prueba clientes",
+    idCategoria: categoriaSobreClientes.id,
+    idEstrategia: estrategiaTramites.id,
+    idEntidad: entidadClientes.id,
+  });
+  const campoMotivo = await ensureTipoTramiteCampo({
+    codigo: "motivo",
+    nombre: "Motivo",
+    idTipoTramite: tipoTramiteCliente.id,
+    idTipoCampo: tipoCampoTexto.id,
+    orden: 1,
+    obligatorio: true,
+  });
+  const campoTelefonoContacto = await ensureTipoTramiteCampo({
+    codigo: "telefono_contacto",
+    nombre: "Teléfono de contacto",
+    idTipoTramite: tipoTramiteCliente.id,
+    idTipoCampo: tipoCampoTel.id,
+    orden: 2,
+  });
+  const campoMonto = await ensureTipoTramiteCampo({
+    codigo: "monto",
+    nombre: "Monto",
+    idTipoTramite: tipoTramiteCliente.id,
+    idTipoCampo: tipoCampoNumero.id,
+    orden: 3,
+    numMin: 0,
+  });
+
+  const tipoTramiteClienteTitular = await ensureTipoTramite({
+    codigo: "TEST_CLI_TIT_1",
+    nombre: "Prueba clientes titulares",
+    idCategoria: categoriaSobreClientes.id,
+    idEstrategia: estrategiaTramites.id,
+    idEntidad: entidadClientes.id,
+    filtro: "fn_filtro_tramite_cli_titular_1",
+  });
+  const campoEmailContacto = await ensureTipoTramiteCampo({
+    codigo: "email_contacto",
+    nombre: "Email de contacto",
+    idTipoTramite: tipoTramiteClienteTitular.id,
+    idTipoCampo: tipoCampoEmail.id,
+    orden: 1,
+    obligatorio: true,
+  });
+  const campoCanalPreferido = await ensureTipoTramiteCampo({
+    codigo: "canal_preferido",
+    nombre: "Canal preferido",
+    idTipoTramite: tipoTramiteClienteTitular.id,
+    idTipoCampo: tipoCampoSelectMultiple.id,
+    orden: 2,
+    listaValores: `SELECT * FROM (VALUES ('email','Email'), ('telefono','Teléfono'), ('whatsapp','WhatsApp')) AS v(value, label)`,
+  });
+  const campoAceptaTerminos = await ensureTipoTramiteCampo({
+    codigo: "acepta_terminos",
+    nombre: "Acepta términos",
+    idTipoTramite: tipoTramiteClienteTitular.id,
+    idTipoCampo: tipoCampoCheckbox.id,
+    orden: 3,
+    obligatorio: true,
+  });
+
+  // --- Instancias de trámite de prueba, sobre algunos de los legajos demo ---
+  const estimuloActualizarTramite = await getEstimuloPorCodigo(estrategiaTramites.id, "actualizar");
+  const estimuloResolverTramite = await getEstimuloPorCodigo(estrategiaTramites.id, "resolver");
+
+  const legajo1 = await getLegajoPorNumero("DEMO-0001");
+  await ensureTramiteDemo({
+    idTipoTramite: tipoTramiteLegajo.id,
+    idRegistro: legajo1.id,
+    datos: [
+      mapearValorCampo("INPUT_TEXT", campoAsunto.id, "Consulta general"),
+      mapearValorCampo("SELECT", campoPrioridad.id, "media"),
+      mapearValorCampo("INPUT_CHECKBOX", campoUrgente.id, false),
+    ],
+    idEstimulo: estimuloActualizarTramite.id,
+    idUsuario: admin.id,
+    observacion: "Trámite demo — consulta general del legajo.",
+  });
+
+  const legajo2 = await getLegajoPorNumero("DEMO-0002");
+  await ensureTramiteDemo({
+    idTipoTramite: tipoTramiteLegajo.id,
+    idRegistro: legajo2.id,
+    datos: [
+      mapearValorCampo("INPUT_TEXT", campoAsunto.id, "Reclamo por facturación"),
+      mapearValorCampo("SELECT", campoPrioridad.id, "alta"),
+      mapearValorCampo("INPUT_CHECKBOX", campoUrgente.id, true),
+    ],
+    idEstimulo: estimuloResolverTramite.id,
+    idUsuario: admin.id,
+    observacion: "Trámite demo — reclamo ya resuelto.",
+  });
+
+  const legajo3 = await getLegajoPorNumero("DEMO-0003");
+  const titular3 = await getTitularDelLegajo(legajo3.id);
+  await ensureTramiteDemo({
+    idTipoTramite: tipoTramiteCliente.id,
+    idRegistro: titular3.id,
+    datos: [
+      mapearValorCampo("INPUT_TEXT", campoMotivo.id, "Actualización de datos de contacto"),
+      mapearValorCampo("INPUT_TEL", campoTelefonoContacto.id, "+54 11 5555-1234"),
+      mapearValorCampo("INPUT_NUMBER", campoMonto.id, 1500),
+    ],
+    idEstimulo: estimuloActualizarTramite.id,
+    idUsuario: admin.id,
+    observacion: "Trámite demo — sobre el cliente titular.",
+  });
+
+  const legajo4 = await getLegajoPorNumero("DEMO-0004");
+  const titular4 = await getTitularDelLegajo(legajo4.id);
+  await ensureTramiteDemo({
+    idTipoTramite: tipoTramiteClienteTitular.id,
+    idRegistro: titular4.id,
+    datos: [
+      mapearValorCampo("INPUT_EMAIL", campoEmailContacto.id, "camila.lopez@example.com"),
+      mapearValorCampo("SELECT_MULTIPLE", campoCanalPreferido.id, ["email", "whatsapp"]),
+      mapearValorCampo("INPUT_CHECKBOX", campoAceptaTerminos.id, true),
+    ],
+    idEstimulo: estimuloResolverTramite.id,
+    idUsuario: admin.id,
+    observacion: "Trámite demo — sobre cliente titular, vía el tipo con filtro.",
+  });
+
+  console.log("Seed de prueba aplicado (idempotente): 10 legajos, 20 clientes, 3 tipos de trámite, 4 trámites de ejemplo.");
 }
 
 main()
