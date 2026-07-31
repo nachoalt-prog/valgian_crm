@@ -1,4 +1,4 @@
-import { getPermisoParaHerramienta, listMenues, listMenuesOpciones, listHerramientas } from "@valgian/core";
+import { getPermisoParaOperacion, OPERACION_ACCESO, listMenues, listMenuesOpciones, listHerramientas } from "@valgian/core";
 import { getCurrentSession } from "@/lib/current-user";
 import { SinAcceso } from "@/components/sin-acceso";
 import { MenuesTool } from "@/components/menues-tool";
@@ -7,9 +7,9 @@ const HERRAMIENTA_CODIGO = "menues";
 
 export default async function MenuesPage() {
   const session = await getCurrentSession();
-  const permiso = session?.perfil ? await getPermisoParaHerramienta(session.perfil.id, HERRAMIENTA_CODIGO) : null;
+  const tieneAcceso = session?.perfil ? await getPermisoParaOperacion(session.perfil.id, HERRAMIENTA_CODIGO, OPERACION_ACCESO) : false;
 
-  if (!permiso) {
+  if (!tieneAcceso) {
     return <SinAcceso herramienta="Menúes y Opciones" />;
   }
 
@@ -24,7 +24,7 @@ export default async function MenuesPage() {
       menuesIniciales={menues}
       opcionesIniciales={opciones}
       herramientas={herramientas}
-      canGestionar={permiso.gestionar}
+      canGestionar={tieneAcceso}
     />
   );
 }

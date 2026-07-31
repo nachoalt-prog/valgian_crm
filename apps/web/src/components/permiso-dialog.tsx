@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import type { PermisoConNombres } from "@valgian/core";
+import type { PermisoConNombres, OperacionOption } from "@valgian/core";
 
 interface Option {
   id: string;
@@ -19,26 +19,35 @@ interface PermisoDialogProps {
   permiso: PermisoConNombres | null;
   perfiles: Option[];
   herramientas: Option[];
-  onSave: (data: { idPerfil: string; idHerramienta: string; gestionar: boolean }, id?: string) => Promise<{ error?: string } | void>;
+  operaciones: OperacionOption[];
+  onSave: (data: { idPerfil: string; idOperacion: string }, id?: string) => Promise<{ error?: string } | void>;
 }
 
 // key={permiso?.id ?? "new"} en el padre fuerza un remount al cambiar de registro.
-export function PermisoDialog({ open, onOpenChange, permiso, perfiles, herramientas, onSave }: PermisoDialogProps) {
+export function PermisoDialog({ open, onOpenChange, permiso, perfiles, herramientas, operaciones, onSave }: PermisoDialogProps) {
   const [idPerfil, setIdPerfil] = useState<string | null>(permiso?.idPerfil ?? null);
   const [idHerramienta, setIdHerramienta] = useState<string | null>(permiso?.idHerramienta ?? null);
-  const [gestionar, setGestionar] = useState(permiso?.gestionar ?? false);
+  const [idOperacion, setIdOperacion] = useState<string | null>(permiso?.idOperacion ?? null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
+  const operacionesDeLaHerramienta = operaciones.filter((o) => o.idHerramienta === idHerramienta);
+
+  function handleHerramientaChange(v: string) {
+    setIdHerramienta(v);
+    // Cambiar de herramienta invalida la operación elegida — las opciones son otras.
+    setIdOperacion(null);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!idPerfil || !idHerramienta) {
-      setError("Elegí un perfil y una herramienta.");
+    if (!idPerfil || !idOperacion) {
+      setError("Elegí un perfil, una herramienta y una operación.");
       return;
     }
     setPending(true);
     setError(null);
-    const result = await onSave({ idPerfil, idHerramienta, gestionar }, permiso?.id);
+    const result = await onSave({ idPerfil, idOperacion }, permiso?.id);
     setPending(false);
     if (result?.error) {
       setError(result.error);
@@ -81,8 +90,7 @@ export function PermisoDialog({ open, onOpenChange, permiso, perfiles, herramien
             <Select
               items={Object.fromEntries(herramientas.map((h) => [h.id, `[${h.codigo}] ${h.nombre}`]))}
               value={idHerramienta ?? undefined}
-              onValueChange={(v) => setIdHerramienta(v)}
-              disabled={!!permiso}
+              onValueChange={handleHerramientaChange}
             >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Seleccioná una herramienta…" />
@@ -97,15 +105,26 @@ export function PermisoDialog({ open, onOpenChange, permiso, perfiles, herramien
             </Select>
           </div>
 
-          <label className="flex cursor-pointer items-center gap-2.5">
-            <input
-              type="checkbox"
-              checked={gestionar}
-              onChange={(e) => setGestionar(e.target.checked)}
-              className="size-4 accent-primary"
-            />
-            <span className="text-sm text-foreground">Puede gestionar (crear/editar/borrar)</span>
-          </label>
+          <div className="space-y-1.5">
+            <Label className="text-xs uppercase tracking-wider text-muted-foreground">Operación</Label>
+            <Select
+              items={Object.fromEntries(operacionesDeLaHerramienta.map((o) => [o.id, `[${o.codigo}] ${o.nombre}`]))}
+              value={idOperacion ?? undefined}
+              onValueChange={(v) => setIdOperacion(v)}
+              disabled={!idHerramienta}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder={idHerramienta ? "Seleccioná una operación…" : "Elegí primero una herramienta"} />
+              </SelectTrigger>
+              <SelectContent>
+                {operacionesDeLaHerramienta.map((o) => (
+                  <SelectItem key={o.id} value={o.id}>
+                    [{o.codigo}] {o.nombre}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}
 

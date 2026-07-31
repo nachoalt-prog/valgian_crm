@@ -167,7 +167,10 @@ export function PlantillasAdjuntosTool({ plantillasIniciales, canGestionar }: Pl
           idEntidad={null}
           idRegistro={null}
           herramientaCodigo={HERRAMIENTA_PLANTILLAS_CODIGO}
-          canGestionar={canGestionar}
+          canCrear={canGestionar}
+          canReemplazar={canGestionar}
+          canDescargar={canGestionar}
+          canGuardar={canGestionar}
           onGuardado={() => router.refresh()}
           tiposPermitidos={["html"]}
         />

@@ -15,7 +15,8 @@ import {
   reconstruirValorCampo,
   mapearValorCampo,
   esValorVacio,
-  getPermisoParaHerramienta,
+  getPermisoParaOperacion,
+  OPERACION_ACCESO,
   listUsuarios,
   getEntidadPorCodigo,
   type FiltrosTramitesLegajo,
@@ -24,32 +25,22 @@ import { getCurrentSession } from "@/lib/current-user";
 
 const HERRAMIENTA_CODIGO = "TRAMITES_1";
 
-async function requireAcceso(): Promise<{ error?: string; perfilId?: string }> {
-  const session = await getCurrentSession();
-  if (!session?.perfil) return { error: "No autenticado." };
-
-  const permiso = await getPermisoParaHerramienta(session.perfil.id, HERRAMIENTA_CODIGO);
-  if (!permiso) return { error: "No tenés acceso a esta herramienta." };
-
-  return { perfilId: session.perfil.id };
-}
-
-async function requireGestion(): Promise<{ error?: string; usuarioId?: string }> {
+async function requireAcceso(): Promise<{ error?: string; perfilId?: string; usuarioId?: string }> {
   const session = await getCurrentSession();
   if (!session?.perfil || !session.usuario) return { error: "No autenticado." };
 
-  const permiso = await getPermisoParaHerramienta(session.perfil.id, HERRAMIENTA_CODIGO);
-  if (!permiso?.gestionar) return { error: "No tenés permiso de gestión sobre esta herramienta." };
+  const tieneAcceso = await getPermisoParaOperacion(session.perfil.id, HERRAMIENTA_CODIGO, OPERACION_ACCESO);
+  if (!tieneAcceso) return { error: "No tenés acceso a esta herramienta." };
 
-  return { usuarioId: session.usuario.id };
+  return { perfilId: session.perfil.id, usuarioId: session.usuario.id };
 }
 
 /** Para el modal abierto directo desde una bandeja (no hay solapa que ya resuelva esto). */
 export async function getPermisoTramitesAction() {
   const session = await getCurrentSession();
   if (!session?.perfil) return { data: false };
-  const permiso = await getPermisoParaHerramienta(session.perfil.id, HERRAMIENTA_CODIGO);
-  return { data: !!permiso?.gestionar };
+  const tieneAcceso = await getPermisoParaOperacion(session.perfil.id, HERRAMIENTA_CODIGO, OPERACION_ACCESO);
+  return { data: tieneAcceso };
 }
 
 /** Para la solapa Historial del Modal de Trámites — HistorialTool necesita el ID real, no el CODIGO. */
@@ -151,7 +142,7 @@ export async function gestionarTramiteAction(input: {
   idEstimulo: string;
   observacion?: string | null;
 }) {
-  const check = await requireGestion();
+  const check = await requireAcceso();
   if (check.error || !check.usuarioId) return { error: check.error ?? "No autenticado." };
 
   // Defensa en profundidad — el Modal de Trámites ya valida esto del lado del

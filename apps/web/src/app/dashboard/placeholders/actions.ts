@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createPlaceholder, updatePlaceholder, deletePlaceholder, getPermisoParaHerramienta, type PlaceholderInput } from "@valgian/core";
+import { createPlaceholder, updatePlaceholder, deletePlaceholder, getPermisoParaOperacion, OPERACION_ACCESO, type PlaceholderInput } from "@valgian/core";
 import { getCurrentSession } from "@/lib/current-user";
 
 const HERRAMIENTA_CODIGO = "placeholders";
@@ -11,8 +11,8 @@ async function requireGestion(): Promise<{ error?: string }> {
   const session = await getCurrentSession();
   if (!session?.perfil) return { error: "No autenticado." };
 
-  const permiso = await getPermisoParaHerramienta(session.perfil.id, HERRAMIENTA_CODIGO);
-  if (!permiso?.gestionar) return { error: NO_GESTIONAR };
+  const tieneAcceso = await getPermisoParaOperacion(session.perfil.id, HERRAMIENTA_CODIGO, OPERACION_ACCESO);
+  if (!tieneAcceso) return { error: NO_GESTIONAR };
 
   return {};
 }

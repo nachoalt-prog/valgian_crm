@@ -9,7 +9,8 @@ import {
   listTiposDocumento,
   listGeneros,
   listProvincias,
-  getPermisoParaHerramienta,
+  getPermisoParaOperacion,
+  OPERACION_ACCESO,
   type ClienteInput,
 } from "@valgian/core";
 import { getCurrentSession } from "@/lib/current-user";
@@ -20,18 +21,8 @@ async function requireAcceso(): Promise<{ error?: string; usuarioId?: string }> 
   const session = await getCurrentSession();
   if (!session?.perfil || !session.usuario) return { error: "No autenticado." };
 
-  const permiso = await getPermisoParaHerramienta(session.perfil.id, HERRAMIENTA_CODIGO);
-  if (!permiso) return { error: "No tenés acceso a esta herramienta." };
-
-  return { usuarioId: session.usuario.id };
-}
-
-async function requireGestion(): Promise<{ error?: string; usuarioId?: string }> {
-  const session = await getCurrentSession();
-  if (!session?.perfil || !session.usuario) return { error: "No autenticado." };
-
-  const permiso = await getPermisoParaHerramienta(session.perfil.id, HERRAMIENTA_CODIGO);
-  if (!permiso?.gestionar) return { error: "No tenés permiso de gestión sobre esta herramienta." };
+  const tieneAcceso = await getPermisoParaOperacion(session.perfil.id, HERRAMIENTA_CODIGO, OPERACION_ACCESO);
+  if (!tieneAcceso) return { error: "No tenés acceso a esta herramienta." };
 
   return { usuarioId: session.usuario.id };
 }
@@ -54,21 +45,21 @@ export async function getCatalogosClienteAction() {
 }
 
 export async function createClienteAction(data: ClienteInput) {
-  const check = await requireGestion();
+  const check = await requireAcceso();
   if (check.error || !check.usuarioId) return { error: check.error ?? "No autenticado." };
 
   return createCliente(data, check.usuarioId);
 }
 
 export async function updateClienteAction(id: string, data: ClienteInput) {
-  const check = await requireGestion();
+  const check = await requireAcceso();
   if (check.error || !check.usuarioId) return { error: check.error ?? "No autenticado." };
 
   return updateCliente(id, data, check.usuarioId);
 }
 
 export async function deleteClienteAction(id: string) {
-  const check = await requireGestion();
+  const check = await requireAcceso();
   if (check.error) return { error: check.error };
 
   return deleteCliente(id);

@@ -1,6 +1,6 @@
 "use server";
 
-import { getLegajoDetalle, updateLegajoNumero, getEntidadPorCodigo, getPermisoParaHerramienta } from "@valgian/core";
+import { getLegajoDetalle, updateLegajoNumero, getEntidadPorCodigo, getPermisoParaOperacion, OPERACION_ACCESO } from "@valgian/core";
 import { getCurrentSession } from "@/lib/current-user";
 
 const HERRAMIENTA_CODIGO = "LEGAJO_DAT_1";
@@ -9,20 +9,10 @@ async function requireAcceso(): Promise<{ error?: string; perfilId?: string; usu
   const session = await getCurrentSession();
   if (!session?.perfil || !session.usuario) return { error: "No autenticado." };
 
-  const permiso = await getPermisoParaHerramienta(session.perfil.id, HERRAMIENTA_CODIGO);
-  if (!permiso) return { error: "No tenés acceso a esta herramienta." };
+  const tieneAcceso = await getPermisoParaOperacion(session.perfil.id, HERRAMIENTA_CODIGO, OPERACION_ACCESO);
+  if (!tieneAcceso) return { error: "No tenés acceso a esta herramienta." };
 
   return { perfilId: session.perfil.id, usuarioId: session.usuario.id };
-}
-
-async function requireGestion(): Promise<{ error?: string; usuarioId?: string }> {
-  const session = await getCurrentSession();
-  if (!session?.perfil || !session.usuario) return { error: "No autenticado." };
-
-  const permiso = await getPermisoParaHerramienta(session.perfil.id, HERRAMIENTA_CODIGO);
-  if (!permiso?.gestionar) return { error: "No tenés permiso de gestión sobre esta herramienta." };
-
-  return { usuarioId: session.usuario.id };
 }
 
 export async function getLegajoDetalleAction(id: string) {
@@ -34,7 +24,7 @@ export async function getLegajoDetalleAction(id: string) {
 }
 
 export async function updateLegajoNumeroAction(id: string, numero: string) {
-  const check = await requireGestion();
+  const check = await requireAcceso();
   if (check.error || !check.usuarioId) return { error: check.error ?? "No autenticado." };
 
   return updateLegajoNumero(id, numero, check.usuarioId);

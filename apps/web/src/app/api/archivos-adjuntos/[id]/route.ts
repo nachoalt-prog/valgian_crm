@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getArchivoAdjunto, leerArchivoParaDescarga, reemplazarArchivo, borrarArchivo } from "@valgian/core";
-import { getCurrentSession } from "@/lib/current-user";
 import { autorizarOperacionArchivo } from "../_shared";
 
 /** RFC 6266/5987: filename ASCII de respaldo + filename* UTF-8 para navegadores modernos (nombres con tildes/espacios). */
@@ -13,19 +12,30 @@ function contentDisposition(nombreOriginal: string, inline: boolean): string {
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const session = await getCurrentSession();
-  if (!session?.perfil) return NextResponse.json({ error: "No autenticado." }, { status: 401 });
-
-  const resultado = await leerArchivoParaDescarga(id);
-  if (resultado.error || !resultado.data) {
-    return NextResponse.json({ error: resultado.error ?? "No encontrado." }, { status: 404 });
-  }
+  const existente = await getArchivoAdjunto(id);
+  if (!existente) return NextResponse.json({ error: "No encontrado." }, { status: 404 });
 
   // Las previsualizaciones (<img>/<embed> src) piden ?inline=1 — con
   // "attachment" el navegador fuerza la descarga en vez de mostrar el
   // contenido embebido (pasaba con los PDF). "Descargar" no manda el
   // parámetro, así que sigue forzando la descarga como corresponde.
   const inline = request.nextUrl.searchParams.get("inline") === "1";
+  const herramientaCodigo = request.nextUrl.searchParams.get("herramientaCodigo");
+
+  // El preview inline solo exige Acceso (ya estás viendo el registro dueño);
+  // la descarga forzada exige el permiso granular Descargar.
+  const auth = await autorizarOperacionArchivo({
+    idEntidad: existente.idEntidad,
+    idRegistro: existente.idRegistro,
+    herramientaCodigo,
+    accion: inline ? "acceso" : "descargar",
+  });
+  if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
+  const resultado = await leerArchivoParaDescarga(id);
+  if (resultado.error || !resultado.data) {
+    return NextResponse.json({ error: resultado.error ?? "No encontrado." }, { status: 404 });
+  }
 
   return new NextResponse(new Uint8Array(resultado.data.buffer), {
     headers: {
@@ -52,6 +62,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     idEntidad: existente.idEntidad,
     idRegistro: existente.idRegistro,
     herramientaCodigo: typeof herramientaCodigo === "string" ? herramientaCodigo : null,
+    accion: "reemplazar",
   });
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
@@ -79,6 +90,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     idEntidad: existente.idEntidad,
     idRegistro: existente.idRegistro,
     herramientaCodigo,
+    accion: "borrar",
   });
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 

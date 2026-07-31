@@ -95,7 +95,7 @@ Mecanismo genérico y configurable para gobernar el ciclo de vida de cualquier e
 | ID_PERFIL | FK → PERFILES |
 | ID_ESTIMULO | FK → ESTIMULOS |
 
-Unique sobre (`ID_PERFIL`, `ID_ESTIMULO`). Define qué estímulos puede aplicar cada perfil — gobierna qué opciones aparecen en el selector de la herramienta "Gestión de Entidad" (ver más abajo). Es un permiso más fino que `PERMISOS`: `PERMISOS` gobierna el acceso a la herramienta en sí (con su flag `GESTIONAR`), `PERFILES_ESTIMULOS` gobierna cuáles estímulos concretos puede aplicar un perfil que sí tiene acceso.
+Unique sobre (`ID_PERFIL`, `ID_ESTIMULO`). Define qué estímulos puede aplicar cada perfil — gobierna qué opciones aparecen en el selector de la herramienta "Gestión de Entidad" (ver más abajo). Es un permiso más fino que `PERMISOS`: `PERMISOS` gobierna el acceso a la herramienta en sí (hoy, la operación `acceso` de `GESTION_ENTIDAD_1` — ver `domain/infraestructura.md`, "Modelo de permisos"), `PERFILES_ESTIMULOS` gobierna cuáles estímulos concretos puede aplicar un perfil que sí tiene acceso.
 
 ABM en `/dashboard/perfiles-estimulos` (`HERRAMIENTAS.CODIGO = 'perfiles_estimulos'`, con entrada en el menú Configuración). En el selector de estímulos de esa pantalla, cada opción se muestra como `<estrategia> - <estímulo>` para poder distinguir estímulos del mismo nombre en estrategias distintas.
 
@@ -137,7 +137,7 @@ Consecuencia: los SPs y el código de `COMANDO` requieren su propia estrategia d
 
 - Selector de estímulos: partiendo del `ID_ESTADO` actual del registro, busca en `TRANSICIONES` todas las filas donde ese estado es `ID_ESTADO_0`, y de esas solo muestra los estímulos donde el perfil actual tiene una fila en `PERFILES_ESTIMULOS`.
 - Campo de observación (textarea) + botón "Gestionar", que ejecuta `SP_APLICAR_ESTIMULO`.
-- Como cualquier herramienta: sin fila en `PERMISOS`, no se ve. Con fila pero sin `GESTIONAR`, se ve (solapa visible, estado actual visible) pero el botón "Gestionar" queda deshabilitado.
+- Como cualquier herramienta que todavía no migró a operaciones granulares: sin fila en `PERMISOS` para la operación `acceso`, no se ve. Con esa fila, se ve completa (no hay hoy una operación separada para deshabilitar solo el botón "Gestionar" — ver `domain/infraestructura.md`, "Modelo de permisos").
 
 ## Pendiente
 

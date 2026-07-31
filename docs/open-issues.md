@@ -10,7 +10,7 @@ Todo lo que está identificado pero no resuelto todavía, sin importar de qué s
 
 ## Infraestructura
 
-- **Permisos más granulares que VER/GESTIONAR**: si se necesita distinguir, por ejemplo, editar de eliminar, `PERMISOS` debe expandirse con más flags o columnas. (`domain/infraestructura.md`)
+- **Resuelto — permisos más granulares que VER/GESTIONAR**: `PERMISOS.GESTIONAR` fue reemplazado por `OPERACIONES` (acciones concretas por herramienta) + `PERMISOS.ID_OPERACION` — ver `domain/infraestructura.md`, "Modelo de permisos". De momento la mayoría de las herramientas siguen con una única operación `acceso` (equivalente al viejo `GESTIONAR`); `LEGAJO_ADJ_1` es el primer caso con operaciones realmente finas (crear/reemplazar/descargar/guardar/borrar). Migrar otra herramienta a este nivel de detalle no requiere cambio de schema, solo sumarle sus propias filas en `OPERACIONES`.
 - **Sesión única por usuario**: si se necesita soporte para múltiples sesiones simultáneas, hace falta introducir una tabla `SESIONES` — ver ADR 0010.
 
 ## Módulos

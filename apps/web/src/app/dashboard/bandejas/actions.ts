@@ -1,6 +1,6 @@
 "use server";
 
-import { getBandejaConfig, buscarBandeja, getLayoutParaBandeja, getPermisoParaHerramienta, type BandejaConfig, type LayoutLegajo } from "@valgian/core";
+import { getBandejaConfig, buscarBandeja, getLayoutParaBandeja, getPermisoParaOperacion, OPERACION_ACCESO, type BandejaConfig, type LayoutLegajo } from "@valgian/core";
 import { getCurrentSession } from "@/lib/current-user";
 
 const HERRAMIENTA_CODIGO = "bandejas";
@@ -9,8 +9,8 @@ async function requireAcceso(): Promise<{ error?: string; perfilId?: string }> {
   const session = await getCurrentSession();
   if (!session?.perfil) return { error: "No autenticado." };
 
-  const permiso = await getPermisoParaHerramienta(session.perfil.id, HERRAMIENTA_CODIGO);
-  if (!permiso) return { error: "No tenés acceso a esta herramienta." };
+  const tieneAcceso = await getPermisoParaOperacion(session.perfil.id, HERRAMIENTA_CODIGO, OPERACION_ACCESO);
+  if (!tieneAcceso) return { error: "No tenés acceso a esta herramienta." };
 
   return { perfilId: session.perfil.id };
 }

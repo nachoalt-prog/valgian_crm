@@ -1,5 +1,6 @@
 import { and, eq } from "drizzle-orm";
-import { db, menues, menuesOpciones, permisos, interfacesMenues } from "@valgian/db";
+import { db, menues, menuesOpciones, permisos, operaciones, interfacesMenues } from "@valgian/db";
+import { OPERACION_ACCESO } from "./permissions";
 
 interface MenuOpcion {
   id: string;
@@ -36,10 +37,8 @@ export async function getMenuForPerfil(perfilId: string, interfazId: string | nu
     .from(interfacesMenues)
     .innerJoin(menues, eq(menues.id, interfacesMenues.idMenu))
     .innerJoin(menuesOpciones, eq(menuesOpciones.idMenu, menues.id))
-    .innerJoin(
-      permisos,
-      and(eq(permisos.idHerramienta, menuesOpciones.idHerramienta), eq(permisos.idPerfil, perfilId)),
-    )
+    .innerJoin(operaciones, and(eq(operaciones.idHerramienta, menuesOpciones.idHerramienta), eq(operaciones.codigo, OPERACION_ACCESO)))
+    .innerJoin(permisos, and(eq(permisos.idOperacion, operaciones.id), eq(permisos.idPerfil, perfilId)))
     .where(eq(interfacesMenues.idInterfaz, interfazId));
 
   const grupos = new Map<string, MenuGrupo>();

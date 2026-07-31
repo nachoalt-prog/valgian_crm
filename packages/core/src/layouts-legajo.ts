@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { db, layoutsLegajo, layoutsLegajoSolapas, bandejas, herramientas } from "@valgian/db";
-import { getPermisoParaHerramienta } from "./permissions";
+import { getPermisoParaOperacion, OPERACION_ACCESO } from "./permissions";
 
 export interface SolapaLegajo {
   id: string;
@@ -48,9 +48,9 @@ export async function getLayoutParaBandeja(bandejaId: string, perfilId: string):
       solapas.push({ id: s.id, orden: s.orden ?? 0, nombre: s.nombre, herramientaCodigo: null, canGestionar: false });
       continue;
     }
-    const permiso = await getPermisoParaHerramienta(perfilId, s.herramientaCodigo);
-    if (!permiso) continue;
-    solapas.push({ id: s.id, orden: s.orden ?? 0, nombre: s.nombre, herramientaCodigo: s.herramientaCodigo, canGestionar: permiso.gestionar });
+    const tieneAcceso = await getPermisoParaOperacion(perfilId, s.herramientaCodigo, OPERACION_ACCESO);
+    if (!tieneAcceso) continue;
+    solapas.push({ id: s.id, orden: s.orden ?? 0, nombre: s.nombre, herramientaCodigo: s.herramientaCodigo, canGestionar: tieneAcceso });
   }
 
   return { id: layout.id, codigo: layout.codigo, nombre: layout.nombre, solapas };

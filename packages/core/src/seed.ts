@@ -6,6 +6,7 @@ import {
   perfiles,
   interfaz,
   herramientas,
+  operaciones,
   permisos,
   menues,
   menuesOpciones,
@@ -19,6 +20,14 @@ import {
   tiposArchivosAdjuntos,
 } from "@valgian/db";
 import { hashPassword } from "./auth/password";
+import { OPERACION_ACCESO } from "./permissions";
+import {
+  OPERACION_ADJUNTOS_CREAR,
+  OPERACION_ADJUNTOS_REEMPLAZAR,
+  OPERACION_ADJUNTOS_DESCARGAR,
+  OPERACION_ADJUNTOS_GUARDAR,
+  OPERACION_ADJUNTOS_BORRAR,
+} from "./archivos-adjuntos";
 
 const ADMIN_USERNAME = "admin";
 const ADMIN_PASSWORD = "admin123";
@@ -98,14 +107,25 @@ async function ensureHerramienta(codigo: string, nombre: string, slug: string) {
   return creada;
 }
 
-async function ensurePermisoGestion(idPerfil: string, idHerramienta: string) {
+async function ensureOperacion(idHerramienta: string, codigo: string, nombre: string) {
+  const [existente] = await db
+    .select()
+    .from(operaciones)
+    .where(and(eq(operaciones.idHerramienta, idHerramienta), eq(operaciones.codigo, codigo)));
+  if (existente) return existente;
+
+  const [creada] = await db.insert(operaciones).values({ idHerramienta, codigo, nombre }).returning();
+  return creada;
+}
+
+async function ensurePermisoOperacion(idPerfil: string, idOperacion: string) {
   const [existente] = await db
     .select()
     .from(permisos)
-    .where(and(eq(permisos.idPerfil, idPerfil), eq(permisos.idHerramienta, idHerramienta)));
+    .where(and(eq(permisos.idPerfil, idPerfil), eq(permisos.idOperacion, idOperacion)));
   if (existente) return existente;
 
-  const [creado] = await db.insert(permisos).values({ idPerfil, idHerramienta, gestionar: true }).returning();
+  const [creado] = await db.insert(permisos).values({ idPerfil, idOperacion }).returning();
   return creado;
 }
 
@@ -267,8 +287,9 @@ async function main() {
   const herramientaTramites = await ensureHerramienta("TRAMITES_1", "Trámites", "tramites_1.gestionar");
   const herramientaArchivosAdjuntos = await ensureHerramienta("LEGAJO_ADJ_1", "Archivos Adjuntos (Legajo)", "legajo_adj_1.gestionar");
 
-  // Admin tiene acceso de gestión completo a todas las herramientas — la existencia
-  // de la fila en PERMISOS ya implica acceso de lectura (no hay columna VER).
+  // Admin tiene acceso completo a todas las herramientas — de momento cada una
+  // tiene una única operación 'Acceso'; la existencia de la fila en PERMISOS
+  // para esa operación ya implica acceso (no hay columna VER separada).
   for (const h of [
     herramientaDashboard,
     herramientaUsuarios,
@@ -290,7 +311,20 @@ async function main() {
     herramientaTramites,
     herramientaArchivosAdjuntos,
   ]) {
-    await ensurePermisoGestion(perfilAdmin.id, h.id);
+    const operacionAcceso = await ensureOperacion(h.id, OPERACION_ACCESO, "Acceso");
+    await ensurePermisoOperacion(perfilAdmin.id, operacionAcceso.id);
+  }
+
+  // LEGAJO_ADJ_1: primer uso real de operaciones granulares más allá de Acceso.
+  for (const [codigo, nombre] of [
+    [OPERACION_ADJUNTOS_CREAR, "Crear"],
+    [OPERACION_ADJUNTOS_REEMPLAZAR, "Reemplazar"],
+    [OPERACION_ADJUNTOS_DESCARGAR, "Descargar"],
+    [OPERACION_ADJUNTOS_GUARDAR, "Guardar"],
+    [OPERACION_ADJUNTOS_BORRAR, "Borrar"],
+  ]) {
+    const operacion = await ensureOperacion(herramientaArchivosAdjuntos.id, codigo, nombre);
+    await ensurePermisoOperacion(perfilAdmin.id, operacion.id);
   }
 
   const menuPrincipal = await ensureMenu("principal", "Principal");

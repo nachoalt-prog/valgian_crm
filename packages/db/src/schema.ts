@@ -68,15 +68,32 @@ export const herramientas = pgTable("HERRAMIENTAS", {
   comodin: jsonb("COMODIN"),
 });
 
+/**
+ * Acciones concretas dentro de una herramienta (ver domain/infraestructura.md).
+ * Toda herramienta tiene como mínimo la operación CODIGO='acceso' — el permiso
+ * sobre esa operación es lo que hoy decide si la herramienta se ve o no. Una
+ * herramienta puede sumar operaciones más finas (ej. ARCHIVOS_ADJUNTOS: crear,
+ * reemplazar, descargar, guardar, borrar) para gatillar botones puntuales.
+ */
+export const operaciones = pgTable(
+  "OPERACIONES",
+  {
+    id: uuid("ID").primaryKey().defaultRandom(),
+    idHerramienta: uuid("ID_HERRAMIENTA").references(() => herramientas.id),
+    codigo: text("CODIGO").notNull(),
+    nombre: text("NOMBRE").notNull(),
+  },
+  (table) => [uniqueIndex("OPERACIONES_HERRAMIENTA_CODIGO_UNIQUE").on(table.idHerramienta, table.codigo)],
+);
+
 export const permisos = pgTable(
   "PERMISOS",
   {
     id: uuid("ID").primaryKey().defaultRandom(),
     idPerfil: uuid("ID_PERFIL").references(() => perfiles.id),
-    idHerramienta: uuid("ID_HERRAMIENTA").references(() => herramientas.id),
-    gestionar: boolean("GESTIONAR"),
+    idOperacion: uuid("ID_OPERACION").references(() => operaciones.id),
   },
-  (table) => [uniqueIndex("PERMISOS_PERFIL_HERRAMIENTA_UNIQUE").on(table.idPerfil, table.idHerramienta)],
+  (table) => [uniqueIndex("PERMISOS_PERFIL_OPERACION_UNIQUE").on(table.idPerfil, table.idOperacion)],
 );
 
 export const menues = pgTable("MENUES", {

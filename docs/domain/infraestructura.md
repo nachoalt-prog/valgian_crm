@@ -50,16 +50,28 @@ Usuarios, permisos, y configuración de interfaz. No es "negocio" del CRM en sí
 | SLUG | string (identificador estable usado en código y permisos, ej. 'legajos.listado') |
 | COMODIN | jsonb, nullable |
 
+### OPERACIONES
+
+| Campo | Tipo |
+|---|---|
+| ID | UUID, PK |
+| ID_HERRAMIENTA | FK → HERRAMIENTAS |
+| CODIGO | string |
+| NOMBRE | string |
+
+**Regla — unicidad**: a lo sumo una fila de `OPERACIONES` por combinación (`ID_HERRAMIENTA`, `CODIGO`). Constraint UNIQUE.
+
+Toda herramienta tiene como mínimo la operación `CODIGO = 'acceso'` — el permiso sobre esa operación es lo que hoy decide si la herramienta se ve o no (equivalente al viejo `GESTIONAR`, de momento). Una herramienta puede sumar operaciones más finas para gatillar botones/acciones puntuales — ver "Modelo de permisos" más abajo.
+
 ### PERMISOS
 
 | Campo | Tipo |
 |---|---|
 | ID | UUID, PK |
 | ID_PERFIL | FK → PERFILES |
-| ID_HERRAMIENTA | FK → HERRAMIENTAS |
-| GESTIONAR | boolean |
+| ID_OPERACION | FK → OPERACIONES |
 
-**Regla — unicidad**: a lo sumo una fila de `PERMISOS` por combinación (`ID_PERFIL`, `ID_HERRAMIENTA`). Constraint UNIQUE.
+**Regla — unicidad**: a lo sumo una fila de `PERMISOS` por combinación (`ID_PERFIL`, `ID_OPERACION`). Constraint UNIQUE. Un perfil puede tener varias filas de `PERMISOS` para la misma herramienta — una por cada operación que tenga habilitada.
 
 ### MENUES
 
@@ -109,7 +121,13 @@ Cada instalación arranca con un seed que crea un usuario administrador inicial.
 
 `HERRAMIENTAS` es el catálogo central de todo lo permisable en el sistema. No toda herramienta necesita una entrada de menú — `MENUES_OPCIONES` es solo una forma de llegar a una herramienta, no la única (permite controlar permisos sobre acciones a las que se llega sin pasar por el menú lateral, ej. desde el detalle de un legajo).
 
-`PERMISOS` conecta `PERFILES` con `HERRAMIENTAS`. La existencia de la fila ya implica acceso de lectura — no hay columna `VER` separada. `GESTIONAR` es el único flag: distingue "puede ver y usar" de "puede además crear/editar/borrar". No hay niveles más granulares por ahora — ver `open-issues.md`.
+`PERMISOS` conecta `PERFILES` con `OPERACIONES` (no directamente con `HERRAMIENTAS` — la herramienta se deriva por JOIN vía `OPERACIONES.ID_HERRAMIENTA`). La existencia de la fila ya implica el permiso — no hay booleano adicional (reemplaza al viejo `PERMISOS.GESTIONAR`, que ya no existe).
+
+**Única función de chequeo, sin excepciones**: `getPermisoParaOperacion(perfilId, herramientaCodigo, operacionCodigo)` en `packages/core/src/permissions.ts` — devuelve `boolean`. No existe (deliberadamente) una función separada tipo `getPermisoParaHerramienta`; todo el código, sin excepción, pasa por esta única función, variando el `operacionCodigo`. Para "¿tiene acceso a la herramienta?" se usa la constante exportada `OPERACION_ACCESO = "acceso"`.
+
+De momento, todas las herramientas salvo una tienen una única operación (`OPERACION_ACCESO`) — la distinción vieja entre "puede ver" y "puede además gestionar" desapareció para esas herramientas (colapsan a un solo nivel: tener la fila es tener acceso completo). Es una decisión consciente, no un efecto secundario: en la práctica ninguna herramienta usaba hoy un perfil de solo-lectura (el seed siempre otorgó `GESTIONAR = true`), así que el riesgo real es nulo. El primer caso real con operaciones más finas es `LEGAJO_ADJ_1` (Archivos Adjuntos) — además de `acceso`, tiene `crear`, `reemplazar`, `descargar`, `guardar` y `borrar`, una por cada botón del modal de adjunto (ver `domain/archivos-adjuntos.md`). Cuando otra herramienta necesite este mismo nivel de detalle, se le suman sus propias filas en `OPERACIONES` — no hace falta ningún cambio de schema.
+
+**ABM de Permisos** (`/dashboard/permisos`): la columna "Herramienta" sigue existiendo en la grilla aunque ahora es indirecta (derivada de la operación elegida). El modal filtra las opciones del combo Operación según la Herramienta elegida. Al editar un permiso existente, `Perfil` queda bloqueado (es la identidad del titular del permiso) pero `Herramienta` y `Operación` quedan editables — a diferencia del viejo `GESTIONAR` (un booleano que se tocaba en el lugar), reasignar la operación de una fila existente es la forma de corregirla sin borrar y volver a crear.
 
 ## Imágenes y archivos
 

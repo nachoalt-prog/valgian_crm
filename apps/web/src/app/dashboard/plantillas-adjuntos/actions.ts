@@ -6,7 +6,8 @@ import {
   crearPlantillaAdjunto,
   actualizarPlantillaAdjunto,
   borrarPlantillaAdjunto,
-  getPermisoParaHerramienta,
+  getPermisoParaOperacion,
+  OPERACION_ACCESO,
   type ActualizarPlantillaAdjuntoInput,
 } from "@valgian/core";
 import { getCurrentSession } from "@/lib/current-user";
@@ -18,8 +19,8 @@ async function requireGestion(): Promise<{ error?: string; usuarioId?: string }>
   const session = await getCurrentSession();
   if (!session?.perfil || !session.usuario) return { error: "No autenticado." };
 
-  const permiso = await getPermisoParaHerramienta(session.perfil.id, HERRAMIENTA_CODIGO);
-  if (!permiso?.gestionar) return { error: NO_GESTIONAR };
+  const tieneAcceso = await getPermisoParaOperacion(session.perfil.id, HERRAMIENTA_CODIGO, OPERACION_ACCESO);
+  if (!tieneAcceso) return { error: NO_GESTIONAR };
 
   return { usuarioId: session.usuario.id };
 }
@@ -27,8 +28,8 @@ async function requireGestion(): Promise<{ error?: string; usuarioId?: string }>
 export async function listPlantillasAdjuntoAction() {
   const session = await getCurrentSession();
   if (!session?.perfil) return { error: "No autenticado." };
-  const permiso = await getPermisoParaHerramienta(session.perfil.id, HERRAMIENTA_CODIGO);
-  if (!permiso) return { error: "No tenés acceso a esta herramienta." };
+  const tieneAcceso = await getPermisoParaOperacion(session.perfil.id, HERRAMIENTA_CODIGO, OPERACION_ACCESO);
+  if (!tieneAcceso) return { error: "No tenés acceso a esta herramienta." };
   return { data: await listPlantillasAdjunto() };
 }
 

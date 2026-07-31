@@ -1,4 +1,4 @@
-import { getPermisoParaHerramienta, listPerfiles, listUsuarios, listInterfaces } from "@valgian/core";
+import { getPermisoParaOperacion, OPERACION_ACCESO, listPerfiles, listUsuarios, listInterfaces } from "@valgian/core";
 import { getCurrentSession } from "@/lib/current-user";
 import { SinAcceso } from "@/components/sin-acceso";
 import { UsuariosPerfilesTool } from "@/components/usuarios-perfiles-tool";
@@ -7,9 +7,9 @@ const HERRAMIENTA_CODIGO = "usuarios_perfiles";
 
 export default async function UsuariosPerfilesPage() {
   const session = await getCurrentSession();
-  const permiso = session?.perfil ? await getPermisoParaHerramienta(session.perfil.id, HERRAMIENTA_CODIGO) : null;
+  const tieneAcceso = session?.perfil ? await getPermisoParaOperacion(session.perfil.id, HERRAMIENTA_CODIGO, OPERACION_ACCESO) : false;
 
-  if (!permiso) {
+  if (!tieneAcceso) {
     return <SinAcceso herramienta="Usuarios y Perfiles" />;
   }
 
@@ -20,7 +20,7 @@ export default async function UsuariosPerfilesPage() {
       perfilesIniciales={perfiles}
       usuariosIniciales={usuarios}
       interfaces={interfaces}
-      canGestionar={permiso.gestionar}
+      canGestionar={tieneAcceso}
     />
   );
 }

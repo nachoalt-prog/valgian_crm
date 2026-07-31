@@ -24,6 +24,18 @@ import { db, archivosAdjuntos, tiposArchivosAdjuntos } from "@valgian/db";
  *   viejo si cambió de extensión.
  */
 
+/**
+ * Códigos de OPERACIONES de la herramienta LEGAJO_ADJ_1 (Archivos Adjuntos) —
+ * primer uso real de operaciones granulares, más allá de OPERACION_ACCESO.
+ * Centralizados acá porque los usan tanto el seed (que las crea) como las
+ * rutas HTTP (que las valida) — nunca repetir el string literal.
+ */
+export const OPERACION_ADJUNTOS_CREAR = "crear";
+export const OPERACION_ADJUNTOS_REEMPLAZAR = "reemplazar";
+export const OPERACION_ADJUNTOS_DESCARGAR = "descargar";
+export const OPERACION_ADJUNTOS_GUARDAR = "guardar";
+export const OPERACION_ADJUNTOS_BORRAR = "borrar";
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MONOREPO_ROOT = path.resolve(__dirname, "../../../");
 const UPLOADS_DIR = path.resolve(MONOREPO_ROOT, process.env.UPLOADS_DIR ?? "apps/web/uploads");

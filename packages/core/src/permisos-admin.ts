@@ -1,15 +1,18 @@
 import { eq } from "drizzle-orm";
-import { db, permisos, perfiles, herramientas } from "@valgian/db";
+import { db, permisos, perfiles, herramientas, operaciones } from "@valgian/db";
+import { OPERACION_ACCESO } from "./permissions";
 
 export interface PermisoConNombres {
   id: string;
   idPerfil: string | null;
-  idHerramienta: string | null;
-  gestionar: boolean | null;
+  idOperacion: string | null;
   perfilCodigo: string | null;
   perfilNombre: string | null;
+  idHerramienta: string | null;
   herramientaCodigo: string | null;
   herramientaNombre: string | null;
+  operacionCodigo: string | null;
+  operacionNombre: string | null;
 }
 
 export async function listPermisos(): Promise<PermisoConNombres[]> {
@@ -17,22 +20,38 @@ export async function listPermisos(): Promise<PermisoConNombres[]> {
     .select({
       id: permisos.id,
       idPerfil: permisos.idPerfil,
-      idHerramienta: permisos.idHerramienta,
-      gestionar: permisos.gestionar,
+      idOperacion: permisos.idOperacion,
       perfilCodigo: perfiles.codigo,
       perfilNombre: perfiles.nombre,
+      idHerramienta: herramientas.id,
       herramientaCodigo: herramientas.codigo,
       herramientaNombre: herramientas.nombre,
+      operacionCodigo: operaciones.codigo,
+      operacionNombre: operaciones.nombre,
     })
     .from(permisos)
     .leftJoin(perfiles, eq(perfiles.id, permisos.idPerfil))
-    .leftJoin(herramientas, eq(herramientas.id, permisos.idHerramienta));
+    .leftJoin(operaciones, eq(operaciones.id, permisos.idOperacion))
+    .leftJoin(herramientas, eq(herramientas.id, operaciones.idHerramienta));
+}
+
+export interface OperacionOption {
+  id: string;
+  codigo: string;
+  nombre: string;
+  idHerramienta: string | null;
+}
+
+/** Todas las OPERACIONES, para que el modal filtre client-side según la herramienta elegida. */
+export async function listOperaciones(): Promise<OperacionOption[]> {
+  return db
+    .select({ id: operaciones.id, codigo: operaciones.codigo, nombre: operaciones.nombre, idHerramienta: operaciones.idHerramienta })
+    .from(operaciones);
 }
 
 export interface PermisoInput {
   idPerfil: string;
-  idHerramienta: string;
-  gestionar: boolean;
+  idOperacion: string;
 }
 
 interface Resultado<T> {
@@ -49,28 +68,36 @@ export async function createPermiso(data: PermisoInput): Promise<Resultado<typeo
     const [fila] = await db.insert(permisos).values(data).returning();
     return { data: fila };
   } catch (err) {
-    if (esViolacionUnica(err)) return { error: "Ya existe un permiso para ese perfil y esa herramienta." };
+    if (esViolacionUnica(err)) return { error: "Ya existe un permiso para ese perfil y esa operación." };
     throw err;
   }
 }
 
-export async function updatePermiso(id: string, gestionar: boolean): Promise<Resultado<typeof permisos.$inferSelect>> {
-  const [fila] = await db.update(permisos).set({ gestionar }).where(eq(permisos.id, id)).returning();
-  return { data: fila };
+export async function updatePermiso(id: string, idOperacion: string): Promise<Resultado<typeof permisos.$inferSelect>> {
+  try {
+    const [fila] = await db.update(permisos).set({ idOperacion }).where(eq(permisos.id, id)).returning();
+    return { data: fila };
+  } catch (err) {
+    if (esViolacionUnica(err)) return { error: "Ya existe un permiso para ese perfil y esa operación." };
+    throw err;
+  }
 }
 
 export async function deletePermiso(id: string, currentPerfilId: string): Promise<Resultado<true>> {
   const [fila] = await db
-    .select({ idPerfil: permisos.idPerfil, herramientaCodigo: herramientas.codigo })
+    .select({ idPerfil: permisos.idPerfil, herramientaCodigo: herramientas.codigo, operacionCodigo: operaciones.codigo })
     .from(permisos)
-    .leftJoin(herramientas, eq(herramientas.id, permisos.idHerramienta))
+    .leftJoin(operaciones, eq(operaciones.id, permisos.idOperacion))
+    .leftJoin(herramientas, eq(herramientas.id, operaciones.idHerramienta))
     .where(eq(permisos.id, id));
 
   if (!fila) return { error: "El permiso ya no existe." };
 
-  if (fila.idPerfil === currentPerfilId && fila.herramientaCodigo === "permisos") {
+  const esPropioAccesoAPermisos =
+    fila.idPerfil === currentPerfilId && fila.herramientaCodigo === "permisos" && fila.operacionCodigo === OPERACION_ACCESO;
+  if (esPropioAccesoAPermisos) {
     return {
-      error: "No podés eliminar tu propio permiso de gestión sobre Permisos — te dejaría sin acceso a esta herramienta.",
+      error: "No podés eliminar tu propio acceso a Permisos — te dejaría sin acceso a esta herramienta.",
     };
   }
 

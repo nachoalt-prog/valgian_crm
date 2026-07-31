@@ -37,7 +37,7 @@ El componente recibe `{ idLegajo, idEntidad, canGestionar }` como props — el l
 
 ## Permisos por solapa
 
-Cada solapa con `ID_HERRAMIENTA` asignado respeta el mismo criterio que el resto de la app: si el perfil no tiene ninguna fila en `PERMISOS` para esa herramienta, **la solapa entera queda oculta** (no aparece como botón siquiera) — no es un simple "solo lectura". Si la fila existe, `PERMISOS.GESTIONAR` habilita o no los botones de edición dentro de la herramienta embebida.
+Cada solapa con `ID_HERRAMIENTA` asignado respeta el mismo criterio que el resto de la app: si el perfil no tiene ninguna fila en `PERMISOS` para la operación `acceso` de esa herramienta (ver `domain/infraestructura.md`, "Modelo de permisos"), **la solapa entera queda oculta** (no aparece como botón siquiera) — no es un simple "solo lectura". Si la fila existe, la herramienta embebida se ve completa — salvo `LEGAJO_ADJ_1` (Archivos Adjuntos), que además resuelve sus propias operaciones granulares para habilitar/deshabilitar cada botón individualmente (ver `domain/archivos-adjuntos.md`).
 
 Una solapa sin `ID_HERRAMIENTA` (vacía) siempre se muestra si `VISIBLE=true`, sin chequeo de permisos — no hay nada que proteger.
 

@@ -3,8 +3,35 @@ Lo siguiente que me interesa hoy
 
 - HOY
   - archivos adjuntos
-    - ABM modal de adjuntos en nueva solapa del modal de trámites, que muestre sus adjuntos asociados
-    - Asociación de adjuntos y movimientos ?
+    - Ampliar HERRAMIENTAS y PERMISOS: 
+      - Crear nueva tabla OPERACIONES con ID, ID_HERRAMIENTA, CODIGO y NOMBRE
+      - Modificar la tabla PERMISOS reemplazando ID_HERRAMIENTA por ID_OPERACION, descartar columna GESTIONAR
+      - Modificar el ABM de Permisos 
+        - Mantener la columna Herramienta, aunque ahora será indirecta
+        - Añadir columna Operación
+        - Eliminar columna Gestionar
+        - Añadir posibilidad de ordenar por cada columna
+        - En el modal de edición y creación: mantener combo de herramienta, pero que su selección determine las opciones en el nuevo combo a añadir con las operaciones. Eliminar 'Puede gestionar'
+    - Migrar todas las herramientas al nuevo esquema con, de momento una única operación 'Acceso'.
+    - Modificar la herramienta de adjuntos con el primer uso real de operaciones:
+      - Crearle, además de 'Acceso' 4 acciones: Crear, Reemplazar, Descargar y Guardar
+      - Añadir en la herramienta un botón para borrar (dentro del modal donde se previsualiza). Al darle al botón primero lanzar un confirm porque borrar un adjunto es algo serio. Si se avanza, hay que terminar borrando no solo el registro en la tabla sino el archivo físico del directorio de adjuntos.
+      - Modificar la herramienta para que para cada acción a realizar (los 4 botones) valide si el perfil del usuario tiene permiso para hacerlo, caso contrario mostrar un error.
+    
+    ----------------------------------------------------------------
+    - Extender el módulo de ARCHIVOS_ADJUNTOS moviendo las dos columnas ID_ENTIDAD y ID_RELACION una nueva tabla ARCHIVOS_ADJUNTOS_ENTIDADES donde también halla ID_ARCHIVO_ADJUNTO de forma que un mismo adjunto se pueda asociar a varias entidades
+      - Modificar toda dependencia
+      - Trigger on delete de ARCHIVOS_ADJUNTOS que borre toda relación en ARCHIVOS_ADJUNTOS_ENTIDADES
+      - Antes de eliminar las columnas originales, migrar toda relación de adjuntos existentes en demo a la nueva tabla
+    - Crear entidad Historial
+    - Añadir trigger on insert de HISTORIAL
+      - Si es un movimiento de legajo o trámite: buscar todo adjunto vinculado al mismo legajo o trámite, con fecha de carga dentro de los últimos 10 minutos y sin asociación contra entidad historial. Para todos los encontrados: ingresarles un registro en ARCHIVOS_ADJUNTOS_ENTIDADES vinculandolos a este registro de historial que se crea.
+    - Modificar tanto LAYOUTS_LEGAJO_SOLAPAS como MENUES_OPCIONES para añadir una columna PARAMETROS tipo JSONB
+    - Modificar todo uso de las tablas anteriores para soportar pasarle esos parámetros a las herramientas
+    - Modificar el ABM de archivos adjuntos para soportar recibir por parámetro los falgs Crear, Borrar, Reemplazar y Descargar
+      - Si recibe alguno en 0 o false debe impedir hacer esa acción. Para el caso de 'Crear' directamente no mostrar el botón Nuevo. Si no los recibe asume que se puede hacer todo, como si fueran todos 1 o true.
+    - Añadir en la vista de historial (trámites y de legajos) una nueva columna 'Adjuntos' con un botón, que debe desplegar como modal el ABM de archivos_adjuntos pasándo como entidad el registro de historial, por tanto deberían verse los adjuntos de tal movimiento.
+    - Añadir el ABM modal de adjuntos en una nueva solapa del modal de trámites, que muestre sus adjuntos asociados al trámite y permita cargar nuevos. Análogo a legajos.
     - No se previsualizan HTMLs ?
     - ABM tipos de adjunto ?
     - generación de adjuntos

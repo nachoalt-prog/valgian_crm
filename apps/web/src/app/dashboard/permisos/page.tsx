@@ -1,4 +1,4 @@
-import { getPermisoParaHerramienta, listPermisos, listPerfiles, listHerramientas } from "@valgian/core";
+import { getPermisoParaOperacion, OPERACION_ACCESO, listPermisos, listPerfiles, listHerramientas, listOperaciones } from "@valgian/core";
 import { getCurrentSession } from "@/lib/current-user";
 import { SinAcceso } from "@/components/sin-acceso";
 import { PermisosTool } from "@/components/permisos-tool";
@@ -7,20 +7,26 @@ const HERRAMIENTA_CODIGO = "permisos";
 
 export default async function PermisosPage() {
   const session = await getCurrentSession();
-  const permiso = session?.perfil ? await getPermisoParaHerramienta(session.perfil.id, HERRAMIENTA_CODIGO) : null;
+  const tieneAcceso = session?.perfil ? await getPermisoParaOperacion(session.perfil.id, HERRAMIENTA_CODIGO, OPERACION_ACCESO) : false;
 
-  if (!permiso) {
+  if (!tieneAcceso) {
     return <SinAcceso herramienta="Permisos" />;
   }
 
-  const [permisos, perfiles, herramientas] = await Promise.all([listPermisos(), listPerfiles(), listHerramientas()]);
+  const [permisos, perfiles, herramientas, operaciones] = await Promise.all([
+    listPermisos(),
+    listPerfiles(),
+    listHerramientas(),
+    listOperaciones(),
+  ]);
 
   return (
     <PermisosTool
       permisosIniciales={permisos}
       perfiles={perfiles}
       herramientas={herramientas}
-      canGestionar={permiso.gestionar}
+      operaciones={operaciones}
+      canGestionar={tieneAcceso}
     />
   );
 }

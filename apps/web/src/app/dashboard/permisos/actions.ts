@@ -5,7 +5,8 @@ import {
   createPermiso,
   updatePermiso,
   deletePermiso,
-  getPermisoParaHerramienta,
+  getPermisoParaOperacion,
+  OPERACION_ACCESO,
   type PermisoInput,
 } from "@valgian/core";
 import { getCurrentSession } from "@/lib/current-user";
@@ -17,8 +18,8 @@ async function requireGestion(): Promise<{ error?: string; perfilId?: string }> 
   const session = await getCurrentSession();
   if (!session?.perfil) return { error: "No autenticado." };
 
-  const permiso = await getPermisoParaHerramienta(session.perfil.id, HERRAMIENTA_CODIGO);
-  if (!permiso?.gestionar) return { error: NO_GESTIONAR };
+  const tieneAcceso = await getPermisoParaOperacion(session.perfil.id, HERRAMIENTA_CODIGO, OPERACION_ACCESO);
+  if (!tieneAcceso) return { error: NO_GESTIONAR };
 
   return { perfilId: session.perfil.id };
 }
@@ -32,11 +33,11 @@ export async function createPermisoAction(data: PermisoInput) {
   return result;
 }
 
-export async function updatePermisoAction(id: string, gestionar: boolean) {
+export async function updatePermisoAction(id: string, idOperacion: string) {
   const check = await requireGestion();
   if (check.error) return { error: check.error };
 
-  const result = await updatePermiso(id, gestionar);
+  const result = await updatePermiso(id, idOperacion);
   if (result.data) revalidatePath("/dashboard/permisos");
   return result;
 }

@@ -1,4 +1,4 @@
-import { getPermisoParaHerramienta, listBandejasAdmin, listFiltros, listLayoutsLegajoAdmin } from "@valgian/core";
+import { getPermisoParaOperacion, OPERACION_ACCESO, listBandejasAdmin, listFiltros, listLayoutsLegajoAdmin } from "@valgian/core";
 import { getCurrentSession } from "@/lib/current-user";
 import { SinAcceso } from "@/components/sin-acceso";
 import { BandejasAdminTool } from "@/components/bandejas-admin-tool";
@@ -7,9 +7,9 @@ const HERRAMIENTA_CODIGO = "bandejas_admin";
 
 export default async function BandejasAdminPage() {
   const session = await getCurrentSession();
-  const permiso = session?.perfil ? await getPermisoParaHerramienta(session.perfil.id, HERRAMIENTA_CODIGO) : null;
+  const tieneAcceso = session?.perfil ? await getPermisoParaOperacion(session.perfil.id, HERRAMIENTA_CODIGO, OPERACION_ACCESO) : false;
 
-  if (!permiso) {
+  if (!tieneAcceso) {
     return <SinAcceso herramienta="Bandejas (ABM)" />;
   }
 
@@ -24,7 +24,7 @@ export default async function BandejasAdminPage() {
       bandejasIniciales={bandejas}
       filtrosDisponibles={filtrosDisponibles}
       layoutsDisponibles={layoutsDisponibles}
-      canGestionar={permiso.gestionar}
+      canGestionar={tieneAcceso}
     />
   );
 }
