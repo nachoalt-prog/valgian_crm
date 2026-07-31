@@ -23,9 +23,15 @@ import {
   tiposTramite,
   tiposCampos,
   tiposTramiteCampos,
+  interfaz,
+  perfiles,
+  herramientas,
+  operaciones,
+  permisos,
 } from "@valgian/db";
 import { gestionarTramite, mapearValorCampo, type DatoTramiteInput } from "./tramites";
 import { crearPlantillaAdjunto } from "./plantillas-adjunto";
+import { OPERACION_ADJUNTOS_BORRAR } from "./archivos-adjuntos";
 
 const ADMIN_USERNAME = "admin";
 
@@ -66,6 +72,31 @@ async function getProvinciaPorCodigo(codigo: string) {
   const [provincia] = await db.select().from(provincias).where(eq(provincias.codigo, codigo));
   if (!provincia) throw new Error(`No existe PROVINCIAS.CODIGO = "${codigo}" — corré el seed principal primero.`);
   return provincia;
+}
+
+async function getInterfazPorCodigo(codigo: string) {
+  const [fila] = await db.select().from(interfaz).where(eq(interfaz.codigo, codigo));
+  if (!fila) throw new Error(`No existe INTERFAZ.CODIGO = "${codigo}" — corré el seed principal primero.`);
+  return fila;
+}
+
+async function ensurePerfilPorCodigo(codigo: string, nombre: string, idInterfaz: string) {
+  const [existente] = await db.select().from(perfiles).where(eq(perfiles.codigo, codigo));
+  if (existente) return existente;
+
+  const [creado] = await db.insert(perfiles).values({ codigo, nombre, idInterfaz }).returning();
+  return creado;
+}
+
+async function ensurePermisoOperacionDemo(idPerfil: string, idOperacion: string) {
+  const [existente] = await db
+    .select()
+    .from(permisos)
+    .where(and(eq(permisos.idPerfil, idPerfil), eq(permisos.idOperacion, idOperacion)));
+  if (existente) return existente;
+
+  const [creado] = await db.insert(permisos).values({ idPerfil, idOperacion }).returning();
+  return creado;
 }
 
 async function getEstrategiaPorCodigo(codigo: string) {
@@ -689,8 +720,25 @@ async function main() {
     observacion: "Trámite demo — sobre cliente titular, vía el tipo con filtro.",
   });
 
+  // Perfil de prueba "Admin2": todos los permisos salvo Borrar en Archivos
+  // Adjuntos — sirve para verificar en vivo que el gate granular de un botón
+  // puntual efectivamente bloquea, sin tener que restringir todo el perfil.
+  const interfazDefault = await getInterfazPorCodigo("default");
+  const perfilAdmin2 = await ensurePerfilPorCodigo("Admin2", "Administrador test 2", interfazDefault.id);
+
+  const todasLasOperaciones = await db
+    .select({ id: operaciones.id, codigo: operaciones.codigo, herramientaCodigo: herramientas.codigo })
+    .from(operaciones)
+    .innerJoin(herramientas, eq(herramientas.id, operaciones.idHerramienta));
+
+  for (const operacion of todasLasOperaciones) {
+    const esBorrarAdjuntos = operacion.herramientaCodigo === "LEGAJO_ADJ_1" && operacion.codigo === OPERACION_ADJUNTOS_BORRAR;
+    if (esBorrarAdjuntos) continue;
+    await ensurePermisoOperacionDemo(perfilAdmin2.id, operacion.id);
+  }
+
   console.log(
-    "Seed de prueba aplicado (idempotente): 10 legajos, 20 clientes, 3 tipos de trámite, 4 trámites de ejemplo, 4 placeholders + 1 plantilla + 1 acción de generación de documentos.",
+    "Seed de prueba aplicado (idempotente): 10 legajos, 20 clientes, 3 tipos de trámite, 4 trámites de ejemplo, 4 placeholders + 1 plantilla + 1 acción de generación de documentos, perfil Admin2 con todos los permisos salvo Borrar adjuntos.",
   );
 }
 
