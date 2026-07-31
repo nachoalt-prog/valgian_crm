@@ -36,7 +36,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   });
 }
 
-/** Reemplazo — multipart/form-data: file, herramientaCodigo (opcional, no hace falta para el propio avatar). */
+/** Reemplazo — multipart/form-data: file, herramientaCodigo (opcional, no hace falta para el propio avatar), tiposPermitidos (opcional, códigos separados por coma). */
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const existente = await getArchivoAdjunto(id);
@@ -45,11 +45,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   const formData = await request.formData();
   const file = formData.get("file");
   const herramientaCodigo = formData.get("herramientaCodigo");
+  const tiposPermitidosRaw = formData.get("tiposPermitidos");
   if (!(file instanceof File)) return NextResponse.json({ error: "Falta el archivo." }, { status: 400 });
 
   const auth = await autorizarOperacionArchivo({
-    idEntidad: existente.idEntidad ?? "",
-    idRegistro: existente.idRegistro ?? "",
+    idEntidad: existente.idEntidad,
+    idRegistro: existente.idRegistro,
     herramientaCodigo: typeof herramientaCodigo === "string" ? herramientaCodigo : null,
   });
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
@@ -61,6 +62,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     nombreOriginal: file.name,
     mimetype: file.type || "application/octet-stream",
     idUsuario: auth.usuarioId,
+    tiposPermitidos: typeof tiposPermitidosRaw === "string" && tiposPermitidosRaw ? tiposPermitidosRaw.split(",") : undefined,
   });
 
   if (resultado.error) return NextResponse.json({ error: resultado.error }, { status: 400 });
@@ -74,8 +76,8 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 
   const herramientaCodigo = request.nextUrl.searchParams.get("herramientaCodigo");
   const auth = await autorizarOperacionArchivo({
-    idEntidad: existente.idEntidad ?? "",
-    idRegistro: existente.idRegistro ?? "",
+    idEntidad: existente.idEntidad,
+    idRegistro: existente.idRegistro,
     herramientaCodigo,
   });
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });

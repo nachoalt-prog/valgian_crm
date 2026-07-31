@@ -256,6 +256,8 @@ async function main() {
   const herramientaBandejasAdmin = await ensureHerramienta("bandejas_admin", "Bandejas (ABM)", "bandejas_admin.gestionar");
   const herramientaLayoutsLegajo = await ensureHerramienta("layouts_legajo", "Layouts de Legajo", "layouts_legajo.gestionar");
   const herramientaPerfilesEstimulos = await ensureHerramienta("perfiles_estimulos", "Perfiles-Estímulos", "perfiles_estimulos.gestionar");
+  const herramientaPlaceholders = await ensureHerramienta("placeholders", "Placeholders", "placeholders.gestionar");
+  const herramientaPlantillasAdjuntos = await ensureHerramienta("plantillas_adjuntos", "Plantillas de Documento", "plantillas_adjuntos.gestionar");
   // Estas no se navegan desde el sidebar — se cargan embebidas dentro de un
   // LAYOUTS_LEGAJO dentro del modal de legajo abierto desde Bandejas.
   const herramientaLegajoDatos = await ensureHerramienta("LEGAJO_DAT_1", "Datos de Legajo", "legajo_dat_1.gestionar");
@@ -279,6 +281,8 @@ async function main() {
     herramientaBandejasAdmin,
     herramientaLayoutsLegajo,
     herramientaPerfilesEstimulos,
+    herramientaPlaceholders,
+    herramientaPlantillasAdjuntos,
     herramientaLegajoDatos,
     herramientaLegajoClientes,
     herramientaGestionEntidad,
@@ -303,6 +307,8 @@ async function main() {
   await ensureMenuOpcion(menuConfiguracion.id, herramientaBandejasAdmin.id, "bandejas_admin", "Bandejas", "icon.bandejas", 7);
   await ensureMenuOpcion(menuConfiguracion.id, herramientaLayoutsLegajo.id, "layouts_legajo", "Layouts de Legajo", "icon.layouts", 8);
   await ensureMenuOpcion(menuConfiguracion.id, herramientaPerfilesEstimulos.id, "perfiles_estimulos", "Perfiles-Estímulos", "icon.perfilesEstimulos", 9);
+  await ensureMenuOpcion(menuConfiguracion.id, herramientaPlaceholders.id, "placeholders", "Placeholders", "icon.placeholders", 10);
+  await ensureMenuOpcion(menuConfiguracion.id, herramientaPlantillasAdjuntos.id, "plantillas_adjuntos", "Plantillas de Documento", "icon.plantillasAdjuntos", 11);
   await ensureMenuOpcion(menuHerramientas.id, herramientaBandejas.id, "bandejas", "Bandejas", "icon.bandejas", 1);
 
   await ensureInterfazMenu(interfazDefault.id, menuPrincipal.id);
@@ -348,6 +354,7 @@ async function main() {
     { codigo: "webp", nombre: "Imagen WEBP", extension: "webp", mimetype: "image/webp", permiteCarga: true, permiteDownload: true, renderizar: true },
     { codigo: "pdf", nombre: "Documento PDF", extension: "pdf", mimetype: "application/pdf", permiteCarga: true, permiteDownload: true, renderizar: true },
     { codigo: "txt", nombre: "Texto plano", extension: "txt", mimetype: "text/plain", permiteCarga: true, permiteDownload: true, renderizar: true },
+    { codigo: "html", nombre: "HTML", extension: "html", mimetype: "text/html", permiteCarga: true, permiteDownload: true, renderizar: false },
     {
       codigo: "docx",
       nombre: "Word (DOCX)",

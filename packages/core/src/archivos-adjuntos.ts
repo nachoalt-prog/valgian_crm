@@ -29,6 +29,28 @@ const MONOREPO_ROOT = path.resolve(__dirname, "../../../");
 const UPLOADS_DIR = path.resolve(MONOREPO_ROOT, process.env.UPLOADS_DIR ?? "apps/web/uploads");
 const ADJUNTOS_SUBDIR = "adjuntos";
 
+const MODALIDADES_ALMACENAMIENTO_SOPORTADAS = ["filesystem"] as const;
+type ModalidadAlmacenamiento = (typeof MODALIDADES_ALMACENAMIENTO_SOPORTADAS)[number];
+
+/**
+ * Config de INFRAESTRUCTURA por instalación (no de negocio) — vive en .env,
+ * mismo criterio que UPLOADS_DIR, no en una tabla (ver candidato a ADR 0013).
+ * Hoy solo existe "filesystem"; queda preparado el punto de ramificación en
+ * escribirAtomico/reemplazarArchivo/borrarArchivo/leerArchivoCrudo para el
+ * día que haga falta un segundo modo (ej. "s3") — sin switch/interfaz/clase
+ * todavía, no se usa ese estilo en el resto de packages/core y nadie puede
+ * probar de verdad un modo que no tiene una instalación real que lo necesite.
+ */
+export function getModalidadAlmacenamiento(): ModalidadAlmacenamiento {
+  const valor = process.env.MODALIDAD_ALMACENAMIENTO_ADJUNTOS ?? "filesystem";
+  if (!(MODALIDADES_ALMACENAMIENTO_SOPORTADAS as readonly string[]).includes(valor)) {
+    throw new Error(
+      `MODALIDAD_ALMACENAMIENTO_ADJUNTOS="${valor}" no está soportada. Valores válidos: ${MODALIDADES_ALMACENAMIENTO_SOPORTADAS.join(", ")}.`,
+    );
+  }
+  return valor as ModalidadAlmacenamiento;
+}
+
 interface Resultado<T> {
   data?: T;
   error?: string;
@@ -52,6 +74,7 @@ async function getTipoPorExtensionYMimetype(extension: string, mimetype: string)
   return tipo ?? null;
 }
 
+// Punto de ramificación por MODALIDAD_ALMACENAMIENTO_ADJUNTOS (ver getModalidadAlmacenamiento) — hoy solo escribe a disco.
 async function escribirAtomico(rutaRelativa: string, buffer: Buffer): Promise<void> {
   const rutaAbsoluta = path.join(UPLOADS_DIR, rutaRelativa);
   await fs.mkdir(path.dirname(rutaAbsoluta), { recursive: true });
@@ -60,13 +83,26 @@ async function escribirAtomico(rutaRelativa: string, buffer: Buffer): Promise<vo
   await fs.rename(tempPath, rutaAbsoluta);
 }
 
+/** Si `tiposPermitidos` viene con algo, el CODIGO del tipo matcheado tiene que estar en la lista — ej. la ventanita de plantillas solo admite "html". */
+function validarTipoPermitido(tipo: { codigo: string; nombre: string }, tiposPermitidos?: string[]): string | null {
+  if (!tiposPermitidos || tiposPermitidos.length === 0) return null;
+  if (tiposPermitidos.includes(tipo.codigo)) return null;
+  return `Este campo solo admite: ${tiposPermitidos.join(", ")}.`;
+}
+
 export interface GuardarArchivoInput {
-  idEntidad: string;
-  idRegistro: string;
+  // NULL para archivos globales sin registro dueño (ej. PLANTILLAS_ADJUNTOS,
+  // identificados por su propio CODIGO, no por un ID_ENTIDAD/ID_REGISTRO).
+  idEntidad?: string | null;
+  idRegistro?: string | null;
   buffer: Buffer;
   nombreOriginal: string;
   mimetype: string;
-  idUsuario: string;
+  // NULL para archivos generados por el propio sistema (ej. PDFs armados por
+  // la generación de documentos) — no hay un usuario humano detrás.
+  idUsuario?: string | null;
+  // Restringe a estos CODIGO de TIPOS_ARCHIVOS_ADJUNTOS (ej. ["html"] para plantillas). Sin restricción si se omite.
+  tiposPermitidos?: string[];
 }
 
 /** Alta de un archivo adjunto nuevo — ver reglas de consistencia arriba. */
@@ -75,6 +111,10 @@ export async function guardarArchivo(input: GuardarArchivoInput): Promise<Result
   const tipo = await getTipoPorExtensionYMimetype(extension, input.mimetype);
   if (!tipo) return { error: `Tipo de archivo no soportado (extensión "${extension || "?"}", ${input.mimetype}).` };
   if (!tipo.permiteCarga) return { error: `El tipo de archivo "${tipo.nombre}" no admite carga.` };
+  {
+    const errorTipoPermitido = validarTipoPermitido(tipo, input.tiposPermitidos);
+    if (errorTipoPermitido) return { error: errorTipoPermitido };
+  }
 
   const id = crypto.randomUUID();
   const { rutaRelativa } = shardYRuta(id, extension);
@@ -114,9 +154,14 @@ export interface ReemplazarArchivoInput {
   nombreOriginal: string;
   mimetype: string;
   idUsuario: string;
+  // Restringe a estos CODIGO de TIPOS_ARCHIVOS_ADJUNTOS (ej. ["html"] para plantillas). Sin restricción si se omite.
+  tiposPermitidos?: string[];
 }
 
-/** Reemplaza el archivo de una fila ya existente — el ID nunca cambia (no rompe FKs como USUARIOS.ID_ARCHIVO_ADJUNTO). */
+/**
+ * Reemplaza el archivo de una fila ya existente — el ID nunca cambia (no rompe FKs como USUARIOS.ID_ARCHIVO_ADJUNTO).
+ * Punto de ramificación por MODALIDAD_ALMACENAMIENTO_ADJUNTOS — hoy escribe a disco (temp + rename dentro de la transacción, ver comentario más abajo).
+ */
 export async function reemplazarArchivo(input: ReemplazarArchivoInput): Promise<Resultado<{ id: string }>> {
   const [existente] = await db.select().from(archivosAdjuntos).where(eq(archivosAdjuntos.id, input.id));
   if (!existente) return { error: "No existe el archivo adjunto a reemplazar." };
@@ -125,6 +170,10 @@ export async function reemplazarArchivo(input: ReemplazarArchivoInput): Promise<
   const tipo = await getTipoPorExtensionYMimetype(extension, input.mimetype);
   if (!tipo) return { error: `Tipo de archivo no soportado (extensión "${extension || "?"}", ${input.mimetype}).` };
   if (!tipo.permiteCarga) return { error: `El tipo de archivo "${tipo.nombre}" no admite carga.` };
+  {
+    const errorTipoPermitido = validarTipoPermitido(tipo, input.tiposPermitidos);
+    if (errorTipoPermitido) return { error: errorTipoPermitido };
+  }
 
   const { rutaRelativa } = shardYRuta(input.id, extension);
   const rutaAbsolutaFinal = path.join(UPLOADS_DIR, rutaRelativa);
@@ -165,7 +214,10 @@ export async function reemplazarArchivo(input: ReemplazarArchivoInput): Promise<
   return { data: { id: input.id } };
 }
 
-/** Borra la fila y el archivo — el archivo se borra PRIMERO: si algo falla a mitad de camino, es preferible una fila sin archivo (visible, se puede reintentar) a un archivo sin fila (invisible, sin forma de encontrarlo). */
+/**
+ * Borra la fila y el archivo — el archivo se borra PRIMERO: si algo falla a mitad de camino, es preferible una fila sin archivo (visible, se puede reintentar) a un archivo sin fila (invisible, sin forma de encontrarlo).
+ * Punto de ramificación por MODALIDAD_ALMACENAMIENTO_ADJUNTOS — hoy borra de disco.
+ */
 export async function borrarArchivo(id: string): Promise<Resultado<true>> {
   const [existente] = await db.select().from(archivosAdjuntos).where(eq(archivosAdjuntos.id, id));
   if (!existente) return { error: "No existe el archivo adjunto." };
@@ -227,22 +279,41 @@ export interface ArchivoParaDescarga {
   mimetype: string | null;
 }
 
-/** Lee el archivo de disco para servirlo — valida PERMITE_DOWNLOAD acá adentro, no confiar en que el llamador ya lo chequeó. */
-export async function leerArchivoParaDescarga(id: string): Promise<Resultado<ArchivoParaDescarga>> {
+/**
+ * Lee los bytes de disco sin validar PERMITE_DOWNLOAD — ese flag es sobre si
+ * un usuario final puede bajarse el archivo desde la UI, no sobre si el
+ * propio sistema puede leerlo para procesarlo internamente (ej. el HTML de
+ * una PLANTILLAS_ADJUNTOS al generar un documento). Uso interno — el route
+ * handler de descarga usa `leerArchivoParaDescarga`, no esta función directo.
+ * Punto de ramificación por MODALIDAD_ALMACENAMIENTO_ADJUNTOS — hoy lee de disco.
+ */
+export async function leerArchivoCrudo(id: string): Promise<Resultado<ArchivoParaDescarga>> {
   const [fila] = await db
     .select({
       rutaArchivo: archivosAdjuntos.rutaArchivo,
       nombreOriginal: archivosAdjuntos.nombreOriginal,
       mimetype: tiposArchivosAdjuntos.mimetype,
-      permiteDownload: tiposArchivosAdjuntos.permiteDownload,
     })
     .from(archivosAdjuntos)
     .leftJoin(tiposArchivosAdjuntos, eq(tiposArchivosAdjuntos.id, archivosAdjuntos.idTipoArchivoAdjunto))
     .where(eq(archivosAdjuntos.id, id));
 
   if (!fila || !fila.rutaArchivo) return { error: "No existe el archivo adjunto." };
-  if (!fila.permiteDownload) return { error: "Este tipo de archivo no admite descarga." };
 
   const buffer = await fs.readFile(path.join(UPLOADS_DIR, fila.rutaArchivo));
   return { data: { buffer, nombreOriginal: fila.nombreOriginal ?? "archivo", mimetype: fila.mimetype } };
+}
+
+/** Lee el archivo de disco para servirlo por descarga — valida PERMITE_DOWNLOAD acá adentro, no confiar en que el llamador ya lo chequeó. */
+export async function leerArchivoParaDescarga(id: string): Promise<Resultado<ArchivoParaDescarga>> {
+  const [fila] = await db
+    .select({ permiteDownload: tiposArchivosAdjuntos.permiteDownload })
+    .from(archivosAdjuntos)
+    .leftJoin(tiposArchivosAdjuntos, eq(tiposArchivosAdjuntos.id, archivosAdjuntos.idTipoArchivoAdjunto))
+    .where(eq(archivosAdjuntos.id, id));
+
+  if (!fila) return { error: "No existe el archivo adjunto." };
+  if (!fila.permiteDownload) return { error: "Este tipo de archivo no admite descarga." };
+
+  return leerArchivoCrudo(id);
 }

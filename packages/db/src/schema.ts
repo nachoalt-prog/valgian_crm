@@ -508,3 +508,62 @@ export const archivosAdjuntos = pgTable("ARCHIVOS_ADJUNTOS", {
   auditFecha: timestamp("AUDIT_FECHA", { withTimezone: true }),
   auditUsuario: uuid("AUDIT_USUARIO").references(() => usuarios.id),
 });
+
+/**
+ * Generación de documentos: PDF armados a partir de un modelo HTML con
+ * placeholders ##CODIGO##, resueltos contra datos de la base y guardados
+ * como un ARCHIVOS_ADJUNTOS más — ver domain/generacion-documentos.md.
+ */
+
+export const placeholders = pgTable(
+  "PLACEHOLDERS",
+  {
+    id: uuid("ID").primaryKey().defaultRandom(),
+    codigo: text("CODIGO").notNull(),
+    nombre: text("NOMBRE").notNull(),
+    // SQL de confianza (ADR 0009): recibe un único $1 jsonb con los datos raíz
+    // del llamador, devuelve un valor escalar. Sin recursión — si hace falta
+    // componer, se resuelve con SQL nativo dentro de la propia query.
+    query: text("QUERY"),
+    // Si es exactamente `false`, el resultado NO se escapa antes de insertarlo
+    // en el HTML (permite que un placeholder arme HTML de confianza, ej. una
+    // tabla). Tratar como "escapar salvo === false" en el código de
+    // resolución — un flag en NULL debe quedar seguro por default, no inseguro.
+    escapar: boolean("ESCAPAR"),
+    comodin: jsonb("COMODIN"),
+  },
+  (table) => [uniqueIndex("PLACEHOLDERS_CODIGO_UNIQUE").on(table.codigo)],
+);
+
+export const plantillasAdjunto = pgTable(
+  "PLANTILLAS_ADJUNTOS",
+  {
+    id: uuid("ID").primaryKey().defaultRandom(),
+    // El ARCHIVOS_ADJUNTOS de una plantilla queda con ID_ENTIDAD/ID_REGISTRO
+    // en NULL — es global, se identifica por CODIGO, no por un registro dueño.
+    idArchivoAdjunto: uuid("ID_ARCHIVO_ADJUNTO").references(() => archivosAdjuntos.id),
+    codigo: text("CODIGO").notNull(),
+    nombre: text("NOMBRE").notNull(),
+    descripcion: text("DESCRIPCION"),
+  },
+  (table) => [
+    uniqueIndex("PLANTILLAS_ADJUNTOS_CODIGO_UNIQUE").on(table.codigo),
+    uniqueIndex("PLANTILLAS_ADJUNTOS_ARCHIVO_UNIQUE").on(table.idArchivoAdjunto),
+  ],
+);
+
+export const generacionesDocumento = pgTable("GENERACIONES_DOCUMENTO", {
+  id: uuid("ID").primaryKey().defaultRandom(),
+  idPlantilla: uuid("ID_PLANTILLA").references(() => plantillasAdjunto.id),
+  idEntidad: uuid("ID_ENTIDAD").references(() => entidades.id),
+  // Sin FK real (asociación polimórfica) — mismo criterio que ARCHIVOS_ADJUNTOS.ID_REGISTRO.
+  idRegistro: uuid("ID_REGISTRO"),
+  // Datos raíz que se le pasan a CADA placeholder como su único parámetro $1.
+  datos: jsonb("DATOS"),
+  // 'pendiente' | 'procesando' | 'completado' | 'error'
+  estado: text("ESTADO"),
+  idArchivoResultado: uuid("ID_ARCHIVO_RESULTADO").references(() => archivosAdjuntos.id),
+  error: text("ERROR"),
+  altaFecha: timestamp("ALTA_FECHA", { withTimezone: true }),
+  auditFecha: timestamp("AUDIT_FECHA", { withTimezone: true }),
+});

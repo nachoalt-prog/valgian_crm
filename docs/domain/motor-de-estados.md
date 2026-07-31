@@ -129,6 +129,8 @@ Contiene código SQL ejecutable de verdad, corrido por el propio SP — no un id
 
 Consecuencia: los SPs y el código de `COMANDO` requieren su propia estrategia de versionado (migraciones SQL manuales), separada de las que Drizzle genera a partir del schema TypeScript.
 
+**Primer ejemplo real** (antes de esto la tabla nunca tuvo filas): la acción `generar_comprobante_1` del seed-demo, colgada de una transición de `TRAMITES`, dispara la generación de un documento — ver `domain/generacion-documentos.md`, sección "Cómo se dispara", que incluye un gotcha real encontrado ahí: cuando `$1` es el `ID` de un registro "intermedio" (como un trámite, que no es el destinatario final del efecto), el `COMANDO` tiene que resolver con un `JOIN` a qué registro real corresponde la acción — no asumir que es directamente `$1`.
+
 ## Herramienta "Gestión de Entidad"
 
 `GESTION_ENTIDAD_1` — la herramienta que le da uso real a las estrategias. Sin entrada en `MENUES_OPCIONES` (no es navegable por sidebar): se usa embebida dentro de una solapa de `LAYOUTS_LEGAJO` (ver `domain/layouts-legajo.md`), recibiendo `ID_ENTIDAD` e `ID_RELACION` (=`idLegajo`) desde ese contexto.

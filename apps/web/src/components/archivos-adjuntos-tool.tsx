@@ -5,6 +5,7 @@ import { Paperclip, PlusCircle, FileIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ArchivoAdjuntoDialog } from "@/components/archivo-adjunto-dialog";
 import { listArchivosAdjuntosAction } from "@/app/dashboard/archivos-adjuntos/actions";
+import { HERRAMIENTA_ADJUNTOS_CODIGO } from "@/lib/archivos-adjuntos-const";
 import type { ArchivoAdjuntoDetalle } from "@valgian/core";
 
 interface ArchivosAdjuntosToolProps {
@@ -81,6 +82,7 @@ export function ArchivosAdjuntosTool({ idLegajo, idEntidad, canGestionar, revisi
           idArchivoExistente={dialogTarget.id}
           idEntidad={idEntidad}
           idRegistro={idLegajo}
+          herramientaCodigo={HERRAMIENTA_ADJUNTOS_CODIGO}
           canGestionar={canGestionar}
           onGuardado={onCambio}
         />

@@ -10,6 +10,11 @@ import {
   estrategias,
   estados,
   estimulos,
+  transiciones,
+  acciones,
+  transicionesAcciones,
+  placeholders,
+  plantillasAdjunto,
   legajos,
   clientes,
   tramites,
@@ -20,6 +25,7 @@ import {
   tiposTramiteCampos,
 } from "@valgian/db";
 import { gestionarTramite, mapearValorCampo, type DatoTramiteInput } from "./tramites";
+import { crearPlantillaAdjunto } from "./plantillas-adjunto";
 
 const ADMIN_USERNAME = "admin";
 
@@ -130,6 +136,64 @@ async function getEntidadPorCodigo(codigo: string) {
   const [entidad] = await db.select().from(entidades).where(eq(entidades.codigo, codigo));
   if (!entidad) throw new Error(`No existe ENTIDADES.CODIGO = "${codigo}" — corré el seed principal primero.`);
   return entidad;
+}
+
+async function getTransicion(idEstrategia: string, idEstado0: string, idEstimulo: string) {
+  const [transicion] = await db
+    .select()
+    .from(transiciones)
+    .where(and(eq(transiciones.idEstrategia, idEstrategia), eq(transiciones.idEstado0, idEstado0), eq(transiciones.idEstimulo, idEstimulo)));
+  if (!transicion) throw new Error(`No existe la transición (estrategia=${idEstrategia}, estado0=${idEstado0}, estimulo=${idEstimulo}).`);
+  return transicion;
+}
+
+async function ensureAccion(params: { idEstrategia: string; codigo: string; nombre: string; comando: string }) {
+  const [existente] = await db
+    .select()
+    .from(acciones)
+    .where(and(eq(acciones.idEstrategia, params.idEstrategia), eq(acciones.codigo, params.codigo)));
+  if (existente) return existente;
+
+  const [creada] = await db.insert(acciones).values(params).returning();
+  return creada;
+}
+
+async function ensureTransicionAccion(idTransicion: string, idAccion: string, orden: number) {
+  const [existente] = await db
+    .select()
+    .from(transicionesAcciones)
+    .where(and(eq(transicionesAcciones.idTransicion, idTransicion), eq(transicionesAcciones.idAccion, idAccion)));
+  if (existente) return existente;
+
+  const [creada] = await db.insert(transicionesAcciones).values({ idTransicion, idAccion, orden }).returning();
+  return creada;
+}
+
+async function ensurePlaceholderDemo(params: { codigo: string; nombre: string; query: string; escapar: boolean }) {
+  const [existente] = await db.select().from(placeholders).where(eq(placeholders.codigo, params.codigo));
+  if (existente) return existente;
+
+  const [creado] = await db.insert(placeholders).values(params).returning();
+  return creado;
+}
+
+async function ensurePlantillaDemo(params: { codigo: string; nombre: string; descripcion?: string; html: string; idUsuario: string }) {
+  const [existente] = await db.select().from(plantillasAdjunto).where(eq(plantillasAdjunto.codigo, params.codigo));
+  if (existente) return existente;
+
+  const resultado = await crearPlantillaAdjunto({
+    codigo: params.codigo,
+    nombre: params.nombre,
+    descripcion: params.descripcion ?? null,
+    buffer: Buffer.from(params.html, "utf-8"),
+    nombreOriginal: `${params.codigo}.html`,
+    mimetype: "text/html",
+    idUsuario: params.idUsuario,
+  });
+  if (resultado.error || !resultado.data) throw new Error(`Error creando la plantilla demo "${params.codigo}": ${resultado.error}`);
+
+  const [fila] = await db.select().from(plantillasAdjunto).where(eq(plantillasAdjunto.id, resultado.data.id));
+  return fila;
 }
 
 async function getTipoCampoPorCodigo(codigo: string) {
@@ -473,6 +537,100 @@ async function main() {
   const estimuloActualizarTramite = await getEstimuloPorCodigo(estrategiaTramites.id, "actualizar");
   const estimuloResolverTramite = await getEstimuloPorCodigo(estrategiaTramites.id, "resolver");
 
+  // --- Generación de documentos: placeholders + plantilla + acción demo ---
+  // Al resolver un trámite (estrategia STD_TRAMITE_1), se genera un PDF de
+  // comprobante a partir de la plantilla "demo_comprobante_1" — ver
+  // domain/generacion-documentos.md.
+  const phFecha = await ensurePlaceholderDemo({
+    codigo: "demo_fecha_generacion",
+    nombre: "Fecha de generación (demo)",
+    query: `SELECT to_char(($1::jsonb->>'fecha')::timestamptz, 'DD/MM/YYYY HH24:MI') AS valor`,
+    escapar: true,
+  });
+  const phAsunto = await ensurePlaceholderDemo({
+    codigo: "demo_asunto_tramite",
+    nombre: "Asunto del trámite (demo)",
+    query: `
+      SELECT tcd."VALOR_TEXTO" AS valor
+      FROM "TRAMITES_CAMPOS_DATOS" tcd
+      JOIN "TIPOS_TRAMITE_CAMPOS" ttc ON ttc."ID" = tcd."ID_TIPO_TRAMITE_CAMPO"
+      WHERE tcd."ID_TRAMITE" = ($1::jsonb->>'id_tramite')::uuid AND ttc."CODIGO" = 'asunto'
+    `,
+    escapar: true,
+  });
+  const phNumeroLegajo = await ensurePlaceholderDemo({
+    codigo: "demo_numero_legajo",
+    nombre: "Número de legajo (demo)",
+    query: `
+      SELECT l."NUMERO" AS valor
+      FROM "TRAMITES" t
+      JOIN "LEGAJOS" l ON l."ID" = t."ID_REGISTRO"
+      WHERE t."ID" = ($1::jsonb->>'id_tramite')::uuid
+    `,
+    escapar: true,
+  });
+  const phPrioridadHtml = await ensurePlaceholderDemo({
+    codigo: "demo_prioridad_html",
+    nombre: "Badge de prioridad, HTML (demo)",
+    query: `
+      SELECT CASE tcd."VALOR_TEXTO"
+        WHEN 'alta' THEN '<span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:4px;">Alta</span>'
+        WHEN 'media' THEN '<span style="background:#fef9c3;color:#854d0e;padding:2px 8px;border-radius:4px;">Media</span>'
+        WHEN 'baja' THEN '<span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:4px;">Baja</span>'
+        ELSE '<span>Sin definir</span>'
+      END AS valor
+      FROM "TRAMITES_CAMPOS_DATOS" tcd
+      JOIN "TIPOS_TRAMITE_CAMPOS" ttc ON ttc."ID" = tcd."ID_TIPO_TRAMITE_CAMPO"
+      WHERE tcd."ID_TRAMITE" = ($1::jsonb->>'id_tramite')::uuid AND ttc."CODIGO" = 'prioridad'
+    `,
+    escapar: false,
+  });
+
+  await ensurePlantillaDemo({
+    codigo: "demo_comprobante_1",
+    nombre: "Comprobante de gestión (demo)",
+    descripcion: "Plantilla de prueba — se dispara al resolver un trámite sobre legajo.",
+    html: `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><style>body{font-family:sans-serif;padding:24px;color:#1e293b;} h1{font-size:20px;}</style></head>
+<body>
+  <h1>Comprobante de gestión</h1>
+  <p><strong>Fecha:</strong> ##${phFecha.codigo}##</p>
+  <p><strong>Legajo:</strong> ##${phNumeroLegajo.codigo}##</p>
+  <p><strong>Asunto:</strong> ##${phAsunto.codigo}##</p>
+  <p><strong>Prioridad:</strong> ##${phPrioridadHtml.codigo}##</p>
+</body>
+</html>`,
+    idUsuario: admin.id,
+  });
+
+  const estadoInicialTramites = await getEstadoInicial(estrategiaTramites.id);
+  const transicionResolver = await getTransicion(estrategiaTramites.id, estadoInicialTramites.id, estimuloResolverTramite.id);
+  const accionGenerarComprobante = await ensureAccion({
+    idEstrategia: estrategiaTramites.id,
+    codigo: "generar_comprobante_1",
+    nombre: "Generar comprobante de gestión (demo)",
+    // El documento se asocia a lo que el TRÁMITE ES SOBRE (legajo, cliente...),
+    // no al trámite en sí — nunca hay pantalla que muestre "adjuntos de un
+    // trámite", pero sí la solapa Adjuntos del legajo/cliente correspondiente.
+    // Por eso ID_ENTIDAD/ID_REGISTRO salen de TIPOS_TRAMITE.ID_ENTIDAD y
+    // TRAMITES.ID_REGISTRO, no de la entidad "tramites" ni del propio $1.
+    comando: `
+      INSERT INTO "GENERACIONES_DOCUMENTO" ("ID_PLANTILLA", "ID_ENTIDAD", "ID_REGISTRO", "DATOS", "ESTADO", "ALTA_FECHA")
+      SELECT
+        (SELECT "ID" FROM "PLANTILLAS_ADJUNTOS" WHERE "CODIGO" = 'demo_comprobante_1'),
+        tt."ID_ENTIDAD",
+        t."ID_REGISTRO",
+        jsonb_build_object('id_tramite', $1::text, 'fecha', now()::text),
+        'pendiente',
+        now()
+      FROM "TRAMITES" t
+      JOIN "TIPOS_TRAMITE" tt ON tt."ID" = t."ID_TIPO_TRAMITE"
+      WHERE t."ID" = $1
+    `,
+  });
+  await ensureTransicionAccion(transicionResolver.id, accionGenerarComprobante.id, 1);
+
   const legajo1 = await getLegajoPorNumero("DEMO-0001");
   await ensureTramiteDemo({
     idTipoTramite: tipoTramiteLegajo.id,
@@ -531,7 +689,9 @@ async function main() {
     observacion: "Trámite demo — sobre cliente titular, vía el tipo con filtro.",
   });
 
-  console.log("Seed de prueba aplicado (idempotente): 10 legajos, 20 clientes, 3 tipos de trámite, 4 trámites de ejemplo.");
+  console.log(
+    "Seed de prueba aplicado (idempotente): 10 legajos, 20 clientes, 3 tipos de trámite, 4 trámites de ejemplo, 4 placeholders + 1 plantilla + 1 acción de generación de documentos.",
+  );
 }
 
 main()

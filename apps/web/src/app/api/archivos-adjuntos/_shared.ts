@@ -12,8 +12,9 @@ type AutorizacionError = { error: string; status: number };
  * trata y tener GESTIONAR sobre ella.
  */
 export async function autorizarOperacionArchivo(params: {
-  idEntidad: string;
-  idRegistro: string;
+  // NULL para archivos globales sin registro dueño (ej. PLANTILLAS_ADJUNTOS) — siempre exigen herramientaCodigo, nunca son "mi propio avatar".
+  idEntidad: string | null;
+  idRegistro: string | null;
   herramientaCodigo?: string | null;
 }): Promise<AutorizacionOk | AutorizacionError> {
   const session = await getCurrentSession();

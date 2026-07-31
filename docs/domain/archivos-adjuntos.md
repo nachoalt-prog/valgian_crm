@@ -69,6 +69,8 @@ Cada tarjeta abre la misma "ventanita" (`ArchivoAdjuntoDialog`, `apps/web/src/co
 - **Guardar**: recién acá se sube de verdad (`POST` si es alta, `PUT` si ya existía), habilitado solo cuando hay un archivo stageado. Si el servidor rechaza el tipo, el error se muestra en la ventanita sin tocar el archivo/fila anteriores.
 - **Descargar**: habilitado solo si hay un archivo guardado y `PERMITE_DOWNLOAD` es true — navega al route handler de descarga.
 
+`ArchivoAdjuntoDialog` es reusable más allá de esta herramienta puntual — recibe `herramientaCodigo` (qué `HERRAMIENTAS.CODIGO` valida el permiso del lado del servidor) y `idEntidad`/`idRegistro`, que pueden ser `null` para archivos globales sin registro dueño. Opcionalmente acepta `tiposPermitidos?: string[]` para restringir a ciertos `TIPOS_ARCHIVOS_ADJUNTOS.CODIGO` (restringe el `accept` del `<input type="file">` y se valida server-side en `guardarArchivo`/`reemplazarArchivo`) — usado por ejemplo en la herramienta "Plantillas de Documento" (ver `domain/generacion-documentos.md`) para admitir solo `.html`.
+
 ## Alcance de esta etapa (pendiente a futuro)
 
 - `TIPOS_ARCHIVOS_ADJUNTOS` es puramente de formato — no existe hoy un concepto de "tipo de documento" (ej. "DNI frente" vs. "comprobante de domicilio") que etiquete semánticamente cada fila de `ARCHIVOS_ADJUNTOS`. Si hace falta, es una columna nueva (ej. `DESCRIPCION`) o un catálogo aparte, a definir cuando surja el caso real.

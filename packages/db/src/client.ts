@@ -30,6 +30,16 @@ if (process.env.NODE_ENV !== "production") {
 export const db = drizzle(queryClient, { schema });
 
 /**
+ * Cliente crudo de postgres.js — necesario para ejecutar SQL de confianza
+ * escrito a mano por un admin con placeholders posicionales literales
+ * ($1, $2, ...) vía `.unsafe(query, params)`, algo que el `sql` tag de
+ * drizzle no soporta bien (genera su propia numeración de placeholders a
+ * partir de interpolaciones JS). Usar solo para eso — todo lo demás va
+ * por `db` (drizzle). Ver PLACEHOLDERS.QUERY en domain/generacion-documentos.md.
+ */
+export { queryClient };
+
+/**
  * Cierra el pool de conexiones — usar SOLO en scripts de vida corta (seed,
  * one-offs) antes de salir. El server de Next.js nunca debería llamar esto:
  * necesita el pool abierto durante toda su vida.

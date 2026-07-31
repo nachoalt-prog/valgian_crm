@@ -26,3 +26,7 @@ export * from "./historial";
 export * from "./tipos-tramite";
 export * from "./tramites";
 export * from "./archivos-adjuntos";
+export * from "./placeholders";
+export * from "./plantillas-adjunto";
+export * from "./html-a-pdf";
+export * from "./generacion-documentos";

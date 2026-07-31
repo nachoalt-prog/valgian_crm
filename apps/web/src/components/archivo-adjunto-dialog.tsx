@@ -5,17 +5,21 @@ import { FileIcon, Download } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { getArchivoAdjuntoAction } from "@/app/dashboard/archivos-adjuntos/actions";
-import { HERRAMIENTA_ADJUNTOS_CODIGO } from "@/lib/archivos-adjuntos-const";
 import type { ArchivoAdjuntoDetalle } from "@valgian/core";
 
 interface ArchivoAdjuntoDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   idArchivoExistente: string | null;
-  idEntidad: string;
-  idRegistro: string;
+  // NULL para archivos globales sin registro dueño (ej. plantillas de documento).
+  idEntidad: string | null;
+  idRegistro: string | null;
+  // Qué HERRAMIENTAS.CODIGO valida el permiso de gestión del lado del servidor.
+  herramientaCodigo: string;
   canGestionar: boolean;
   onGuardado: () => void;
+  // Restringe a estos CODIGO de TIPOS_ARCHIVOS_ADJUNTOS (ej. ["html"] para plantillas). Sin restricción si se omite.
+  tiposPermitidos?: string[];
 }
 
 function formatearTamanio(bytes: number | null): string {
@@ -31,8 +35,10 @@ export function ArchivoAdjuntoDialog({
   idArchivoExistente,
   idEntidad,
   idRegistro,
+  herramientaCodigo,
   canGestionar,
   onGuardado,
+  tiposPermitidos,
 }: ArchivoAdjuntoDialogProps) {
   const [archivo, setArchivo] = useState<ArchivoAdjuntoDetalle | null | undefined>(idArchivoExistente ? undefined : null);
   const [staged, setStaged] = useState<File | null>(null);
@@ -75,10 +81,11 @@ export function ArchivoAdjuntoDialog({
 
     const formData = new FormData();
     formData.set("file", staged);
-    formData.set("herramientaCodigo", HERRAMIENTA_ADJUNTOS_CODIGO);
+    formData.set("herramientaCodigo", herramientaCodigo);
+    if (tiposPermitidos?.length) formData.set("tiposPermitidos", tiposPermitidos.join(","));
     if (!archivo) {
-      formData.set("idEntidad", idEntidad);
-      formData.set("idRegistro", idRegistro);
+      formData.set("idEntidad", idEntidad ?? "");
+      formData.set("idRegistro", idRegistro ?? "");
     }
 
     const url = archivo ? `/api/archivos-adjuntos/${archivo.id}` : "/api/archivos-adjuntos";
@@ -141,7 +148,13 @@ export function ArchivoAdjuntoDialog({
           {error && <p className="text-sm text-destructive">{error}</p>}
 
           <div className="flex items-center justify-center gap-2">
-            <input ref={inputRef} type="file" className="hidden" onChange={handleSeleccionar} />
+            <input
+              ref={inputRef}
+              type="file"
+              className="hidden"
+              accept={tiposPermitidos?.map((t) => `.${t}`).join(",")}
+              onChange={handleSeleccionar}
+            />
             {canGestionar && (
               <Button type="button" variant="outline" onClick={() => inputRef.current?.click()} disabled={pending}>
                 {archivo ? "Reemplazar" : "Cargar"}

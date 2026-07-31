@@ -15,7 +15,8 @@
     "@node-rs/argon2": "^2.0.2",
     "@valgian/db": "workspace:*",
     "dotenv": "^17.4.2",
-    "drizzle-orm": "^0.45.2"
+    "drizzle-orm": "^0.45.2",
+    "playwright": "^1.62.1"
   },
   "devDependencies": {
     "@types/node": "^20.17.10",
