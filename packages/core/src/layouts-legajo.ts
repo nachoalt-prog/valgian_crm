@@ -8,6 +8,8 @@ export interface SolapaLegajo {
   nombre: string;
   herramientaCodigo: string | null;
   canGestionar: boolean;
+  // Config de esta instancia puntual — ver domain/infraestructura.md, "Parámetros por punto de acceso".
+  parametros: Record<string, unknown> | null;
 }
 
 export interface LayoutLegajo {
@@ -36,6 +38,7 @@ export async function getLayoutParaBandeja(bandejaId: string, perfilId: string):
       orden: layoutsLegajoSolapas.orden,
       nombre: layoutsLegajoSolapas.nombre,
       herramientaCodigo: herramientas.codigo,
+      parametros: layoutsLegajoSolapas.parametros,
     })
     .from(layoutsLegajoSolapas)
     .leftJoin(herramientas, eq(herramientas.id, layoutsLegajoSolapas.idHerramienta))
@@ -45,12 +48,19 @@ export async function getLayoutParaBandeja(bandejaId: string, perfilId: string):
   const solapas: SolapaLegajo[] = [];
   for (const s of solapasRaw) {
     if (!s.herramientaCodigo) {
-      solapas.push({ id: s.id, orden: s.orden ?? 0, nombre: s.nombre, herramientaCodigo: null, canGestionar: false });
+      solapas.push({ id: s.id, orden: s.orden ?? 0, nombre: s.nombre, herramientaCodigo: null, canGestionar: false, parametros: null });
       continue;
     }
     const tieneAcceso = await getPermisoParaOperacion(perfilId, s.herramientaCodigo, OPERACION_ACCESO);
     if (!tieneAcceso) continue;
-    solapas.push({ id: s.id, orden: s.orden ?? 0, nombre: s.nombre, herramientaCodigo: s.herramientaCodigo, canGestionar: tieneAcceso });
+    solapas.push({
+      id: s.id,
+      orden: s.orden ?? 0,
+      nombre: s.nombre,
+      herramientaCodigo: s.herramientaCodigo,
+      canGestionar: tieneAcceso,
+      parametros: s.parametros,
+    });
   }
 
   return { id: layout.id, codigo: layout.codigo, nombre: layout.nombre, solapas };

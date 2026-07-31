@@ -64,6 +64,9 @@ export interface SolapaConNombre {
   herramientaCodigo: string | null;
   herramientaNombre: string | null;
   visible: boolean | null;
+  // Config libre de esta instancia puntual de la herramienta embebida — ver
+  // domain/infraestructura.md, "Parámetros por punto de acceso".
+  parametros: Record<string, unknown> | null;
 }
 
 export async function listLayoutSolapas(idLayout: string): Promise<SolapaConNombre[]> {
@@ -76,6 +79,7 @@ export async function listLayoutSolapas(idLayout: string): Promise<SolapaConNomb
       herramientaCodigo: herramientas.codigo,
       herramientaNombre: herramientas.nombre,
       visible: layoutsLegajoSolapas.visible,
+      parametros: layoutsLegajoSolapas.parametros,
     })
     .from(layoutsLegajoSolapas)
     .leftJoin(herramientas, eq(herramientas.id, layoutsLegajoSolapas.idHerramienta))
@@ -89,6 +93,7 @@ export interface SolapaInput {
   nombre: string;
   idHerramienta: string | null;
   visible: boolean;
+  parametros: Record<string, unknown> | null;
 }
 
 export async function createLayoutSolapa(data: SolapaInput): Promise<Resultado<typeof layoutsLegajoSolapas.$inferSelect>> {

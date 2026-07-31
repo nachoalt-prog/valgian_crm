@@ -1,6 +1,7 @@
 import {
   getEntidadPorCodigo,
   getPermisoParaOperacion,
+  tieneAsociacion,
   OPERACION_ACCESO,
   OPERACION_ADJUNTOS_CREAR,
   OPERACION_ADJUNTOS_REEMPLAZAR,
@@ -24,11 +25,15 @@ const OPERACION_POR_ACCION: Partial<Record<AccionArchivo, string>> = {
 };
 
 /**
- * Un usuario siempre puede tocar su propio avatar (ID_ENTIDAD='usuarios',
- * ID_REGISTRO=su propio ID) sin necesitar permiso de ninguna herramienta —
- * es una acción sobre su propia identidad, no una herramienta administrada.
- * Para cualquier otra entidad, hace falta indicar de qué herramienta se
- * trata y tener el permiso correspondiente a `accion`.
+ * Un usuario siempre puede tocar su propio avatar sin necesitar permiso de
+ * ninguna herramienta — es una acción sobre su propia identidad, no una
+ * herramienta administrada. Con ARCHIVOS_ADJUNTOS_ENTIDADES (N:M), "es mi
+ * propio avatar" pasa a ser "¿este archivo tiene una asociación puntual
+ * contra (entidad='usuarios', registro=mi ID)?" en vez de leer un par de
+ * columnas fijo del archivo — un archivo puede tener otras asociaciones
+ * además de esa y sigue siendo igual de válido el bypass. Para cualquier
+ * otro caso, hace falta indicar de qué herramienta se trata y tener el
+ * permiso correspondiente a `accion`.
  *
  * Solo LEGAJO_ADJ_1 (Archivos Adjuntos) tiene operaciones granulares hoy —
  * primer uso real de OPERACIONES más allá de "Acceso" (ver
@@ -37,18 +42,20 @@ const OPERACION_POR_ACCION: Partial<Record<AccionArchivo, string>> = {
  * OPERACION_ACCESO, de momento.
  */
 export async function autorizarOperacionArchivo(params: {
-  // NULL para archivos globales sin registro dueño (ej. PLANTILLAS_ADJUNTOS) — siempre exigen herramientaCodigo, nunca son "mi propio avatar".
-  idEntidad: string | null;
-  idRegistro: string | null;
+  // NULL en el alta (todavía no existe el archivo) — ahí nunca aplica el bypass de avatar (esa alta pasa por actualizarAvatarAction, no por acá).
+  idArchivoAdjunto: string | null;
   herramientaCodigo?: string | null;
   accion: AccionArchivo;
 }): Promise<AutorizacionOk | AutorizacionError> {
   const session = await getCurrentSession();
   if (!session?.perfil || !session.usuario) return { error: "No autenticado.", status: 401 };
 
-  const entidadUsuarios = await getEntidadPorCodigo("usuarios");
-  const esPropioAvatar = entidadUsuarios?.id === params.idEntidad && params.idRegistro === session.usuario.id;
-  if (esPropioAvatar) return { usuarioId: session.usuario.id };
+  if (params.idArchivoAdjunto) {
+    const entidadUsuarios = await getEntidadPorCodigo("usuarios");
+    const esPropioAvatar =
+      !!entidadUsuarios && (await tieneAsociacion(params.idArchivoAdjunto, entidadUsuarios.id, session.usuario.id));
+    if (esPropioAvatar) return { usuarioId: session.usuario.id };
+  }
 
   if (!params.herramientaCodigo) return { error: "Falta indicar la herramienta.", status: 400 };
 

@@ -12,6 +12,9 @@ export interface LegajoHerramientaProps {
   // motor de estados (ej. Gestión de Entidad); las demás lo ignoran.
   idEntidad?: string;
   canGestionar: boolean;
+  // Config de esta instancia puntual de la solapa (LAYOUTS_LEGAJO_SOLAPAS.PARAMETROS)
+  // — la mayoría de las herramientas lo ignoran; ver domain/infraestructura.md.
+  parametros?: Record<string, unknown> | null;
   // Todas las solapas quedan montadas desde que se abre el modal (ver
   // legajo-layout-modal.tsx) para no re-fetchear al cambiar de pestaña. `revision`
   // sube cada vez que CUALQUIER herramienta reporta un cambio vía `onCambio`, así

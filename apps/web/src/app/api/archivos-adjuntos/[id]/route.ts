@@ -25,8 +25,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   // El preview inline solo exige Acceso (ya estás viendo el registro dueño);
   // la descarga forzada exige el permiso granular Descargar.
   const auth = await autorizarOperacionArchivo({
-    idEntidad: existente.idEntidad,
-    idRegistro: existente.idRegistro,
+    idArchivoAdjunto: id,
     herramientaCodigo,
     accion: inline ? "acceso" : "descargar",
   });
@@ -59,8 +58,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   if (!(file instanceof File)) return NextResponse.json({ error: "Falta el archivo." }, { status: 400 });
 
   const auth = await autorizarOperacionArchivo({
-    idEntidad: existente.idEntidad,
-    idRegistro: existente.idRegistro,
+    idArchivoAdjunto: id,
     herramientaCodigo: typeof herramientaCodigo === "string" ? herramientaCodigo : null,
     accion: "reemplazar",
   });
@@ -87,8 +85,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 
   const herramientaCodigo = request.nextUrl.searchParams.get("herramientaCodigo");
   const auth = await autorizarOperacionArchivo({
-    idEntidad: existente.idEntidad,
-    idRegistro: existente.idRegistro,
+    idArchivoAdjunto: id,
     herramientaCodigo,
     accion: "borrar",
   });

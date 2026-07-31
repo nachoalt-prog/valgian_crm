@@ -62,7 +62,10 @@ export function LayoutSolapasAdmin({ idLayout, herramientasDisponibles, canGesti
     setDeleteConfirm(s);
   }
 
-  async function handleSave(data: { orden: number; nombre: string; idHerramienta: string | null; visible: boolean }, id?: string) {
+  async function handleSave(
+    data: { orden: number; nombre: string; idHerramienta: string | null; visible: boolean; parametros: Record<string, unknown> | null },
+    id?: string,
+  ) {
     const result = id
       ? await updateLayoutSolapaAction(id, { idLayout, ...data })
       : await createLayoutSolapaAction({ idLayout, ...data });

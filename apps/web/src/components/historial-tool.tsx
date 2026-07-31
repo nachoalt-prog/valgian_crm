@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { History } from "lucide-react";
+import { History, Paperclip } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { listHistorialAction } from "@/app/dashboard/historial/actions";
+import { Button } from "@/components/ui/button";
+import { HistorialAdjuntosDialog } from "@/components/historial-adjuntos-dialog";
+import { listHistorialAction, getEntidadHistorialIdAction } from "@/app/dashboard/historial/actions";
 import type { HistorialFila } from "@valgian/core";
 
 interface HistorialToolProps {
@@ -35,6 +37,8 @@ function formatearStatus(fila: HistorialFila): string {
 
 export function HistorialTool({ idLegajo, idEntidad, revision }: HistorialToolProps) {
   const [filas, setFilas] = useState<HistorialFila[] | null | undefined>(undefined);
+  const [idEntidadHistorial, setIdEntidadHistorial] = useState<string | null>(null);
+  const [adjuntosDe, setAdjuntosDe] = useState<string | null>(null);
 
   useEffect(() => {
     if (!idEntidad) return;
@@ -46,6 +50,16 @@ export function HistorialTool({ idLegajo, idEntidad, revision }: HistorialToolPr
       cancelado = true;
     };
   }, [idEntidad, idLegajo, revision]);
+
+  useEffect(() => {
+    let cancelado = false;
+    getEntidadHistorialIdAction().then((res) => {
+      if (!cancelado) setIdEntidadHistorial(res.data ?? null);
+    });
+    return () => {
+      cancelado = true;
+    };
+  }, []);
 
   return (
     <div className="flex h-full flex-col overflow-hidden p-5">
@@ -70,6 +84,7 @@ export function HistorialTool({ idLegajo, idEntidad, revision }: HistorialToolPr
                 <TableHead>Usuario</TableHead>
                 <TableHead>Status de acciones</TableHead>
                 <TableHead>Observación</TableHead>
+                <TableHead>Adjuntos</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -82,11 +97,31 @@ export function HistorialTool({ idLegajo, idEntidad, revision }: HistorialToolPr
                   <TableCell>{fila.auditUsuarioNombre ?? "—"}</TableCell>
                   <TableCell>{formatearStatus(fila)}</TableCell>
                   <TableCell className="max-w-md min-w-[16rem] wrap-break-word whitespace-normal">{fila.observacion ?? "—"}</TableCell>
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7 text-muted-foreground hover:text-primary"
+                      disabled={!idEntidadHistorial}
+                      onClick={() => setAdjuntosDe(fila.id)}
+                    >
+                      <Paperclip className="size-3.5" />
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </div>
+      )}
+
+      {adjuntosDe && idEntidadHistorial && (
+        <HistorialAdjuntosDialog
+          open={!!adjuntosDe}
+          onOpenChange={(open) => !open && setAdjuntosDe(null)}
+          idHistorial={adjuntosDe}
+          idEntidadHistorial={idEntidadHistorial}
+        />
       )}
     </div>
   );

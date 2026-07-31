@@ -3,7 +3,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { eq, and } from "drizzle-orm";
-import { db, archivosAdjuntos, tiposArchivosAdjuntos } from "@valgian/db";
+import { db, archivosAdjuntos, archivosAdjuntosEntidades, tiposArchivosAdjuntos } from "@valgian/db";
 
 /**
  * Storage de archivos adjuntos — ver ADR 0011. El archivo real vive siempre
@@ -103,8 +103,10 @@ function validarTipoPermitido(tipo: { codigo: string; nombre: string }, tiposPer
 }
 
 export interface GuardarArchivoInput {
-  // NULL para archivos globales sin registro dueño (ej. PLANTILLAS_ADJUNTOS,
-  // identificados por su propio CODIGO, no por un ID_ENTIDAD/ID_REGISTRO).
+  // NULL/omitido para archivos globales sin registro dueño (ej.
+  // PLANTILLAS_ADJUNTOS, identificados por su propio CODIGO). Si se pasan,
+  // crea también la primera fila en ARCHIVOS_ADJUNTOS_ENTIDADES — el archivo
+  // puede sumar más asociaciones después (ej. el trigger de HISTORIAL).
   idEntidad?: string | null;
   idRegistro?: string | null;
   buffer: Buffer;
@@ -132,32 +134,63 @@ export async function guardarArchivo(input: GuardarArchivoInput): Promise<Result
   const { rutaRelativa } = shardYRuta(id, extension);
   const ahora = new Date();
 
-  const [fila] = await db
-    .insert(archivosAdjuntos)
-    .values({
-      id,
-      idEntidad: input.idEntidad,
-      idRegistro: input.idRegistro,
-      idTipoArchivoAdjunto: tipo.id,
-      nombreOriginal: input.nombreOriginal,
-      rutaArchivo: rutaRelativa,
-      tamanioBytes: input.buffer.length,
-      altaFecha: ahora,
-      altaUsuario: input.idUsuario,
-      auditFecha: ahora,
-      auditUsuario: input.idUsuario,
-    })
-    .returning();
+  const fila = await db.transaction(async (tx) => {
+    const [f] = await tx
+      .insert(archivosAdjuntos)
+      .values({
+        id,
+        idTipoArchivoAdjunto: tipo.id,
+        nombreOriginal: input.nombreOriginal,
+        rutaArchivo: rutaRelativa,
+        tamanioBytes: input.buffer.length,
+        altaFecha: ahora,
+        altaUsuario: input.idUsuario,
+        auditFecha: ahora,
+        auditUsuario: input.idUsuario,
+      })
+      .returning();
+
+    if (input.idEntidad && input.idRegistro) {
+      await tx.insert(archivosAdjuntosEntidades).values({ idArchivoAdjunto: f.id, idEntidad: input.idEntidad, idRegistro: input.idRegistro });
+    }
+
+    return f;
+  });
 
   try {
     await escribirAtomico(rutaRelativa, input.buffer);
   } catch (err) {
+    // El DELETE dispara fn_cascade_archivos_adjuntos_entidades — limpia también
+    // la asociación recién creada, no hace falta borrarla acá aparte.
     await db.delete(archivosAdjuntos).where(eq(archivosAdjuntos.id, fila.id));
     const message = err instanceof Error ? err.message : "Error guardando el archivo en disco.";
     return { error: message };
   }
 
   return { data: { id: fila.id } };
+}
+
+/** Suma una asociación adicional a un archivo ya existente (ej. vincularlo a mano a otra entidad). Idempotente — no falla si ya estaba vinculado. */
+export async function vincularArchivoAEntidad(idArchivoAdjunto: string, idEntidad: string, idRegistro: string): Promise<void> {
+  await db
+    .insert(archivosAdjuntosEntidades)
+    .values({ idArchivoAdjunto, idEntidad, idRegistro })
+    .onConflictDoNothing();
+}
+
+/** ¿Este archivo tiene una asociación puntual contra (idEntidad, idRegistro)? Ej.: el bypass de "es mi propio avatar" en autorizarOperacionArchivo. */
+export async function tieneAsociacion(idArchivoAdjunto: string, idEntidad: string, idRegistro: string): Promise<boolean> {
+  const [fila] = await db
+    .select({ id: archivosAdjuntosEntidades.id })
+    .from(archivosAdjuntosEntidades)
+    .where(
+      and(
+        eq(archivosAdjuntosEntidades.idArchivoAdjunto, idArchivoAdjunto),
+        eq(archivosAdjuntosEntidades.idEntidad, idEntidad),
+        eq(archivosAdjuntosEntidades.idRegistro, idRegistro),
+      ),
+    );
+  return !!fila;
 }
 
 export interface ReemplazarArchivoInput {
@@ -243,8 +276,6 @@ export async function borrarArchivo(id: string): Promise<Resultado<true>> {
 
 export interface ArchivoAdjuntoDetalle {
   id: string;
-  idEntidad: string | null;
-  idRegistro: string | null;
   nombreOriginal: string | null;
   tamanioBytes: number | null;
   tipoCodigo: string | null;
@@ -256,8 +287,6 @@ export interface ArchivoAdjuntoDetalle {
 
 const SELECT_DETALLE = {
   id: archivosAdjuntos.id,
-  idEntidad: archivosAdjuntos.idEntidad,
-  idRegistro: archivosAdjuntos.idRegistro,
   nombreOriginal: archivosAdjuntos.nombreOriginal,
   tamanioBytes: archivosAdjuntos.tamanioBytes,
   tipoCodigo: tiposArchivosAdjuntos.codigo,
@@ -267,6 +296,7 @@ const SELECT_DETALLE = {
   permiteDownload: tiposArchivosAdjuntos.permiteDownload,
 } as const;
 
+/** Ya no expone ID_ENTIDAD/ID_REGISTRO — un archivo puede tener varias asociaciones (ver ARCHIVOS_ADJUNTOS_ENTIDADES), no "una" entidad dueña. */
 export async function getArchivoAdjunto(id: string): Promise<ArchivoAdjuntoDetalle | null> {
   const [fila] = await db
     .select(SELECT_DETALLE)
@@ -276,13 +306,14 @@ export async function getArchivoAdjunto(id: string): Promise<ArchivoAdjuntoDetal
   return fila ?? null;
 }
 
-/** Todos los adjuntos de un registro — ARCHIVOS_ADJUNTOS admite varias filas para el mismo (ID_ENTIDAD, ID_REGISTRO). */
+/** Todos los adjuntos asociados a (ID_ENTIDAD, ID_REGISTRO) vía ARCHIVOS_ADJUNTOS_ENTIDADES — un mismo archivo puede aparecer en varios listados distintos si tiene varias asociaciones. */
 export async function listArchivosAdjuntos(idEntidad: string, idRegistro: string): Promise<ArchivoAdjuntoDetalle[]> {
   return db
     .select(SELECT_DETALLE)
-    .from(archivosAdjuntos)
+    .from(archivosAdjuntosEntidades)
+    .innerJoin(archivosAdjuntos, eq(archivosAdjuntos.id, archivosAdjuntosEntidades.idArchivoAdjunto))
     .leftJoin(tiposArchivosAdjuntos, eq(tiposArchivosAdjuntos.id, archivosAdjuntos.idTipoArchivoAdjunto))
-    .where(and(eq(archivosAdjuntos.idEntidad, idEntidad), eq(archivosAdjuntos.idRegistro, idRegistro)));
+    .where(and(eq(archivosAdjuntosEntidades.idEntidad, idEntidad), eq(archivosAdjuntosEntidades.idRegistro, idRegistro)));
 }
 
 export interface ArchivoParaDescarga {

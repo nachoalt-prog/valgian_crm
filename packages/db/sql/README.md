@@ -13,5 +13,8 @@ psql "$DATABASE_URL" -f sql/0001_trigger_clientes_titular.sql
 ## Archivos
 
 - `0001_trigger_clientes_titular.sql`: trigger que garantiza que `CLIENTES.ES_TITULAR = true` sea único por `ID_LEGAJO` (ver `domain/core.md`, sección Clientes).
-
-Los Stored Procedures del motor de estados (ADR 0009) todavía no están escritos — se suman acá cuando se implemente la ejecución de transiciones.
+- `0002_sp_aplicar_estimulo.sql`: `PROCEDURE` que aplica un estímulo del motor de estados (ver `domain/motor-de-estados.md`).
+- `0003_sp_gestionar_tramite.sql`: `PROCEDURE` equivalente para trámites (ver `domain/tramites.md`).
+- `0004_trigger_notify_generacion_documento.sql`: `NOTIFY` para el worker de generación de documentos (ver `domain/generacion-documentos.md`).
+- `0005_trigger_cascade_archivos_adjuntos_entidades.sql`: borra en cascada las filas de `ARCHIVOS_ADJUNTOS_ENTIDADES` al borrar el adjunto dueño.
+- `0006_trigger_historial_vincular_adjuntos.sql`: auto-vincula a un movimiento de `HISTORIAL` los adjuntos recién subidos al mismo legajo/trámite (ver `domain/motor-de-estados.md`, sección "Adjuntos ↔ Historial").

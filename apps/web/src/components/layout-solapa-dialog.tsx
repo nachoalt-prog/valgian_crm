@@ -20,7 +20,10 @@ interface LayoutSolapaDialogProps {
   onOpenChange: (open: boolean) => void;
   solapa: SolapaConNombre | null;
   herramientasDisponibles: HerramientaOption[];
-  onSave: (data: { orden: number; nombre: string; idHerramienta: string | null; visible: boolean }, id?: string) => Promise<{ error?: string } | void>;
+  onSave: (
+    data: { orden: number; nombre: string; idHerramienta: string | null; visible: boolean; parametros: Record<string, unknown> | null },
+    id?: string,
+  ) => Promise<{ error?: string } | void>;
 }
 
 const SIN_HERRAMIENTA = "__ninguna__";
@@ -40,15 +43,27 @@ export function LayoutSolapaDialog({ open, onOpenChange, solapa, herramientasDis
   const [nombre, setNombre] = useState(solapa?.nombre ?? "");
   const [idHerramienta, setIdHerramienta] = useState(solapa?.idHerramienta ?? SIN_HERRAMIENTA);
   const [visible, setVisible] = useState(solapa?.visible ?? true);
+  const [parametrosTexto, setParametrosTexto] = useState(solapa?.parametros ? JSON.stringify(solapa.parametros, null, 2) : "");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setPending(true);
     setError(null);
+
+    let parametros: Record<string, unknown> | null = null;
+    if (parametrosTexto.trim()) {
+      try {
+        parametros = JSON.parse(parametrosTexto);
+      } catch {
+        setError("Parámetros: el JSON no es válido.");
+        return;
+      }
+    }
+
+    setPending(true);
     const idHerramientaFinal = idHerramienta === SIN_HERRAMIENTA ? null : idHerramienta;
-    const result = await onSave({ orden: Number(orden), nombre, idHerramienta: idHerramientaFinal, visible }, solapa?.id);
+    const result = await onSave({ orden: Number(orden), nombre, idHerramienta: idHerramientaFinal, visible, parametros }, solapa?.id);
     setPending(false);
     if (result?.error) {
       setError(result.error);
@@ -114,6 +129,24 @@ export function LayoutSolapaDialog({ open, onOpenChange, solapa, herramientasDis
             <input type="checkbox" checked={visible} onChange={(e) => setVisible(e.target.checked)} className="size-4 accent-primary" />
             <span className="text-sm text-foreground">Visible</span>
           </label>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="parametrosSolapa" className="text-xs uppercase tracking-wider text-muted-foreground">
+              Parámetros (JSON, opcional)
+            </Label>
+            <textarea
+              id="parametrosSolapa"
+              value={parametrosTexto}
+              onChange={(e) => setParametrosTexto(e.target.value)}
+              rows={3}
+              placeholder={'ej. { "crear": false, "borrar": false }'}
+              className="w-full rounded-lg border border-input bg-transparent px-3 py-2 font-mono text-xs text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            />
+            <p className="text-xs text-muted-foreground">
+              Restringe qué puede hacer la herramienta embebida en ESTA solapa puntual, además del permiso del perfil. Hoy solo lo interpreta
+              Archivos Adjuntos (claves: crear, reemplazar, descargar, borrar). Vacío = sin restricción extra.
+            </p>
+          </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}
 

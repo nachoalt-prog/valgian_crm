@@ -29,6 +29,7 @@ interface MenuOpcionDialogProps {
       nombre: string;
       icono: string | null;
       orden: number | null;
+      parametros: Record<string, unknown> | null;
     },
     id?: string,
   ) => Promise<{ error?: string } | void>;
@@ -41,13 +42,25 @@ export function MenuOpcionDialog({ open, onOpenChange, opcion, menuId, herramien
   const [idHerramienta, setIdHerramienta] = useState<string | null>(opcion?.idHerramienta ?? null);
   const [icono, setIcono] = useState<string | null>(opcion?.icono ?? null);
   const [orden, setOrden] = useState<string>(opcion?.orden != null ? String(opcion.orden) : "");
+  const [parametrosTexto, setParametrosTexto] = useState(opcion?.parametros ? JSON.stringify(opcion.parametros, null, 2) : "");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setPending(true);
     setError(null);
+
+    let parametros: Record<string, unknown> | null = null;
+    if (parametrosTexto.trim()) {
+      try {
+        parametros = JSON.parse(parametrosTexto);
+      } catch {
+        setError("Parámetros: el JSON no es válido.");
+        return;
+      }
+    }
+
+    setPending(true);
     const result = await onSave(
       {
         idMenu: menuId,
@@ -56,6 +69,7 @@ export function MenuOpcionDialog({ open, onOpenChange, opcion, menuId, herramien
         nombre,
         icono,
         orden: orden.trim() === "" ? null : Number(orden),
+        parametros,
       },
       opcion?.id,
     );
@@ -134,6 +148,20 @@ export function MenuOpcionDialog({ open, onOpenChange, opcion, menuId, herramien
               Orden
             </Label>
             <Input id="orden" type="number" value={orden} onChange={(e) => setOrden(e.target.value)} />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="parametrosOpcion" className="text-xs uppercase tracking-wider text-muted-foreground">
+              Parámetros (JSON, opcional)
+            </Label>
+            <textarea
+              id="parametrosOpcion"
+              value={parametrosTexto}
+              onChange={(e) => setParametrosTexto(e.target.value)}
+              rows={3}
+              className="w-full rounded-lg border border-input bg-transparent px-3 py-2 font-mono text-xs text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            />
+            <p className="text-xs text-muted-foreground">Config libre para la herramienta de esta opción. Ninguna la interpreta todavía.</p>
           </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}

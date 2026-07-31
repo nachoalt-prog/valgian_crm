@@ -1,6 +1,6 @@
 # Dominio — Archivos Adjuntos
 
-Almacenamiento genérico de archivos sobre cualquier registro con `ID_ENTIDAD`/`ID_REGISTRO` (mismo patrón polimórfico que `TRAMITES.ID_REGISTRO`/`HISTORIAL.ID_RELACION`). El archivo real vive siempre en el filesystem de la instancia, nunca en la base — ver ADR 0011 y su addendum.
+Almacenamiento genérico de archivos, asociado a cualquier cantidad de registros vía `ARCHIVOS_ADJUNTOS_ENTIDADES` (ver más abajo). El archivo real vive siempre en el filesystem de la instancia, nunca en la base — ver ADR 0011 y su addendum.
 
 ## Tablas
 
@@ -24,17 +24,30 @@ Catálogo de **formatos** (jpg, pdf, docx, etc.) — no tiene relación con la s
 | Campo                  | Tipo |
 | ----------------------- | ---- |
 | ID                       | UUID, PK |
-| ID_ENTIDAD               | FK → ENTIDADES, nullable |
-| ID_REGISTRO              | uuid, nullable — sin FK real (asociación polimórfica) |
 | ID_TIPO_ARCHIVO_ADJUNTO  | FK → TIPOS_ARCHIVOS_ADJUNTOS, nullable |
 | NOMBRE_ORIGINAL          | string, nullable — el nombre que subió el usuario, solo para mostrar/descargar |
 | RUTA_ARCHIVO             | string, nullable — ruta relativa dentro de `uploads/`, calculada a partir del propio `ID` |
 | TAMANIO_BYTES            | integer, nullable |
 | ALTA_FECHA / ALTA_USUARIO / AUDIT_FECHA / AUDIT_USUARIO | auditoría estándar |
 
-**Puede haber varias filas para el mismo `(ID_ENTIDAD, ID_REGISTRO)`** — no hay unique constraint ahí. El nombre real en disco es siempre `<ID>.<extensión>`, nunca `NOMBRE_ORIGINAL` (evita path traversal y colisiones).
+Puramente metadata + storage del archivo — ya no sabe a qué está asociado (eso vive en `ARCHIVOS_ADJUNTOS_ENTIDADES`). El nombre real en disco es siempre `<ID>.<extensión>`, nunca `NOMBRE_ORIGINAL` (evita path traversal y colisiones).
 
-`USUARIOS.ID_ARCHIVO_ADJUNTO` (FK nullable) reemplaza al viejo `AVATAR_PATH` — la foto de perfil es un `ARCHIVOS_ADJUNTOS` más, vía la entidad polimórfica `'usuarios'` (`ID_REGISTRO` = `USUARIOS.ID`).
+### ARCHIVOS_ADJUNTOS_ENTIDADES
+
+| Campo                  | Tipo |
+| ----------------------- | ---- |
+| ID                       | UUID, PK |
+| ID_ARCHIVO_ADJUNTO       | FK → ARCHIVOS_ADJUNTOS |
+| ID_ENTIDAD               | FK → ENTIDADES, nullable |
+| ID_REGISTRO              | uuid, nullable — sin FK real (asociación polimórfica, mismo patrón que `TRAMITES.ID_REGISTRO`/`HISTORIAL.ID_RELACION`) |
+
+Unique en `(ID_ARCHIVO_ADJUNTO, ID_ENTIDAD, ID_REGISTRO)` — no tiene sentido la misma asociación repetida, pero **un mismo archivo puede tener varias filas distintas** (varias asociaciones a la vez). Este es el cambio central de este sprint: antes `ID_ENTIDAD`/`ID_REGISTRO` vivían como columnas directas de `ARCHIVOS_ADJUNTOS` (1 archivo = 1 asociación); ahora son N:M. El caso real que lo motivó: un adjunto subido a un legajo puede, además, terminar asociado al movimiento de `HISTORIAL` puntual en el que se cargó (ver `domain/motor-de-estados.md`, sección "Adjuntos ↔ Historial") — el mismo archivo aparece en ambos listados sin duplicar el archivo físico ni la fila de metadata.
+
+**Trigger `BEFORE DELETE` en `ARCHIVOS_ADJUNTOS`** (`packages/db/sql/0005_trigger_cascade_archivos_adjuntos_entidades.sql`): borra en cascada las filas de `ARCHIVOS_ADJUNTOS_ENTIDADES` del archivo — sin esto, `borrarArchivo()` fallaría por la FK (`ON DELETE NO ACTION`) apenas el archivo tuviera alguna asociación.
+
+`guardarArchivo` sigue aceptando `idEntidad?/idRegistro?` opcionales en su input (misma firma que antes) — si vienen, crea también la primera fila de `ARCHIVOS_ADJUNTOS_ENTIDADES`, en la misma transacción que el alta del archivo. Para sumarle asociaciones adicionales a un archivo ya existente: `vincularArchivoAEntidad(idArchivoAdjunto, idEntidad, idRegistro)` (idempotente). Para consultar si un archivo tiene una asociación puntual: `tieneAsociacion(idArchivoAdjunto, idEntidad, idRegistro)` — usado por el bypass de "es mi propio avatar" (ver más abajo).
+
+`USUARIOS.ID_ARCHIVO_ADJUNTO` (FK nullable) reemplaza al viejo `AVATAR_PATH` — la foto de perfil es un `ARCHIVOS_ADJUNTOS` más, vía la entidad polimórfica `'usuarios'` (`ID_REGISTRO` = `USUARIOS.ID`) en `ARCHIVOS_ADJUNTOS_ENTIDADES`.
 
 ## Capa de storage (`packages/core/src/archivos-adjuntos.ts`)
 
@@ -55,14 +68,20 @@ Reglas de consistencia (no aflojar sin repensarlas):
   - `GET /api/archivos-adjuntos/:id`: sirve el archivo — `Content-Disposition` con `filename="..."; filename*=UTF-8''...` (RFC 6266/5987: ASCII de respaldo + UTF-8 para nombres con tildes/espacios). Por default es `attachment` (fuerza la descarga); con `?inline=1` responde `inline`, para usar la misma URL como `src` de un `<img>`/`<embed>` de previsualización sin que el navegador dispare una descarga (con PDF, `attachment` fuerza la descarga en vez de embeber el visor — con imágenes el navegador lo ignora, pero se manda igual por consistencia).
   - `PUT /api/archivos-adjuntos/:id`: reemplazo.
   - `DELETE /api/archivos-adjuntos/:id`.
-- **Autorización** (`_shared.ts`, `autorizarOperacionArchivo`): un usuario siempre puede tocar su propio avatar (`ID_ENTIDAD='usuarios'` y `ID_REGISTRO` = su propio `ID`) sin permiso de ninguna herramienta — es una acción sobre la propia identidad. Para cualquier otra entidad, el caller indica `herramientaCodigo` y una `accion` (`"acceso" | "crear" | "reemplazar" | "descargar" | "borrar"`); la función mapea `accion` a una `OPERACIONES.CODIGO` concreta y valida con `getPermisoParaOperacion` (ver `domain/infraestructura.md`, "Modelo de permisos"). Solo `LEGAJO_ADJ_1` tiene esas 5 operaciones granulares hoy — cualquier otra herramienta que reutilice este mismo endpoint (ej. `plantillas_adjuntos`) cae siempre a `OPERACION_ACCESO`, de momento. `GET` decide la `accion` según el pedido: `?inline=1` (previsualización) solo exige `acceso` — ya estás viendo un registro al que tenés acceso —, la descarga forzada (sin `?inline=1`) exige el permiso granular `descargar`. **Antes de este sprint, `GET` no validaba ningún permiso más allá de estar logueado** — cualquier perfil autenticado podía descargar cualquier archivo por ID adivinando/enumerando UUIDs; quedó cerrado como parte de este mismo cambio.
+- **Autorización** (`_shared.ts`, `autorizarOperacionArchivo`): recibe `idArchivoAdjunto` (no `idEntidad`/`idRegistro` — ya no existen como columnas propias del archivo) y consulta `tieneAsociacion(idArchivoAdjunto, entidadUsuarios.id, session.usuario.id)` para el bypass de "es mi propio avatar" — un usuario siempre puede tocar un archivo así asociado sin permiso de ninguna herramienta, es una acción sobre la propia identidad. `idArchivoAdjunto` es `null` en el alta (todavía no existe el archivo; de cualquier forma el alta de avatar pasa por `actualizarAvatarAction`, no por acá). Para cualquier otro caso, el caller indica `herramientaCodigo` y una `accion` (`"acceso" | "crear" | "reemplazar" | "descargar" | "borrar"`); la función mapea `accion` a una `OPERACIONES.CODIGO` concreta y valida con `getPermisoParaOperacion` (ver `domain/infraestructura.md`, "Modelo de permisos"). Solo `LEGAJO_ADJ_1` tiene esas 5 operaciones granulares hoy — cualquier otra herramienta que reutilice este mismo endpoint (ej. `plantillas_adjuntos`) cae siempre a `OPERACION_ACCESO`, de momento. `GET` decide la `accion` según el pedido: `?inline=1` (previsualización) solo exige `acceso` — ya estás viendo un registro al que tenés acceso —, la descarga forzada (sin `?inline=1`) exige el permiso granular `descargar`. **Antes del sprint de permisos granulares, `GET` no validaba ningún permiso más allá de estar logueado** — cualquier perfil autenticado podía descargar cualquier archivo por ID adivinando/enumerando UUIDs; quedó cerrado en ese momento.
 - **Foto de perfil**: excepción al patrón anterior — al ser una acción específica y de bajo volumen, se resolvió con una Server Action dedicada (`actualizarAvatarAction`, `apps/web/src/app/dashboard/avatar/actions.ts`) en vez de pasar por el route handler genérico. `next.config.ts` sube el límite de body de Server Actions a 10mb (el default de 1mb es insuficiente para fotos).
 
 ## Herramienta embebible: Archivos Adjuntos de legajo (`LEGAJO_ADJ_1`)
 
-Solapa 6 del Layout Legajo Default (ver `domain/layouts-legajo.md`). Recibe `idLegajo`/`idEntidad`/`canGestionar` como cualquier `LEGAJO_HERRAMIENTA` (`canGestionar` acá solo importa como gate de la solapa en sí — ver más abajo). Lista todos los `ARCHIVOS_ADJUNTOS` del legajo (grilla con miniatura si `RENDERIZAR` + imagen, ícono genérico si no) más un botón "Nuevo".
+Solapa 6 del Layout Legajo Default (ver `domain/layouts-legajo.md`). Recibe `idLegajo`/`idEntidad`/`canGestionar` como cualquier `LEGAJO_HERRAMIENTA` (`canGestionar` acá solo importa como gate de la solapa en sí — ver más abajo). Lista todos los adjuntos asociados al legajo vía `ARCHIVOS_ADJUNTOS_ENTIDADES` (grilla con miniatura si `RENDERIZAR` + imagen, ícono genérico si no) más un botón "Nuevo".
 
-**Primer uso real de operaciones granulares** (ver `domain/infraestructura.md`, "Modelo de permisos"): además de `acceso`, `LEGAJO_ADJ_1` tiene las operaciones `crear`, `reemplazar`, `descargar`, `guardar` y `borrar` — una por cada botón del modal de adjunto. `ArchivosAdjuntosTool` las resuelve al montar vía `getPermisosGranularesAdjuntosAction()` (`apps/web/src/app/dashboard/archivos-adjuntos/actions.ts`) y se las pasa a `ArchivoAdjuntoDialog` como props booleanas independientes (`canCrear`, `canReemplazar`, `canDescargar`, `canGuardar`, `canBorrar`) — no un único `canGestionar` como antes. El botón "Nuevo" de la grilla usa `canCrear` directamente (no `canGestionar`, que hoy solo gatilla si la solapa se ve).
+**Primer uso real de operaciones granulares** (ver `domain/infraestructura.md`, "Modelo de permisos"): además de `acceso`, `LEGAJO_ADJ_1` tiene las operaciones `crear`, `reemplazar`, `descargar`, `guardar` y `borrar` — una por cada botón del modal de adjunto. `ArchivosAdjuntosTool` las resuelve al montar vía `getPermisosGranularesAdjuntosAction()` (`apps/web/src/app/dashboard/archivos-adjuntos/actions.ts`) y se las pasa a `ArchivoAdjuntoDialog` como props booleanas independientes (`canCrear`, `canReemplazar`, `canDescargar`, `canGuardar`, `canBorrar`) — no un único `canGestionar` como antes. El botón "Nuevo" de la grilla combina ese permiso con `PARAMETROS` (ver abajo), no usa `canGestionar` (que hoy solo gatilla si la solapa se ve).
+
+**`PARAMETROS` (`LAYOUTS_LEGAJO_SOLAPAS.PARAMETROS`, ver `domain/infraestructura.md`, "Parámetros por punto de acceso")**: primer y único consumidor real hoy. `ArchivosAdjuntosTool` acepta las claves `crear`/`reemplazar`/`descargar`/`borrar` — `false` o `0` en cualquiera bloquea esa acción en ESTA solapa puntual, además del permiso del perfil (`efectivo = permiso && parametro`); ausente el flag o ausente `PARAMETROS` entero = sin restricción extra. Solo client-side (no hay re-chequeo server-side de `PARAMETROS`) — es config de un admin protegida por su propio ABM, no un límite de seguridad que dependa de no confiar en el cliente.
+
+**Otros dos consumidores nuevos de `ArchivosAdjuntosTool`, sin `PARAMETROS` propio** (siempre "todo permitido" salvo lo que ya recorte el permiso del perfil sobre `LEGAJO_ADJ_1`):
+- **Botón "Adjuntos" por fila en `HistorialTool`** (`apps/web/src/components/historial-adjuntos-dialog.tsx`): abre un modal chico embebiendo `ArchivosAdjuntosTool` con `idEntidad='historial'`, `idRegistro=HISTORIAL.ID` de esa fila — muestra/gestiona los adjuntos vinculados a ESE movimiento puntual (ver `domain/motor-de-estados.md`, "Adjuntos ↔ Historial"). Como `HistorialTool` es compartido, este botón aparece tanto en la solapa Historial del legajo como en la del modal de Trámites.
+- **Solapa "Adjuntos" en el modal de Trámites** (`TramiteModal`, análoga a la del legajo): `idEntidad='tramites'`, `idRegistro=idTramite`. Solo visible si `idTramite` existe (no tiene sentido en un alta nueva, mismo criterio que la solapa Historial ahí).
 
 Cada tarjeta abre la misma "ventanita" (`ArchivoAdjuntoDialog`, `apps/web/src/components/archivo-adjunto-dialog.tsx`) — mismo porte que el modal de legajo (`h-[85vh] max-w-5xl`), para que un PDF se pueda previsualizar cómodo:
 
@@ -80,3 +99,6 @@ Cada tarjeta abre la misma "ventanita" (`ArchivoAdjuntoDialog`, `apps/web/src/co
 
 - `TIPOS_ARCHIVOS_ADJUNTOS` es puramente de formato — no existe hoy un concepto de "tipo de documento" (ej. "DNI frente" vs. "comprobante de domicilio") que etiquete semánticamente cada fila de `ARCHIVOS_ADJUNTOS`. Si hace falta, es una columna nueva (ej. `DESCRIPCION`) o un catálogo aparte, a definir cuando surja el caso real.
 - `TRAMITES_CAMPOS_DATOS.ID_ARCHIVO_ADJUNTO` (campos de tipo `FILE` en el Modal de Trámites) tiene la FK lista pero el flujo de carga todavía no está conectado ahí — el dibujado automático de campos no incluye un caso especial para `FILE` todavía.
+- `ArchivosAdjuntosTool` sigue con su prop `idLegajo` (nombre viejo) aunque ahora se reutiliza para legajos, trámites y movimientos de historial por igual — quedó así deliberadamente para no tocar `LegajoHerramientaProps` y sus 6 componentes en este mismo sprint; renombrar a algo genérico (`idRegistro`) es un cambio puramente cosmético pendiente para cuando se toque ese archivo por otra razón.
+- `MENUES_OPCIONES.PARAMETROS` existe en schema y ABM (mismo mecanismo que `LAYOUTS_LEGAJO_SOLAPAS.PARAMETROS`) pero **ninguna herramienta lo interpreta todavía** — `LEGAJO_ADJ_1` no tiene entrada de menú (es embebida-solamente), así que no hay caso real que lo ejercite. Queda preparado a propósito (ver `domain/infraestructura.md`, "Parámetros por punto de acceso").
+- El botón "Adjuntos" de Historial y la solapa "Adjuntos" de Trámites no tienen forma de configurar `PARAMETROS` propios (no pasan por `LAYOUTS_LEGAJO_SOLAPAS` ni por `MENUES_OPCIONES`, son agregados de UI directos) — quedan siempre "todo permitido" salvo lo que ya recorte el permiso del perfil. Si en el futuro hace falta restringirlos por punto de acceso, hay que pensar de dónde leerían ese `PARAMETROS`.

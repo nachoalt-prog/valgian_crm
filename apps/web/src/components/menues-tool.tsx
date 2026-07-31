@@ -60,6 +60,7 @@ export function MenuesTool({ menuesIniciales, opcionesIniciales, herramientas, c
       nombre: string;
       icono: string | null;
       orden: number | null;
+      parametros: Record<string, unknown> | null;
     },
     id?: string,
   ) {

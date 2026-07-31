@@ -369,6 +369,7 @@ async function main() {
   await ensureEntidad("cuentas", "CUENTAS");
   await ensureEntidad("tramites", "TRAMITES");
   await ensureEntidad("usuarios", "USUARIOS");
+  await ensureEntidad("historial", "HISTORIAL");
 
   // Catálogo de formatos soportados por archivos adjuntos (ver ADR 0011) — no
   // tiene relación con "tipos de documento" semánticos, es puro formato.

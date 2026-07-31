@@ -95,6 +95,7 @@ export function LegajoLayoutModal({ open, onOpenChange, bandejaId, legajoId }: L
                         idLegajo={legajoId}
                         idEntidad={idEntidad}
                         canGestionar={s.canGestionar}
+                        parametros={s.parametros}
                         revision={revision}
                         onCambio={bumpRevision}
                       />

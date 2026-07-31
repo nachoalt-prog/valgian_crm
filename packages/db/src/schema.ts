@@ -112,6 +112,10 @@ export const menuesOpciones = pgTable("MENUES_OPCIONES", {
   icono: text("ICONO"),
   orden: integer("ORDEN"),
   comodin: jsonb("COMODIN"),
+  // Mismo mecanismo que LAYOUTS_LEGAJO_SOLAPAS.PARAMETROS — todavía sin
+  // ningún consumidor real (ninguna herramienta con entrada de menú lo
+  // interpreta hoy), preparado para cuando haga falta.
+  parametros: jsonb("PARAMETROS").$type<Record<string, unknown>>(),
 });
 
 export const interfacesMenues = pgTable(
@@ -396,6 +400,11 @@ export const layoutsLegajoSolapas = pgTable(
     nombre: text("NOMBRE").notNull(),
     idHerramienta: uuid("ID_HERRAMIENTA").references(() => herramientas.id),
     visible: boolean("VISIBLE"),
+    // Config específica de ESTA instancia de la herramienta embebida — ej. para
+    // LEGAJO_ADJ_1, {"crear": false} desactiva el botón Nuevo solo en este layout,
+    // sin tocar el permiso del perfil. Nullable/ausente = sin restricción
+    // adicional (ver domain/infraestructura.md, "Parámetros por punto de acceso").
+    parametros: jsonb("PARAMETROS").$type<Record<string, unknown>>(),
   },
   (table) => [uniqueIndex("LAYOUTS_LEGAJO_SOLAPAS_LAYOUT_ORDEN_UNIQUE").on(table.idLayout, table.orden)],
 );
@@ -513,9 +522,6 @@ export const tiposArchivosAdjuntos = pgTable("TIPOS_ARCHIVOS_ADJUNTOS", {
 
 export const archivosAdjuntos = pgTable("ARCHIVOS_ADJUNTOS", {
   id: uuid("ID").primaryKey().defaultRandom(),
-  idEntidad: uuid("ID_ENTIDAD").references(() => entidades.id),
-  // Sin FK real (asociación polimórfica) — mismo criterio que TRAMITES.ID_REGISTRO/HISTORIAL.ID_RELACION.
-  idRegistro: uuid("ID_REGISTRO"),
   idTipoArchivoAdjunto: uuid("ID_TIPO_ARCHIVO_ADJUNTO").references(() => tiposArchivosAdjuntos.id),
   nombreOriginal: text("NOMBRE_ORIGINAL"),
   rutaArchivo: text("RUTA_ARCHIVO"),
@@ -525,6 +531,26 @@ export const archivosAdjuntos = pgTable("ARCHIVOS_ADJUNTOS", {
   auditFecha: timestamp("AUDIT_FECHA", { withTimezone: true }),
   auditUsuario: uuid("AUDIT_USUARIO").references(() => usuarios.id),
 });
+
+/**
+ * Asociaciones polimórficas de un archivo adjunto — reemplaza a las viejas
+ * columnas ARCHIVOS_ADJUNTOS.ID_ENTIDAD/ID_REGISTRO: un mismo archivo puede
+ * asociarse a varias entidades (ej. al legajo Y a un movimiento puntual de
+ * HISTORIAL). Sin FK real en ID_REGISTRO — mismo criterio polimórfico que
+ * TRAMITES.ID_REGISTRO/HISTORIAL.ID_RELACION. Ver domain/archivos-adjuntos.md.
+ */
+export const archivosAdjuntosEntidades = pgTable(
+  "ARCHIVOS_ADJUNTOS_ENTIDADES",
+  {
+    id: uuid("ID").primaryKey().defaultRandom(),
+    idArchivoAdjunto: uuid("ID_ARCHIVO_ADJUNTO").references(() => archivosAdjuntos.id),
+    idEntidad: uuid("ID_ENTIDAD").references(() => entidades.id),
+    idRegistro: uuid("ID_REGISTRO"),
+  },
+  (table) => [
+    uniqueIndex("ARCHIVOS_ADJUNTOS_ENTIDADES_UNIQUE").on(table.idArchivoAdjunto, table.idEntidad, table.idRegistro),
+  ],
+);
 
 /**
  * Generación de documentos: PDF armados a partir de un modelo HTML con

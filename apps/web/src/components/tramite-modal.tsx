@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { HistorialTool } from "@/components/historial-tool";
+import { ArchivosAdjuntosTool } from "@/components/archivos-adjuntos-tool";
 import {
   getCamposTramiteAction,
   getOpcionesListaValoresAction,
@@ -55,7 +56,8 @@ export function TramiteModal({ open, onOpenChange, idTipoTramite, idRegistro, id
   const [error, setError] = useState<string | null>(null);
   const [exito, setExito] = useState(false);
   const [camposInvalidos, setCamposInvalidos] = useState<Set<string>>(new Set());
-  const [activeTab, setActiveTab] = useState<"datos" | "historial">("datos");
+  const [activeTab, setActiveTab] = useState<"datos" | "historial" | "adjuntos">("datos");
+  const [revisionAdjuntos, setRevisionAdjuntos] = useState(0);
   const [idEntidadTramites, setIdEntidadTramites] = useState<string | undefined>(undefined);
 
   // El padre debe montar este componente con una `key` que cambie según
@@ -311,7 +313,7 @@ export function TramiteModal({ open, onOpenChange, idTipoTramite, idRegistro, id
         {/* Sin idTramite (alta nueva) no hay historial que mostrar todavía. */}
         {idTramite && (
           <div className="flex shrink-0 gap-1 border-b border-border px-5 pt-3">
-            {(["datos", "historial"] as const).map((tab) => (
+            {(["datos", "historial", "adjuntos"] as const).map((tab) => (
               <button
                 key={tab}
                 type="button"
@@ -398,11 +400,23 @@ export function TramiteModal({ open, onOpenChange, idTipoTramite, idRegistro, id
           </div>
         )}
 
-        {/* Montada una sola vez (no se remonta al volver a la solapa), oculta con
+        {/* Montadas una sola vez (no se remontan al volver a la solapa), ocultas con
             CSS — mismo criterio de keep-alive que legajo-layout-modal.tsx. */}
         {idTramite && idEntidadTramites && (
           <div className={cn("flex-1 overflow-y-auto", activeTab !== "historial" && "hidden")}>
             <HistorialTool idLegajo={idTramite} idEntidad={idEntidadTramites} />
+          </div>
+        )}
+
+        {idTramite && idEntidadTramites && (
+          <div className={cn("flex-1 overflow-hidden", activeTab !== "adjuntos" && "hidden")}>
+            <ArchivosAdjuntosTool
+              idLegajo={idTramite}
+              idEntidad={idEntidadTramites}
+              canGestionar={canGestionar}
+              revision={revisionAdjuntos}
+              onCambio={() => setRevisionAdjuntos((r) => r + 1)}
+            />
           </div>
         )}
 

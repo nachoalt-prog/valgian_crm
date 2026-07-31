@@ -24,6 +24,12 @@ interface ArchivosAdjuntosToolProps {
   idLegajo: string;
   idEntidad?: string;
   canGestionar: boolean;
+  // Restricción ADICIONAL a la del permiso, propia de este punto de acceso
+  // puntual (LAYOUTS_LEGAJO_SOLAPAS.PARAMETROS) — ej. {"crear": false} en una
+  // solapa de solo-lectura. Ausente = sin restricción extra (ver
+  // domain/infraestructura.md, "Parámetros por punto de acceso"). Client-side
+  // únicamente — no es un límite de seguridad, ya la pasó el permiso.
+  parametros?: Record<string, unknown> | null;
   revision: number;
   onCambio: () => void;
 }
@@ -32,10 +38,22 @@ interface DialogTarget {
   id: string | null;
 }
 
-export function ArchivosAdjuntosTool({ idLegajo, idEntidad, revision, onCambio }: ArchivosAdjuntosToolProps) {
+/** `false`/`0` en PARAMETROS[clave] bloquea esa acción; ausente el flag o ausente PARAMETROS entero = permitido. */
+function parametroPermite(parametros: Record<string, unknown> | null | undefined, clave: string): boolean {
+  if (!parametros) return true;
+  const valor = parametros[clave];
+  return valor !== false && valor !== 0;
+}
+
+export function ArchivosAdjuntosTool({ idLegajo, idEntidad, parametros, revision, onCambio }: ArchivosAdjuntosToolProps) {
   const [archivos, setArchivos] = useState<ArchivoAdjuntoDetalle[] | null | undefined>(undefined);
   const [dialogTarget, setDialogTarget] = useState<DialogTarget | null>(null);
   const [permisos, setPermisos] = useState<PermisosGranularesAdjuntos>(SIN_PERMISOS_GRANULARES);
+
+  const puedeCrear = permisos.crear && parametroPermite(parametros, "crear");
+  const puedeReemplazar = permisos.reemplazar && parametroPermite(parametros, "reemplazar");
+  const puedeDescargar = permisos.descargar && parametroPermite(parametros, "descargar");
+  const puedeBorrar = permisos.borrar && parametroPermite(parametros, "borrar");
 
   useEffect(() => {
     if (!idEntidad) return;
@@ -65,7 +83,7 @@ export function ArchivosAdjuntosTool({ idLegajo, idEntidad, revision, onCambio }
           <Paperclip className="size-4 text-primary" />
           <h3 className="text-sm font-semibold uppercase tracking-widest text-primary">Archivos Adjuntos</h3>
         </div>
-        {permisos.crear && idEntidad && (
+        {puedeCrear && idEntidad && (
           <Button size="sm" variant="outline" onClick={() => setDialogTarget({ id: null })}>
             <PlusCircle className="size-3.5" />
             Nuevo
@@ -110,11 +128,11 @@ export function ArchivosAdjuntosTool({ idLegajo, idEntidad, revision, onCambio }
           idEntidad={idEntidad}
           idRegistro={idLegajo}
           herramientaCodigo={HERRAMIENTA_ADJUNTOS_CODIGO}
-          canCrear={permisos.crear}
-          canReemplazar={permisos.reemplazar}
-          canDescargar={permisos.descargar}
+          canCrear={puedeCrear}
+          canReemplazar={puedeReemplazar}
+          canDescargar={puedeDescargar}
           canGuardar={permisos.guardar}
-          canBorrar={permisos.borrar}
+          canBorrar={puedeBorrar}
           onGuardado={onCambio}
         />
       )}

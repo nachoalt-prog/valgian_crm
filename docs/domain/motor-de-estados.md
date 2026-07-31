@@ -87,6 +87,18 @@ Mecanismo genérico y configurable para gobernar el ciclo de vida de cualquier e
 
 `HISTORIAL` graba `ID_ESTADO_0`/`ID_ESTIMULO`/`ID_ESTADO_1` directamente (no una FK a `TRANSICIONES`) — así queda registrado el camino real que se hizo, sin impedir que la transición usada se modifique o borre a futuro. Es una decisión deliberada: `TRANSICIONES` es configuración viva, `HISTORIAL` es un registro de auditoría que no debe depender de que esa configuración siga existiendo tal cual.
 
+## Adjuntos ↔ Historial
+
+`ENTIDADES` tiene una fila `CODIGO='historial'` — un registro de `HISTORIAL` es, para `ARCHIVOS_ADJUNTOS_ENTIDADES`, una entidad más a la que asociar archivos (`ID_ENTIDAD`=esa entidad, `ID_REGISTRO`=`HISTORIAL.ID`). Así, un mismo adjunto puede estar vinculado al legajo/trámite en general **y**, además, a un movimiento puntual — ver `domain/archivos-adjuntos.md`.
+
+**Trigger `AFTER INSERT` en `HISTORIAL`** (`packages/db/sql/0006_trigger_historial_vincular_adjuntos.sql`, `fn_vincular_adjuntos_recientes_a_historial`) auto-vincula al movimiento recién creado los adjuntos "candidatos": subidos al mismo `(ID_ENTIDAD, ID_RELACION)`, con `ARCHIVOS_ADJUNTOS.ALTA_FECHA` dentro de los últimos 10 minutos, y sin ninguna asociación previa contra la entidad `historial` (en ningún movimiento anterior, no solo este). Solo corre para movimientos de `legajos` o `tramites` — las únicas entidades donde "un archivo recién cargado es para este movimiento" tiene sentido hoy.
+
+**Heurística deliberadamente aproximada, no una garantía exacta** — casuística conocida y aceptada:
+- El **primer** movimiento dentro de la ventana de 10 minutos "se lleva" el archivo — si se suben un archivo y se hacen dos transiciones seguidas en menos de 10 minutos, el archivo queda pegado a la primera, no a la segunda (por el filtro "sin asociación previa").
+- Un archivo subido y luego dejado más de 10 minutos antes de gestionar el movimiento **no** se vincula solo — queda con su asociación directa al legajo/trámite nomás, sin la del movimiento puntual.
+
+Si en algún momento esto no alcanza (ej. se necesita vincular a mano, o cambiar la ventana), el punto de entrada es ese mismo archivo SQL — no hay lógica de aplicación involucrada, el trigger corre igual sin importar si el `INSERT` en `HISTORIAL` vino de `SP_APLICAR_ESTIMULO`, de un script, o de cualquier otro lado.
+
 ### PERFILES_ESTIMULOS
 
 | Campo | Tipo |

@@ -129,6 +129,14 @@ De momento, todas las herramientas salvo una tienen una única operación (`OPER
 
 **ABM de Permisos** (`/dashboard/permisos`): la columna "Herramienta" sigue existiendo en la grilla aunque ahora es indirecta (derivada de la operación elegida). El modal filtra las opciones del combo Operación según la Herramienta elegida. Al editar un permiso existente, `Perfil` queda bloqueado (es la identidad del titular del permiso) pero `Herramienta` y `Operación` quedan editables — a diferencia del viejo `GESTIONAR` (un booleano que se tocaba en el lugar), reasignar la operación de una fila existente es la forma de corregirla sin borrar y volver a crear.
 
+## Parámetros por punto de acceso
+
+`PERMISOS` gobierna qué puede hacer un **perfil** — el mismo permiso vale sin importar desde dónde se llegue a la herramienta. `LAYOUTS_LEGAJO_SOLAPAS.PARAMETROS` y `MENUES_OPCIONES.PARAMETROS` (ambos `jsonb`, nullable) resuelven el problema complementario: restringir qué puede hacer una herramienta embebida en **este punto de acceso puntual**, sin tocar el permiso de nadie. Mismo archivo, misma herramienta, mismo perfil — pero la solapa A de un layout puede ser de solo-lectura mientras la solapa B del mismo layout (u otro) permite todo.
+
+Config libre por diseño (`Record<string, unknown>`, editada como JSON crudo en ambos ABMs) — cada herramienta interpreta las claves que le interesan, ninguna tabla central las define. Ausente el `PARAMETROS` entero, o ausente una clave puntual dentro de él, significa "sin restricción adicional" — nunca hay que configurar algo para que ande como si `PARAMETROS` no existiera. Es una capa **adicional** a `PERMISOS`, nunca un reemplazo: primero se valida el permiso del perfil sobre la operación (server-side, real límite de seguridad), y **después**, solo si el permiso ya dio positivo, se aplica la restricción de `PARAMETROS` (hoy solo client-side — es config de un admin protegida por su propio ABM, no algo que un cliente pueda manipular para escalar privilegios).
+
+**Primer y único consumidor real hoy**: `LEGAJO_ADJ_1` (Archivos Adjuntos) interpreta `{"crear": false, "reemplazar": false, "descargar": false, "borrar": false}` en `LAYOUTS_LEGAJO_SOLAPAS.PARAMETROS` — ver `domain/archivos-adjuntos.md`. `MENUES_OPCIONES.PARAMETROS` existe con el mismo mecanismo pero sin ningún caso real que lo ejercite todavía (ninguna herramienta con entrada de menú lo necesita hoy).
+
 ## Imágenes y archivos
 
 Íconos de menú: `MENUES_OPCIONES.ICONO` guarda una clave propia y estable (no el nombre de un ícono de librería directamente), mapeada en código a un componente real de lucide-react. Ver ADR 0011.

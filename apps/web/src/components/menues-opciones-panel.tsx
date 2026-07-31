@@ -29,6 +29,7 @@ interface MenuesOpcionesPanelProps {
       nombre: string;
       icono: string | null;
       orden: number | null;
+      parametros: Record<string, unknown> | null;
     },
     id?: string,
   ) => Promise<{ error?: string } | void>;

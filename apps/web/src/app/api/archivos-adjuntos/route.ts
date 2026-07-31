@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Faltan datos del archivo." }, { status: 400 });
   }
 
-  const auth = await autorizarOperacionArchivo({ idEntidad, idRegistro, herramientaCodigo, accion: "crear" });
+  const auth = await autorizarOperacionArchivo({ idArchivoAdjunto: null, herramientaCodigo, accion: "crear" });
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const buffer = Buffer.from(await file.arrayBuffer());

@@ -88,6 +88,8 @@ export interface MenuOpcionConHerramienta {
   icono: string | null;
   orden: number | null;
   herramientaNombre: string | null;
+  // Mismo mecanismo que LAYOUTS_LEGAJO_SOLAPAS.PARAMETROS — ver domain/infraestructura.md.
+  parametros: Record<string, unknown> | null;
 }
 
 export async function listMenuesOpciones(menuId?: string): Promise<MenuOpcionConHerramienta[]> {
@@ -101,6 +103,7 @@ export async function listMenuesOpciones(menuId?: string): Promise<MenuOpcionCon
       icono: menuesOpciones.icono,
       orden: menuesOpciones.orden,
       herramientaNombre: herramientas.nombre,
+      parametros: menuesOpciones.parametros,
     })
     .from(menuesOpciones)
     .leftJoin(herramientas, eq(herramientas.id, menuesOpciones.idHerramienta));
@@ -116,6 +119,7 @@ export interface MenuOpcionInput {
   nombre: string;
   icono: string | null;
   orden: number | null;
+  parametros: Record<string, unknown> | null;
 }
 
 export async function createMenuOpcion(
