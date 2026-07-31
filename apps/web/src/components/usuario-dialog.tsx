@@ -20,10 +20,7 @@ interface UsuarioDialogProps {
   usuario: UsuarioConPerfil | null;
   perfiles: PerfilConContador[];
   defaultPerfilId?: string | null;
-  onSave: (
-    data: { idPerfil: string | null; username: string; password?: string; avatarPath: string | null },
-    id?: string,
-  ) => Promise<{ error?: string } | void>;
+  onSave: (data: { idPerfil: string | null; username: string; password?: string }, id?: string) => Promise<{ error?: string } | void>;
 }
 
 // key={usuario?.id ?? "new"} en el padre fuerza un remount al cambiar de registro.
@@ -31,7 +28,6 @@ export function UsuarioDialog({ open, onOpenChange, usuario, perfiles, defaultPe
   const [idPerfil, setIdPerfil] = useState<string | null>(usuario?.idPerfil ?? defaultPerfilId ?? null);
   const [username, setUsername] = useState(usuario?.username ?? "");
   const [password, setPassword] = useState("");
-  const [avatarPath, setAvatarPath] = useState(usuario?.avatarPath ?? "");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -39,10 +35,7 @@ export function UsuarioDialog({ open, onOpenChange, usuario, perfiles, defaultPe
     e.preventDefault();
     setPending(true);
     setError(null);
-    const result = await onSave(
-      { idPerfil, username, password: password || undefined, avatarPath: avatarPath || null },
-      usuario?.id,
-    );
+    const result = await onSave({ idPerfil, username, password: password || undefined }, usuario?.id);
     setPending(false);
     if (result?.error) {
       setError(result.error);
@@ -106,18 +99,6 @@ export function UsuarioDialog({ open, onOpenChange, usuario, perfiles, defaultPe
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required={!usuario}
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="avatarPath" className="text-xs uppercase tracking-wider text-muted-foreground">
-              Avatar path
-            </Label>
-            <Input
-              id="avatarPath"
-              placeholder="/avatars/user.png"
-              value={avatarPath}
-              onChange={(e) => setAvatarPath(e.target.value)}
             />
           </div>
 

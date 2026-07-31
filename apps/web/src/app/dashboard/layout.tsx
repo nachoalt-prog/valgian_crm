@@ -28,7 +28,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     <div className="flex h-screen bg-background overflow-hidden">
       <AppSidebar menu={menu} titulo={tema?.titulo} />
       <div className="flex flex-col flex-1 min-w-0">
-        <AppTopbar username={usuario.username} perfilNombre={perfil?.nombre} />
+        <AppTopbar username={usuario.username} perfilNombre={perfil?.nombre} idArchivoAdjunto={usuario.idArchivoAdjunto} />
         <main className="flex-1 overflow-y-auto p-6">{children}</main>
       </div>
     </div>

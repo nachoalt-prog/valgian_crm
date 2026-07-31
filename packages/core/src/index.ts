@@ -25,3 +25,4 @@ export * from "./motor-estados";
 export * from "./historial";
 export * from "./tipos-tramite";
 export * from "./tramites";
+export * from "./archivos-adjuntos";

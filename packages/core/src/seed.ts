@@ -16,6 +16,7 @@ import {
   provincias,
   tiposDocumento,
   entidades,
+  tiposArchivosAdjuntos,
 } from "@valgian/db";
 import { hashPassword } from "./auth/password";
 
@@ -182,6 +183,22 @@ async function ensureTipoDocumento(codigo: string, nombre: string) {
   return creado;
 }
 
+async function ensureTipoArchivoAdjunto(params: {
+  codigo: string;
+  nombre: string;
+  extension: string;
+  mimetype: string;
+  permiteCarga: boolean;
+  permiteDownload: boolean;
+  renderizar: boolean;
+}) {
+  const [existente] = await db.select().from(tiposArchivosAdjuntos).where(eq(tiposArchivosAdjuntos.codigo, params.codigo));
+  if (existente) return existente;
+
+  const [creado] = await db.insert(tiposArchivosAdjuntos).values(params).returning();
+  return creado;
+}
+
 async function ensureEntidad(codigo: string, nombre: string) {
   const [existente] = await db.select().from(entidades).where(eq(entidades.codigo, codigo));
   if (existente) return existente;
@@ -246,6 +263,7 @@ async function main() {
   const herramientaGestionEntidad = await ensureHerramienta("GESTION_ENTIDAD_1", "Gestión de Entidad", "gestion_entidad_1.gestionar");
   const herramientaHistorial = await ensureHerramienta("HISTORIAL_1", "Historial", "historial_1.gestionar");
   const herramientaTramites = await ensureHerramienta("TRAMITES_1", "Trámites", "tramites_1.gestionar");
+  const herramientaArchivosAdjuntos = await ensureHerramienta("LEGAJO_ADJ_1", "Archivos Adjuntos (Legajo)", "legajo_adj_1.gestionar");
 
   // Admin tiene acceso de gestión completo a todas las herramientas — la existencia
   // de la fila en PERMISOS ya implica acceso de lectura (no hay columna VER).
@@ -266,6 +284,7 @@ async function main() {
     herramientaGestionEntidad,
     herramientaHistorial,
     herramientaTramites,
+    herramientaArchivosAdjuntos,
   ]) {
     await ensurePermisoGestion(perfilAdmin.id, h.id);
   }
@@ -309,6 +328,48 @@ async function main() {
   await ensureEntidad("clientes", "CLIENTES");
   await ensureEntidad("cuentas", "CUENTAS");
   await ensureEntidad("tramites", "TRAMITES");
+  await ensureEntidad("usuarios", "USUARIOS");
+
+  // Catálogo de formatos soportados por archivos adjuntos (ver ADR 0011) — no
+  // tiene relación con "tipos de documento" semánticos, es puro formato.
+  const TIPOS_ARCHIVO: Array<{
+    codigo: string;
+    nombre: string;
+    extension: string;
+    mimetype: string;
+    permiteCarga: boolean;
+    permiteDownload: boolean;
+    renderizar: boolean;
+  }> = [
+    { codigo: "jpg", nombre: "Imagen JPG", extension: "jpg", mimetype: "image/jpeg", permiteCarga: true, permiteDownload: true, renderizar: true },
+    { codigo: "jpeg", nombre: "Imagen JPEG", extension: "jpeg", mimetype: "image/jpeg", permiteCarga: true, permiteDownload: true, renderizar: true },
+    { codigo: "png", nombre: "Imagen PNG", extension: "png", mimetype: "image/png", permiteCarga: true, permiteDownload: true, renderizar: true },
+    { codigo: "gif", nombre: "Imagen GIF", extension: "gif", mimetype: "image/gif", permiteCarga: true, permiteDownload: true, renderizar: true },
+    { codigo: "webp", nombre: "Imagen WEBP", extension: "webp", mimetype: "image/webp", permiteCarga: true, permiteDownload: true, renderizar: true },
+    { codigo: "pdf", nombre: "Documento PDF", extension: "pdf", mimetype: "application/pdf", permiteCarga: true, permiteDownload: true, renderizar: true },
+    { codigo: "txt", nombre: "Texto plano", extension: "txt", mimetype: "text/plain", permiteCarga: true, permiteDownload: true, renderizar: true },
+    {
+      codigo: "docx",
+      nombre: "Word (DOCX)",
+      extension: "docx",
+      mimetype: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      permiteCarga: true,
+      permiteDownload: true,
+      renderizar: false,
+    },
+    {
+      codigo: "xlsx",
+      nombre: "Excel (XLSX)",
+      extension: "xlsx",
+      mimetype: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      permiteCarga: true,
+      permiteDownload: true,
+      renderizar: false,
+    },
+  ];
+  for (const tipo of TIPOS_ARCHIVO) {
+    await ensureTipoArchivoAdjunto(tipo);
+  }
 
   console.log("Seed aplicado (idempotente).");
   if (usuarioCreado) {

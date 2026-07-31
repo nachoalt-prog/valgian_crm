@@ -16,10 +16,7 @@ interface UsuariosPanelProps {
   selectedPerfilId: string | null;
   canGestionar: boolean;
   onSinPermiso: () => void;
-  onSave: (
-    data: { idPerfil: string | null; username: string; password?: string; avatarPath: string | null },
-    id?: string,
-  ) => Promise<{ error?: string } | void>;
+  onSave: (data: { idPerfil: string | null; username: string; password?: string }, id?: string) => Promise<{ error?: string } | void>;
   onDelete: (id: string) => Promise<{ error?: string } | void>;
 }
 

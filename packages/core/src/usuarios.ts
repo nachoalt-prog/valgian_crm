@@ -7,7 +7,7 @@ export interface UsuarioConPerfil {
   idPerfil: string | null;
   username: string;
   token: string | null;
-  avatarPath: string | null;
+  idArchivoAdjunto: string | null;
   perfilCodigo: string | null;
   perfilNombre: string | null;
 }
@@ -19,7 +19,7 @@ export async function listUsuarios(perfilId?: string): Promise<UsuarioConPerfil[
       idPerfil: usuarios.idPerfil,
       username: usuarios.username,
       token: usuarios.token,
-      avatarPath: usuarios.avatarPath,
+      idArchivoAdjunto: usuarios.idArchivoAdjunto,
       perfilCodigo: perfiles.codigo,
       perfilNombre: perfiles.nombre,
     })
@@ -36,7 +36,6 @@ export interface UsuarioInput {
   idPerfil: string | null;
   username: string;
   password?: string;
-  avatarPath: string | null;
 }
 
 interface Resultado<T> {
@@ -60,7 +59,6 @@ export async function createUsuario(data: UsuarioInput): Promise<Resultado<typeo
         idPerfil: data.idPerfil,
         username: data.username,
         passwordHash,
-        avatarPath: data.avatarPath,
       })
       .returning();
     return { data: usuario };
@@ -75,7 +73,6 @@ export async function updateUsuario(id: string, data: UsuarioInput): Promise<Res
     const set: Partial<typeof usuarios.$inferInsert> = {
       idPerfil: data.idPerfil,
       username: data.username,
-      avatarPath: data.avatarPath,
     };
     if (data.password) {
       set.passwordHash = await hashPassword(data.password);
@@ -91,4 +88,9 @@ export async function updateUsuario(id: string, data: UsuarioInput): Promise<Res
 export async function deleteUsuario(id: string): Promise<Resultado<true>> {
   await db.delete(usuarios).where(eq(usuarios.id, id));
   return { data: true };
+}
+
+/** Vincula (o desvincula, con null) el avatar de un usuario — apps/web nunca toca @valgian/db directo. */
+export async function setAvatarUsuario(idUsuario: string, idArchivoAdjunto: string | null): Promise<void> {
+  await db.update(usuarios).set({ idArchivoAdjunto }).where(eq(usuarios.id, idUsuario));
 }

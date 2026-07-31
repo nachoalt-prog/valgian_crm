@@ -49,7 +49,12 @@ export const usuarios = pgTable(
     passwordHash: text("PASSWORD_HASH").notNull(),
     token: text("TOKEN"),
     tokenExpiracion: timestamp("TOKEN_EXPIRACION", { withTimezone: true }),
-    avatarPath: text("AVATAR_PATH"),
+    // Reemplaza a AVATAR_PATH (ver ADR 0011, addendum) — la foto de
+    // perfil ahora es un ARCHIVOS_ADJUNTOS más, vía la entidad polimórfica
+    // 'usuarios'. Referencia forward (ARCHIVOS_ADJUNTOS se declara más abajo
+    // y a su vez referencia USUARIOS para su propia auditoría) — de ahí el
+    // cast a AnyPgColumn, mismo truco que TRAMITES.ID_TRAMITE_PADRE.
+    idArchivoAdjunto: uuid("ID_ARCHIVO_ADJUNTO").references((): AnyPgColumn => archivosAdjuntos.id),
     comodin: jsonb("COMODIN"),
   },
   (table) => [uniqueIndex("USUARIOS_USERNAME_UNIQUE").on(table.username)],
@@ -463,12 +468,43 @@ export const tramitesCamposDatos = pgTable(
     valorNumero: doublePrecision("VALOR_NUMERO"),
     valorFecha: timestamp("VALOR_FECHA", { withTimezone: true }),
     valorBooleano: boolean("VALOR_BOOLEANO"),
-    // Sin FK todavía — no existe tabla de archivos adjuntos (queda para una
-    // etapa futura, ver domain/tramites.md).
-    idArchivoAdjunto: uuid("ID_ARCHIVO_ADJUNTO"),
+    idArchivoAdjunto: uuid("ID_ARCHIVO_ADJUNTO").references(() => archivosAdjuntos.id),
   },
   (table) => [
     // "para cada trámite, un solo registro por tipo de campo" — habilita upsert limpio.
     uniqueIndex("TRAMITES_CAMPOS_DATOS_TRAMITE_CAMPO_UNIQUE").on(table.idTramite, table.idTipoTramiteCampo),
   ],
 );
+
+/**
+ * Archivos adjuntos: almacenamiento genérico de archivos sobre cualquier
+ * registro con ID_ENTIDAD/ID_RELACION (mismo patrón polimórfico que TRAMITES).
+ * El archivo real vive en el filesystem de la instancia, nunca en la base —
+ * ver ADR 0011.
+ */
+
+export const tiposArchivosAdjuntos = pgTable("TIPOS_ARCHIVOS_ADJUNTOS", {
+  id: uuid("ID").primaryKey().defaultRandom(),
+  codigo: text("CODIGO").notNull(),
+  nombre: text("NOMBRE").notNull(),
+  extension: text("EXTENSION"),
+  mimetype: text("MIMETYPE"),
+  permiteCarga: boolean("PERMITE_CARGA"),
+  permiteDownload: boolean("PERMITE_DOWNLOAD"),
+  renderizar: boolean("RENDERIZAR"),
+});
+
+export const archivosAdjuntos = pgTable("ARCHIVOS_ADJUNTOS", {
+  id: uuid("ID").primaryKey().defaultRandom(),
+  idEntidad: uuid("ID_ENTIDAD").references(() => entidades.id),
+  // Sin FK real (asociación polimórfica) — mismo criterio que TRAMITES.ID_REGISTRO/HISTORIAL.ID_RELACION.
+  idRegistro: uuid("ID_REGISTRO"),
+  idTipoArchivoAdjunto: uuid("ID_TIPO_ARCHIVO_ADJUNTO").references(() => tiposArchivosAdjuntos.id),
+  nombreOriginal: text("NOMBRE_ORIGINAL"),
+  rutaArchivo: text("RUTA_ARCHIVO"),
+  tamanioBytes: integer("TAMANIO_BYTES"),
+  altaFecha: timestamp("ALTA_FECHA", { withTimezone: true }),
+  altaUsuario: uuid("ALTA_USUARIO").references(() => usuarios.id),
+  auditFecha: timestamp("AUDIT_FECHA", { withTimezone: true }),
+  auditUsuario: uuid("AUDIT_USUARIO").references(() => usuarios.id),
+});

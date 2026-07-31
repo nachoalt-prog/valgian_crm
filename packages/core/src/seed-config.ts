@@ -276,6 +276,7 @@ async function main() {
   const herramientaGestionEntidad = await getHerramientaPorCodigo("GESTION_ENTIDAD_1");
   const herramientaHistorial = await getHerramientaPorCodigo("HISTORIAL_1");
   const herramientaTramites = await getHerramientaPorCodigo("TRAMITES_1");
+  const herramientaArchivosAdjuntos = await getHerramientaPorCodigo("LEGAJO_ADJ_1");
 
   const layoutDefault = await ensureLayout("layout_legajo_default_1", "Layout Legajo Default 1");
   await ensureLayoutSolapa(layoutDefault.id, 1, "Datos", herramientaLegajoDatos.id, true);
@@ -283,7 +284,8 @@ async function main() {
   await ensureLayoutSolapa(layoutDefault.id, 3, "Gestión", herramientaGestionEntidad.id, true);
   await ensureLayoutSolapa(layoutDefault.id, 4, "Historial", herramientaHistorial.id, true);
   await ensureLayoutSolapa(layoutDefault.id, 5, "Trámites", herramientaTramites.id, true);
-  // El resto de las solapas (6 a 10) no tienen fila — quedan ocultas y vacías por defecto.
+  await ensureLayoutSolapa(layoutDefault.id, 6, "Adjuntos", herramientaArchivosAdjuntos.id, true);
+  // El resto de las solapas (7 a 10) no tienen fila — quedan ocultas y vacías por defecto.
 
   await ensureBandejaLayout(bandejaLegajos.id, layoutDefault.id);
 

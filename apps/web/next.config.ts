@@ -11,6 +11,13 @@ const nextConfig: NextConfig = {
   // compilado) — Next no los procesa por default porque resuelven bajo
   // node_modules (symlinks de pnpm). Sin esto, sus exports no se ven.
   transpilePackages: ["@valgian/core", "@valgian/db"],
+  // Default de Server Actions es 1MB — muy poco para una foto de perfil o un
+  // adjunto real (ver domain/tramites.md y ADR 0011).
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "10mb",
+    },
+  },
 };
 
 export default nextConfig;

@@ -60,10 +60,7 @@ export function UsuariosPerfilesTool({
     return result;
   }
 
-  async function handleSaveUsuario(
-    data: { idPerfil: string | null; username: string; password?: string; avatarPath: string | null },
-    id?: string,
-  ) {
+  async function handleSaveUsuario(data: { idPerfil: string | null; username: string; password?: string }, id?: string) {
     const result = id ? await updateUsuarioAction(id, data) : await createUsuarioAction(data);
     if (!result.error) router.refresh();
     return result;
