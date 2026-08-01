@@ -1,46 +1,39 @@
 Lo siguiente que me interesa hoy
+  - Que los menues sean botónes que retraigan y desplieguen las opciones que tienen dentro (o sea, el botón del menú se ve siempre, pero oculta o muestra sus opciones)
+  - tramites
+    - cabecera fija con campos de TRAMITES (tipo, categoria, entidad, numero, estado)
+  - modo claro y oscuro un switch muy prolijito arriba de cerrar sesion en la barra lateral izquierda.
+    - Guardar la preferencia en una cookie (o localStorage) del lado del cliente.
+    - Si no hay preferencia guardada, usás prefers-color-scheme del sistema operativo como default.
+      - Con SSR/App Router, si usás cookie (no localStorage) se debería poder leerla en el servidor y evitar el "flash" de tema incorrecto al cargar la página (el clásico FOUC de dark mode).
+      next-themes internamente usa localStorage por default, pero también podés configurarlo para usar cookies si necesitás que el servidor sepa el tema en el primer render (SSR-safe, sin flash).
+  - que al editar interfaces, el selector de colores sea interactivo, tipo el circulo con todos los colores. Pero también dejar poner un código de color a mano.
 
-
-- HOY
-    
-    ----------------------------------------------------------------
-    - Extender el módulo de ARCHIVOS_ADJUNTOS moviendo las dos columnas ID_ENTIDAD y ID_RELACION una nueva tabla ARCHIVOS_ADJUNTOS_ENTIDADES donde también halla ID_ARCHIVO_ADJUNTO de forma que un mismo adjunto se pueda asociar a varias entidades
-      - Modificar toda dependencia
-      - Trigger on delete de ARCHIVOS_ADJUNTOS que borre toda relación en ARCHIVOS_ADJUNTOS_ENTIDADES
-      - Antes de eliminar las columnas originales, migrar toda relación de adjuntos existentes en demo a la nueva tabla
-    - Crear entidad Historial
-    - Añadir trigger on insert de HISTORIAL
-      - Si es un movimiento de legajo o trámite: buscar todo adjunto vinculado al mismo legajo o trámite, con fecha de carga dentro de los últimos 10 minutos y sin asociación contra entidad historial. Para todos los encontrados: ingresarles un registro en ARCHIVOS_ADJUNTOS_ENTIDADES vinculandolos a este registro de historial que se crea.
-    - Modificar tanto LAYOUTS_LEGAJO_SOLAPAS como MENUES_OPCIONES para añadir una columna PARAMETROS tipo JSONB. Modificar también los ABM.
-    - Modificar todo uso de las tablas anteriores para soportar pasarle esos parámetros a las herramientas
-    - Modificar el ABM de archivos adjuntos para soportar recibir por parámetro los falgs Crear, Borrar, Reemplazar y Descargar
-      - Si recibe alguno en 0 o false debe impedir hacer esa acción. Para el caso de 'Crear' directamente no mostrar el botón Nuevo. Si no los recibe asume que se puede hacer todo, como si fueran todos 1 o true. Esto se hace, después de validar permiso a las operaciones, es adicional.
-    - Añadir en la vista de historial (trámites y de legajos) una nueva columna 'Adjuntos' con un botón, que debe desplegar como modal el ABM de archivos_adjuntos pasándo como entidad el registro de historial, por tanto deberían verse los adjuntos de tal movimiento.
-    - Añadir el ABM modal de adjuntos en una nueva solapa del modal de trámites, que muestre sus adjuntos asociados al trámite y permita cargar nuevos. Análogo a legajos.
 
 -----------------------------------------------------------------------------------------------
-    - No se previsualizan HTMLs ?
-    - ABM tipos de adjunto ?
-    - generación de adjuntos
-      - modelos 
-    - En muchas herramientas se muestra tanto código como nombre de los registros. Habría que mostrar solo nombre (esto no incluye ventanas de edición de datos).
-
-
+- HOY
+-------------------
+  - reportes
+    - Crear tabla REPORTES..
+    - Crear reporte de Auditoría de generación de documentos (GENERACIONES_DOCUMENTO)
+ 
 -------------------
 NEXT TODO
 
   - procesos
     - Quiero añadir procesos automáticos programados, tipo Scheduler. Para eso se me ocurre una tabla de procesos con toda la configuración, pero necesito que 'algo' los dispare automáticamente cuando toca según lo que cada uno tenga configurado. Ese algo puede ser job de base de datos en la arquitectura actual? O qué recomendas?
-  - tramites (que puedan servir tambien como tickets, simil manager o invgate)
-    - cabecera fija con campos de TRAMITES (tipo, categoria, entidad, numero, estado)
+  - reportes
+    - Auditoría de procesos
+  - tramites
+    - que puedan servir tambien como tickets, simil manager o invgate. Por tema comentarios.
     - trámites vinculados
     - campos obligatorios por estado
     - solapa de archivos adjuntos
-  - impedir gestión del mismo trámite o legajo a dos usuarios a la vez
-  - reportes
-  - colapsar menues
-  - modo claro y oscuro
-  - que al editar interfaces, haya un selector de colores interactivo
+    - Prueba de generación de adjuntos con tablas dinámicas
+    - impedir gestión del mismo trámite o legajo a dos usuarios a la vez
+  - Prolijidad
+    - emprolijar ABM de Permisos
+    - En muchas herramientas se muestra tanto código como nombre de los registros. Habría que mostrar solo nombre (esto no incluye ventanas de edición de datos).
   - HISTORIAL: verificar índice en historial por ID_ENTIDAD, ID_REGISTRO y FECHA / además generar partición ID_ENTIDAD
 
 BACKLOG
