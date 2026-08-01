@@ -1,5 +1,6 @@
 import { eq, sql } from "drizzle-orm";
 import { db, bandejas, bandejasFiltros, bandejasPerfiles, filtros } from "@valgian/db";
+import { ejecutarQueryConFiltros } from "./query-filtros";
 
 /**
  * Capa de ejecución de Bandejas — ver domain/bandejas.md.
@@ -8,15 +9,11 @@ import { db, bandejas, bandejasFiltros, bandejasPerfiles, filtros } from "@valgi
  * por el usuario final — mismo nivel que ACCIONES.COMANDO, ver ADR 0009). Los
  * valores que ingresa el usuario en el formulario de búsqueda SIEMPRE se
  * pasan parametrizados (nunca interpolados como string) — ver buscarBandeja.
+ *
+ * El armado de WHERE + bind seguro vive en ./query-filtros (compartido con
+ * Reportes, ver ADR 0014) — acá solo queda la resolución de config/filtros
+ * propia de Bandejas.
  */
-
-const IDENTIFICADOR_VALIDO = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
-
-function validarIdentificador(campo: string): void {
-  if (!IDENTIFICADOR_VALIDO.test(campo)) {
-    throw new Error(`Campo de filtro inválido: "${campo}".`);
-  }
-}
 
 export interface BandejaResumen {
   id: string;
@@ -122,33 +119,6 @@ export async function buscarBandeja(bandejaId: string, valores: Record<string, s
     .innerJoin(filtros, eq(filtros.id, bandejasFiltros.idFiltro))
     .where(eq(bandejasFiltros.idBandeja, bandejaId));
 
-  const condiciones = [];
-  for (const f of filtrosRows) {
-    const campo = f.campo;
-    if (!campo) continue;
-    validarIdentificador(campo);
-    const columna = sql.raw(`"${campo}"`);
-
-    if (f.tipo === "fecha_rango") {
-      const desde = valores[`${campo}Desde`];
-      const hasta = valores[`${campo}Hasta`];
-      if (desde) condiciones.push(sql`${columna} >= ${desde}`);
-      if (hasta) condiciones.push(sql`${columna} <= ${hasta}`);
-      continue;
-    }
-
-    const valor = valores[campo];
-    if (!valor) continue;
-
-    if (f.tipo === "texto_like") {
-      condiciones.push(sql`${columna} ILIKE ${"%" + valor + "%"}`);
-    } else if (f.tipo === "select" || f.tipo === "fecha") {
-      condiciones.push(sql`${columna} = ${valor}`);
-    }
-  }
-
-  const whereClause = condiciones.length > 0 ? sql.join(condiciones, sql` AND `) : sql`true`;
-  const query = sql`SELECT * FROM (${sql.raw(bandeja.query)}) AS b WHERE ${whereClause}`;
-
-  return db.execute<Record<string, unknown>>(query);
+  // Sin límite/offset — mismo comportamiento de siempre (ver ADR 0014, Reportes sí pagina).
+  return ejecutarQueryConFiltros(bandeja.query, filtrosRows, valores);
 }

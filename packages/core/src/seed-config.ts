@@ -11,6 +11,9 @@ import {
   bandejas,
   bandejasFiltros,
   bandejasPerfiles,
+  reportes,
+  reportesFiltros,
+  reportesPerfiles,
   herramientas,
   layoutsLegajo,
   layoutsLegajoSolapas,
@@ -108,6 +111,36 @@ async function ensureBandejaPerfil(idBandeja: string, idPerfil: string) {
 
   const [creada] = await db.insert(bandejasPerfiles).values({ idBandeja, idPerfil }).returning();
   return creada;
+}
+
+async function ensureReporte(codigo: string, nombre: string, descripcion: string, query: string, columnas: unknown) {
+  const [existente] = await db.select().from(reportes).where(eq(reportes.codigo, codigo));
+  if (existente) return existente;
+
+  const [creado] = await db.insert(reportes).values({ codigo, nombre, descripcion, query, columnas }).returning();
+  return creado;
+}
+
+async function ensureReporteFiltro(idReporte: string, idFiltro: string, campo: string, orden: number) {
+  const [existente] = await db
+    .select()
+    .from(reportesFiltros)
+    .where(and(eq(reportesFiltros.idReporte, idReporte), eq(reportesFiltros.idFiltro, idFiltro), eq(reportesFiltros.campo, campo)));
+  if (existente) return existente;
+
+  const [creado] = await db.insert(reportesFiltros).values({ idReporte, idFiltro, campo, orden }).returning();
+  return creado;
+}
+
+async function ensureReportePerfil(idReporte: string, idPerfil: string) {
+  const [existente] = await db
+    .select()
+    .from(reportesPerfiles)
+    .where(and(eq(reportesPerfiles.idReporte, idReporte), eq(reportesPerfiles.idPerfil, idPerfil)));
+  if (existente) return existente;
+
+  const [creado] = await db.insert(reportesPerfiles).values({ idReporte, idPerfil }).returning();
+  return creado;
 }
 
 async function getHerramientaPorCodigo(codigo: string) {
@@ -377,6 +410,62 @@ LEFT JOIN "CUENTAS" CU ON ENT."CODIGO" = 'cuentas' AND CU."ID" = T."ID_REGISTRO"
   await ensureBandejaFiltro(bandejaTramites.id, filtroUsuarios.id, "audit_usuario_id", 6);
 
   await ensureBandejaPerfil(bandejaTramites.id, perfilAdmin.id);
+
+  // --- Reportes ---
+
+  const filtroEstadoGeneracion = await ensureFiltro(
+    "select_estado_generacion",
+    "Estado (Generación de Documento)",
+    "select",
+    `SELECT DISTINCT "ESTADO" AS value, "ESTADO" AS label FROM "GENERACIONES_DOCUMENTO" WHERE "ESTADO" IS NOT NULL ORDER BY 1`,
+  );
+  const filtroPlantilla = await ensureFiltro(
+    "select_plantillas_adjuntos",
+    "Plantilla de Documento",
+    "select",
+    `SELECT "ID" AS value, "NOMBRE" AS label FROM "PLANTILLAS_ADJUNTOS" ORDER BY "NOMBRE"`,
+  );
+
+  const REPORTE_AUDITORIA_GENERACIONES_QUERY = `
+SELECT
+  G."ID" AS id,
+  P."NOMBRE" AS plantilla,
+  P."ID" AS plantilla_id,
+  ENT."NOMBRE" AS entidad,
+  G."ESTADO" AS estado,
+  G."ERROR" AS error,
+  G."ALTA_FECHA" AS alta_fecha,
+  G."AUDIT_FECHA" AS audit_fecha,
+  AR."NOMBRE_ORIGINAL" AS archivo_resultado
+FROM "GENERACIONES_DOCUMENTO" G
+LEFT JOIN "PLANTILLAS_ADJUNTOS" P ON P."ID" = G."ID_PLANTILLA"
+LEFT JOIN "ENTIDADES" ENT ON ENT."ID" = G."ID_ENTIDAD"
+LEFT JOIN "ARCHIVOS_ADJUNTOS" AR ON AR."ID" = G."ID_ARCHIVO_RESULTADO"
+`.trim();
+
+  const REPORTE_AUDITORIA_GENERACIONES_COLUMNAS = [
+    { campo: "plantilla", label: "Plantilla" },
+    { campo: "entidad", label: "Entidad" },
+    { campo: "estado", label: "Estado", tipo: "badge" },
+    { campo: "alta_fecha", label: "Solicitado", tipo: "fecha" },
+    { campo: "audit_fecha", label: "Actualizado", tipo: "fecha" },
+    { campo: "archivo_resultado", label: "Archivo generado" },
+    { campo: "error", label: "Error" },
+  ];
+
+  const reporteAuditoriaGeneraciones = await ensureReporte(
+    "auditoria_generaciones_documento",
+    "Auditoría de Generación de Documentos",
+    "Todas las solicitudes de generación de documentos (GENERACIONES_DOCUMENTO), su estado y el archivo resultante.",
+    REPORTE_AUDITORIA_GENERACIONES_QUERY,
+    REPORTE_AUDITORIA_GENERACIONES_COLUMNAS,
+  );
+
+  await ensureReporteFiltro(reporteAuditoriaGeneraciones.id, filtroEstadoGeneracion.id, "estado", 1);
+  await ensureReporteFiltro(reporteAuditoriaGeneraciones.id, filtroPlantilla.id, "plantilla_id", 2);
+  await ensureReporteFiltro(reporteAuditoriaGeneraciones.id, filtroFechaAlta.id, "alta_fecha", 3);
+
+  await ensureReportePerfil(reporteAuditoriaGeneraciones.id, perfilAdmin.id);
 
   console.log("Seed de configuración modelo aplicado (idempotente).");
 }

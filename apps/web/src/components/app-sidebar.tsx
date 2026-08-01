@@ -39,6 +39,8 @@ const RUTA_POR_CODIGO: Record<string, string> = {
   placeholders: "/dashboard/placeholders",
   plantillas_adjuntos: "/dashboard/plantillas-adjuntos",
   tipos_archivos_adjuntos: "/dashboard/tipos-archivos-adjuntos",
+  reportes: "/dashboard/reportes",
+  reportes_admin: "/dashboard/reportes-admin",
 };
 
 export function AppSidebar({

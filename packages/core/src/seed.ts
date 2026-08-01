@@ -279,6 +279,8 @@ async function main() {
   const herramientaPlaceholders = await ensureHerramienta("placeholders", "Placeholders", "placeholders.gestionar");
   const herramientaPlantillasAdjuntos = await ensureHerramienta("plantillas_adjuntos", "Plantillas de Documento", "plantillas_adjuntos.gestionar");
   const herramientaTiposAdjuntos = await ensureHerramienta("tipos_archivos_adjuntos", "Tipos de Adjunto", "tipos_archivos_adjuntos.gestionar");
+  const herramientaReportes = await ensureHerramienta("reportes", "Reportes", "reportes.ver");
+  const herramientaReportesAdmin = await ensureHerramienta("reportes_admin", "Reportes (ABM)", "reportes_admin.gestionar");
   // Estas no se navegan desde el sidebar — se cargan embebidas dentro de un
   // LAYOUTS_LEGAJO dentro del modal de legajo abierto desde Bandejas.
   const herramientaLegajoDatos = await ensureHerramienta("LEGAJO_DAT_1", "Datos de Legajo", "legajo_dat_1.gestionar");
@@ -306,6 +308,8 @@ async function main() {
     herramientaPlaceholders,
     herramientaPlantillasAdjuntos,
     herramientaTiposAdjuntos,
+    herramientaReportes,
+    herramientaReportesAdmin,
     herramientaLegajoDatos,
     herramientaLegajoClientes,
     herramientaGestionEntidad,
@@ -348,6 +352,8 @@ async function main() {
     herramientaPlaceholders,
     herramientaPlantillasAdjuntos,
     herramientaTiposAdjuntos,
+    herramientaReportes,
+    herramientaReportesAdmin,
     herramientaLegajoDatos,
     herramientaLegajoClientes,
     herramientaGestionEntidad,
@@ -382,7 +388,9 @@ async function main() {
   await ensureMenuOpcion(menuConfiguracion.id, herramientaPlaceholders.id, "placeholders", "Placeholders", "icon.placeholders", 10);
   await ensureMenuOpcion(menuConfiguracion.id, herramientaPlantillasAdjuntos.id, "plantillas_adjuntos", "Plantillas de Documento", "icon.plantillasAdjuntos", 11);
   await ensureMenuOpcion(menuConfiguracion.id, herramientaTiposAdjuntos.id, "tipos_archivos_adjuntos", "Tipos de Adjunto", "icon.tiposAdjuntos", 12);
+  await ensureMenuOpcion(menuConfiguracion.id, herramientaReportesAdmin.id, "reportes_admin", "Reportes", "icon.reportes", 13);
   await ensureMenuOpcion(menuHerramientas.id, herramientaBandejas.id, "bandejas", "Bandejas", "icon.bandejas", 1);
+  await ensureMenuOpcion(menuHerramientas.id, herramientaReportes.id, "reportes", "Reportes", "icon.reportes", 2);
 
   await ensureInterfazMenu(interfazDefault.id, menuPrincipal.id);
   await ensureInterfazMenu(interfazDefault.id, menuConfiguracion.id);

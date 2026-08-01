@@ -387,6 +387,46 @@ export const bandejasPerfiles = pgTable(
 );
 
 /**
+ * Reportes: mismo mecanismo de query-filtros que Bandejas (ver ADR 0014,
+ * domain/reportes.md) pero sin acción de apertura — un reporte se mira y se
+ * exporta, no dispara nada sobre un legajo/trámite. Tabla separada de
+ * BANDEJAS a propósito (conceptos de producto distintos).
+ */
+export const reportes = pgTable(
+  "REPORTES",
+  {
+    id: uuid("ID").primaryKey().defaultRandom(),
+    codigo: text("CODIGO").notNull(),
+    nombre: text("NOMBRE").notNull(),
+    descripcion: text("DESCRIPCION"),
+    // SELECT con alias — la base sobre la que se filtra y de la que salen las columnas.
+    query: text("QUERY"),
+    // Qué alias de QUERY se muestran como columnas del listado, en qué orden y con qué label.
+    columnas: jsonb("COLUMNAS"),
+  },
+  (table) => [uniqueIndex("REPORTES_CODIGO_UNIQUE").on(table.codigo)],
+);
+
+export const reportesFiltros = pgTable("REPORTES_FILTROS", {
+  id: uuid("ID").primaryKey().defaultRandom(),
+  idReporte: uuid("ID_REPORTE").references(() => reportes.id),
+  idFiltro: uuid("ID_FILTRO").references(() => filtros.id),
+  // Alias de REPORTES.QUERY al que aplica este filtro en este reporte puntual.
+  campo: text("CAMPO"),
+  orden: integer("ORDEN"),
+});
+
+export const reportesPerfiles = pgTable(
+  "REPORTES_PERFILES",
+  {
+    id: uuid("ID").primaryKey().defaultRandom(),
+    idReporte: uuid("ID_REPORTE").references(() => reportes.id),
+    idPerfil: uuid("ID_PERFIL").references(() => perfiles.id),
+  },
+  (table) => [uniqueIndex("REPORTES_PERFILES_REPORTE_PERFIL_UNIQUE").on(table.idReporte, table.idPerfil)],
+);
+
+/**
  * Layouts de legajo: qué solapas (hasta 10) se muestran al abrir un legajo
  * desde una bandeja, y qué herramienta se carga dentro de cada una — ver
  * domain/layouts-legajo.md.

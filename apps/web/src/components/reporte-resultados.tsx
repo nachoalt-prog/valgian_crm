@@ -1,25 +1,30 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChevronUp, ChevronDown, ChevronsUpDown, FolderOpen, Inbox, Loader2 } from "lucide-react";
+import { ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight, Download, Inbox, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { compararValores, formatearValor, type Direccion } from "@/lib/resultados-formato";
-import type { ColumnaBandeja } from "@valgian/core";
+import type { ColumnaReporte } from "@valgian/core";
 
-interface BandejaResultadosProps {
-  columnas: ColumnaBandeja[];
+interface ReporteResultadosProps {
+  columnas: ColumnaReporte[];
   rows: Record<string, unknown>[];
   loading: boolean;
   searched: boolean;
-  onOpen: (row: Record<string, unknown>) => void;
+  pagina: number;
+  hayMas: boolean;
+  onPrevPage: () => void;
+  onNextPage: () => void;
+  onExport: (formato: "csv" | "tsv") => void;
 }
 
-export function BandejaResultados({ columnas, rows, loading, searched, onOpen }: BandejaResultadosProps) {
+export function ReporteResultados({ columnas, rows, loading, searched, pagina, hayMas, onPrevPage, onNextPage, onExport }: ReporteResultadosProps) {
   const [ordenCampo, setOrdenCampo] = useState<string | null>(null);
   const [ordenDireccion, setOrdenDireccion] = useState<Direccion | null>(null);
 
+  // El orden solo aplica a la página actual — el resultado ya viene paginado del servidor.
   const filasOrdenadas = useMemo(() => {
     if (!ordenCampo || !ordenDireccion) return rows;
     return [...rows].sort((a, b) => compararValores(a[ordenCampo], b[ordenCampo], ordenDireccion));
@@ -57,7 +62,7 @@ export function BandejaResultados({ columnas, rows, loading, searched, onOpen }:
     );
   }
 
-  if (rows.length === 0) {
+  if (rows.length === 0 && pagina === 0) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 text-muted-foreground">
         <Inbox className="size-10 text-muted-foreground/30" />
@@ -91,26 +96,14 @@ export function BandejaResultados({ columnas, rows, loading, searched, onOpen }:
                   </TableHead>
                 );
               })}
-              <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filasOrdenadas.map((row, idx) => (
-              <TableRow key={String(row.id ?? idx)} className="group">
+              <TableRow key={String(row.id ?? idx)}>
                 {columnas.map((c) => (
                   <TableCell key={c.campo}>{formatearValor(row[c.campo], c.tipo)}</TableCell>
                 ))}
-                <TableCell className="text-right">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => onOpen(row)}
-                    className="h-7 gap-1.5 px-2.5 text-xs text-primary opacity-0 transition-opacity group-hover:opacity-100 hover:bg-primary/10 hover:text-primary"
-                  >
-                    <FolderOpen className="size-3.5" />
-                    Abrir
-                  </Button>
-                </TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -118,9 +111,28 @@ export function BandejaResultados({ columnas, rows, loading, searched, onOpen }:
       </div>
 
       <div className="flex items-center justify-between border-t border-border px-5 py-2.5">
-        <span className="text-xs text-muted-foreground">
-          {rows.length} resultado{rows.length !== 1 ? "s" : ""}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <Button size="sm" variant="ghost" onClick={() => onExport("csv")} className="h-7 gap-1.5 px-2.5 text-xs">
+            <Download className="size-3.5" />
+            CSV
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => onExport("tsv")} className="h-7 gap-1.5 px-2.5 text-xs">
+            <Download className="size-3.5" />
+            TSV
+          </Button>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-muted-foreground">Página {pagina + 1}</span>
+          <div className="flex items-center gap-1">
+            <Button size="icon" variant="ghost" disabled={pagina === 0} onClick={onPrevPage} className="size-7">
+              <ChevronLeft className="size-3.5" />
+            </Button>
+            <Button size="icon" variant="ghost" disabled={!hayMas} onClick={onNextPage} className="size-7">
+              <ChevronRight className="size-3.5" />
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );
