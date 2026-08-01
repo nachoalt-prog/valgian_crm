@@ -35,17 +35,18 @@ pnpm db:seed
 
 El seed crea un usuario administrador: **`admin` / `admin123`** (solo para desarrollo local, no tiene ninguna sensibilidad real).
 
-### Los 3 seeds
+### Los seeds
 
-El seed está partido en tres, cada uno pensado para un momento distinto:
+El seed base está partido en tres, cada uno pensado para un momento distinto, más un cuarto seed regional que se suma solo cuando aplica:
 
 | Seed | Comando | Qué trae | ¿Sirve para una instalación real? |
 |---|---|---|---|
 | Principal | `pnpm db:seed` | Lo mínimo para que el sistema funcione: usuario admin, catálogos base (géneros, país/provincias, tipo de documento, carácter Titular), menúes/herramientas/permisos del core | Sí — es obligatorio |
 | Config modelo | `pnpm db:seed:config` | Configuración reusable de ejemplo para arrancar rápido: caracteres Secundario/Pariente, una estrategia de estados para legajos, y una bandeja de búsqueda ya armada y funcional | Sí — opcional, pensado como plantilla de arranque rápido |
 | Demo/mock | `pnpm db:seed:demo` | Datos ficticios de prueba: 10 legajos + 20 clientes inventados | No — solo para desarrollo/pruebas |
+| Configuración Argentina | `pnpm db:seed:configuracion-argentina` | Catálogo `MONEDAS` (peso + tipos de dólar) — ver `domain/acciones-externas.md` | Solo para clientes en Argentina — separado de "Config modelo" a propósito, no es genérico para cualquier instalación |
 
-`db:seed:demo` depende de `db:seed:config` (usa la estrategia/estado y los caracteres que crea), que a su vez depende de `db:seed` (usa el usuario admin y los catálogos base). Correr en ese orden.
+`db:seed:demo` depende de `db:seed:config` (usa la estrategia/estado y los caracteres que crea), que a su vez depende de `db:seed` (usa el usuario admin y los catálogos base). Correr en ese orden. `db:seed:configuracion-argentina` solo depende de `db:seed` (los catálogos base) — independiente de `db:seed:config`/`db:seed:demo`.
 
 ## Día a día
 
@@ -82,6 +83,7 @@ pnpm db:seed:demo
 | `pnpm db:seed` | Corre el seed mínimo (`packages/core/src/seed.ts`) — es idempotente, no hace nada si el usuario admin ya existe |
 | `pnpm db:seed:config` | Corre el seed de configuración modelo (`packages/core/src/seed-config.ts`) — opcional, idempotente |
 | `pnpm db:seed:demo` | Corre el seed de datos ficticios de prueba (`packages/core/src/seed-demo.ts`) — opcional, idempotente, no usar en una instalación real |
+| `pnpm db:seed:configuracion-argentina` | Corre el seed de `MONEDAS` para Argentina (`packages/core/src/seed-configuracion-argentina.ts`) — opcional, idempotente, solo para clientes en Argentina |
 | `pnpm lint` | Corre lint/type-check en todo el workspace (tsc en los packages, eslint en apps/web) |
 
 ## Troubleshooting

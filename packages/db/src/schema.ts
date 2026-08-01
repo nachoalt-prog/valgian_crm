@@ -661,3 +661,102 @@ export const generacionesDocumento = pgTable("GENERACIONES_DOCUMENTO", {
   altaFecha: timestamp("ALTA_FECHA", { withTimezone: true }),
   auditFecha: timestamp("AUDIT_FECHA", { withTimezone: true }),
 });
+
+/**
+ * Acciones externas: puente entre SQL de confianza y trabajo que Postgres no
+ * puede hacer solo (pegarle a un webservice, mandar un mail, etc.) — ver
+ * domain/acciones-externas.md, ADR 0016. ACCIONES_EXTERNAS/ACCIONES_EXTERNAS_COLA
+ * son puramente infraestructura (catálogo + cola genérica) — nunca guardan
+ * datos de dominio; cada COMPONENTE que produce datos reales (ej. una
+ * cotización) tiene su propia tabla, con una FK de vuelta a la fila de cola
+ * que la generó (trazabilidad).
+ */
+
+export const accionesExternas = pgTable(
+  "ACCIONES_EXTERNAS",
+  {
+    id: uuid("ID").primaryKey().defaultRandom(),
+    codigo: text("CODIGO").notNull(),
+    nombre: text("NOMBRE").notNull(),
+    // Cerrado, mapea a un handler Node registrado a mano
+    // (packages/core/src/acciones-externas-handlers.ts). Hoy solo 'consulta_cotizacion'.
+    componente: text("COMPONENTE").notNull(),
+    // Parámetros FIJOS que el handler necesita (credenciales, config propia del
+    // componente) — distinto de ACCIONES_EXTERNAS_COLA.PARAMETROS (dinámico, por llamada).
+    parametros: jsonb("PARAMETROS"),
+    // Sesión con el servicio externo, cuando el COMPONENTE la necesita (mismo
+    // patrón que USUARIOS.TOKEN/TOKEN_EXPIRACION). Ningún handler de este
+    // sprint la usa — queda preparada para un COMPONENTE futuro basado en OAuth.
+    token: text("TOKEN"),
+    tokenExpiracion: timestamp("TOKEN_EXPIRACION", { withTimezone: true }),
+    // Si es false, el barrido NO reclama filas pendientes de esta acción aunque
+    // existan (pausa manual) — se filtra en la query del barrido, no se toca la fila.
+    activo: boolean("ACTIVO").default(true),
+    // Si el disparo es por evento (cada llamador inserta su propia fila al
+    // toque) o se delega a un proceso batch que inserta una sola vez para que
+    // el COMPONENTE barra todo junto. Se crea, NO se usa todavía — ningún
+    // código se ramifica según este valor por ahora.
+    inmediato: boolean("INMEDIATO").default(true),
+    reintentosMax: integer("REINTENTOS_MAX"),
+    // Minutos de margen desde ACCIONES_EXTERNAS_COLA.FECHA_ENCOLADO — pasado
+    // ese margen, no se reintenta más aunque REINTENTO no haya llegado a REINTENTOS_MAX.
+    reintentosMargen: integer("REINTENTOS_MARGEN"),
+  },
+  (table) => [uniqueIndex("ACCIONES_EXTERNAS_CODIGO_UNIQUE").on(table.codigo)],
+);
+
+export const accionesExternasCola = pgTable("ACCIONES_EXTERNAS_COLA", {
+  id: uuid("ID").primaryKey().defaultRandom(),
+  idAccionExterna: uuid("ID_ACCION_EXTERNA").references(() => accionesExternas.id),
+  // DEFAULT alcanza para "setear la fecha salvo que venga en el insert" — no
+  // hace falta un trigger aparte, un DEFAULT de columna ya es esa semántica.
+  fechaEncolado: timestamp("FECHA_ENCOLADO", { withTimezone: true }).defaultNow(),
+  // null = no intentado, 0 = éxito, cualquier otro valor = error (el
+  // componente elige el código; el barrido solo distingue 0 de "no-0").
+  resultado: integer("RESULTADO"),
+  resultadoDesc: text("RESULTADO_DESC"),
+  resultadoFecha: timestamp("RESULTADO_FECHA", { withTimezone: true }),
+  reintento: integer("REINTENTO").default(0),
+  reintentosSuperados: boolean("REINTENTOS_SUPERADOS").default(false),
+  // Milisegundos — integer alcanza de sobra para una llamada HTTP puntual.
+  tiempoConexion: integer("TIEMPO_CONEXION"),
+  idEntidad: uuid("ID_ENTIDAD").references(() => entidades.id),
+  // Sin FK real (asociación polimórfica) — mismo criterio que ARCHIVOS_ADJUNTOS.ID_REGISTRO.
+  idRegistro: uuid("ID_REGISTRO"),
+  // Dinámico, por esta llamada puntual: ID_ENTIDAD/ID_REGISTRO para llamados
+  // simples (el componente busca el dato solo), PARAMETROS para llamados
+  // complejos (el que encola ya pasa los pares clave/valor).
+  parametros: jsonb("PARAMETROS"),
+  request: jsonb("REQUEST"),
+  response: jsonb("RESPONSE"),
+});
+
+/**
+ * Cotizaciones: primer consumidor real de Acciones Externas (COMPONENTE
+ * 'consulta_cotizacion' contra DolarApi). MONEDAS tiene un registro por tipo
+ * de cotización (no un TIPO sobre un único USD) — CODIGO_API es el
+ * identificador con el que la fuente externa reconoce ese registro puntual;
+ * null = no se consulta a ninguna API (ej. ARS). El handler recorre todas las
+ * MONEDAS con CODIGO_API no nulo, sin lista hardcodeada.
+ */
+
+export const monedas = pgTable(
+  "MONEDAS",
+  {
+    id: uuid("ID").primaryKey().defaultRandom(),
+    codigo: text("CODIGO").notNull(),
+    nombre: text("NOMBRE").notNull(),
+    codigoApi: text("CODIGO_API"),
+  },
+  (table) => [uniqueIndex("MONEDAS_CODIGO_UNIQUE").on(table.codigo)],
+);
+
+export const cotizaciones = pgTable("COTIZACIONES", {
+  id: uuid("ID").primaryKey().defaultRandom(),
+  idMoneda: uuid("ID_MONEDA").references(() => monedas.id),
+  compra: doublePrecision("COMPRA"),
+  venta: doublePrecision("VENTA"),
+  fechaConsulta: timestamp("FECHA_CONSULTA", { withTimezone: true }),
+  // Trazabilidad — qué disparo puntual generó esta fila.
+  idAccionExternaCola: uuid("ID_ACCION_EXTERNA_COLA").references(() => accionesExternasCola.id),
+});

@@ -13,7 +13,8 @@
     "db:migrate": "pnpm --filter @valgian/db db:migrate",
     "db:seed": "pnpm --filter @valgian/core db:seed",
     "db:seed:config": "pnpm --filter @valgian/core db:seed:config",
-    "db:seed:demo": "pnpm --filter @valgian/core db:seed:demo"
+    "db:seed:demo": "pnpm --filter @valgian/core db:seed:demo",
+    "db:seed:configuracion-argentina": "pnpm --filter @valgian/core db:seed:configuracion-argentina"
   },
   "devDependencies": {
     "turbo": "^2.10.7",

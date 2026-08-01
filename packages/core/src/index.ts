@@ -34,3 +34,5 @@ export * from "./placeholders";
 export * from "./plantillas-adjunto";
 export * from "./html-a-pdf";
 export * from "./generacion-documentos";
+export * from "./acciones-externas";
+export * from "./monedas";

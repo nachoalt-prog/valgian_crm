@@ -8,9 +8,16 @@
  * dinámicamente solo del lado nodejs, es el patrón que documenta Next.js
  * para este caso exacto.
  */
-import { procesarUnaGeneracionPendiente, escucharGeneracionesPendientes } from "@valgian/core";
+import {
+  procesarUnaGeneracionPendiente,
+  escucharGeneracionesPendientes,
+  procesarAccionesExternasPendientes,
+  escucharAccionesExternasPendientes,
+} from "@valgian/core";
+import { registrar as registrarCotizacionesArgentina } from "@valgian/module-cotizaciones-argentina";
 
 const SEGUNDOS_BARRIDO_SEGURIDAD = 15 * 60;
+const SEGUNDOS_BARRIDO_ACCIONES_EXTERNAS = 60;
 
 // Postgres NO reenvía notificaciones perdidas por una desconexión temporal —
 // por eso el barrido periódico no es un nice-to-have, es necesario para no
@@ -44,4 +51,36 @@ try {
   console.log("[generacion-documentos] Worker iniciado (LISTEN activo, barrido cada 15 min).");
 } catch (err) {
   console.error("[generacion-documentos] No se pudo iniciar el worker:", err);
+}
+
+// Acciones Externas — ver domain/acciones-externas.md. Mismo patrón que arriba
+// (NOTIFY + barrido de seguridad + pasada al arrancar, los 3 llaman al mismo
+// barrido), en un try/catch aparte para que una falla acá no tumbe el worker
+// de generación de documentos ni viceversa.
+async function barrerAccionesExternas(origen: string) {
+  try {
+    await procesarAccionesExternasPendientes();
+  } catch (err) {
+    console.error(`[acciones-externas] Error en el barrido (origen: ${origen}):`, err);
+  }
+}
+
+try {
+  // Registro explícito de módulos opcionales (ver docs/contracts/modulo.md) —
+  // nada de autodescubrimiento. Este es hoy el único módulo instalado en apps/web.
+  registrarCotizacionesArgentina();
+
+  await escucharAccionesExternasPendientes(() => {
+    void barrerAccionesExternas("notify");
+  });
+
+  setInterval(() => {
+    void barrerAccionesExternas("barrido");
+  }, SEGUNDOS_BARRIDO_ACCIONES_EXTERNAS * 1000);
+
+  void barrerAccionesExternas("arranque");
+
+  console.log("[acciones-externas] Worker iniciado (LISTEN activo, barrido cada 1 min).");
+} catch (err) {
+  console.error("[acciones-externas] No se pudo iniciar el worker:", err);
 }
