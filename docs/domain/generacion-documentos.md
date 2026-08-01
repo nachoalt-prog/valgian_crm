@@ -90,10 +90,10 @@ Chromium headless embebido vía Playwright (`packages/core/src/html-a-pdf.ts`) �
 
 ## Resolución de placeholders (`packages/core/src/placeholders.ts`)
 
-Dos fases, sin recursión:
+Sin recursión (un placeholder nunca resuelve a otro `##PLACEHOLDER##`):
 
-1. Se extraen TODOS los `##CODIGO##` únicos del HTML del modelo, se busca cuáles existen en `PLACEHOLDERS`. Si falta alguno, se corta ahí mismo **sin ejecutar ninguna query**, devolviendo la lista completa de códigos faltantes (no uno a la vez).
-2. Si todos existen, se ejecuta cada `QUERY` en orden. Si una puntual falla, se corta ahí — se informa CUÁL placeholder falló, no se sigue con los demás.
+- Se extraen TODOS los `##CODIGO##` únicos del HTML del modelo. Cada uno que **no** tiene fila en `PLACEHOLDERS` se ignora — queda literal en el HTML final, no aborta nada. Cambió a propósito (antes cortaba toda la generación si faltaba uno): permite ir armando/pegando un template con marcadores todavía sin `PLACEHOLDERS` creado, sin que eso bloquee la generación de los demás valores.
+- Los códigos que sí existen se resuelven ejecutando su `QUERY` en orden. Si una puntual falla al ejecutarse, ahí sí se corta — se informa CUÁL placeholder falló, no se sigue con los demás (esto no cambió).
 
 ## Módulos de código
 

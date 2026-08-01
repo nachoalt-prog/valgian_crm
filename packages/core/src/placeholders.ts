@@ -48,13 +48,14 @@ export async function deletePlaceholder(id: string): Promise<Resultado<true>> {
 
 /**
  * Resolución de ##CODIGO## en un HTML modelo — ver domain/generacion-documentos.md.
- * Dos fases, sin recursión (un placeholder nunca resuelve a otro ##PLACEHOLDER##):
+ * Sin recursión (un placeholder nunca resuelve a otro ##PLACEHOLDER##).
  *
- * 1. Se buscan TODOS los códigos del template de una — si falta alguno, se
- *    corta ahí mismo sin ejecutar ninguna query, informando la lista completa
- *    de faltantes (no uno a la vez).
- * 2. Recién con todos confirmados, se ejecuta cada QUERY en orden. Si una
- *    puntual falla, se corta ahí — se informa CUÁL, no se sigue con las demás.
+ * Un ##CODIGO## que no tiene fila en PLACEHOLDERS se ignora — queda tal cual,
+ * literal, en el HTML final (no aborta la generación). Deliberado: permite
+ * pegar un template con marcadores todavía sin placeholder creado sin que
+ * eso bloquee la generación de los demás. Si en cambio el QUERY de un
+ * placeholder que SÍ existe falla al ejecutarse, ahí sí se corta — se
+ * informa cuál, no se sigue con los demás.
  */
 
 interface ResolverPlaceholdersResult {
@@ -89,14 +90,11 @@ export async function resolverPlaceholders(htmlTemplate: string, datos: unknown)
   const filas = await db.select().from(placeholders).where(inArray(placeholders.codigo, codigos));
   const porCodigo = new Map(filas.map((f) => [f.codigo, f]));
 
-  const faltantes = codigos.filter((c) => !porCodigo.has(c));
-  if (faltantes.length > 0) {
-    return { error: `No existen los siguientes placeholders: ${faltantes.join(", ")}.` };
-  }
-
   let html = htmlTemplate;
   for (const codigo of codigos) {
-    const placeholder = porCodigo.get(codigo)!;
+    const placeholder = porCodigo.get(codigo);
+    if (!placeholder) continue; // No existe -> se ignora, el ##CODIGO## queda literal.
+
     let valor: string;
     try {
       valor = await ejecutarQueryPlaceholder(placeholder.query ?? "", datos);
