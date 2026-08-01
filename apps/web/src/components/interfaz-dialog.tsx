@@ -112,26 +112,44 @@ export function InterfazDialog({ open, onOpenChange, interfaz, onSave }: Interfa
             <Label htmlFor="colorPrimario" className="text-xs uppercase tracking-wider text-muted-foreground">
               Color primario
             </Label>
-            <Input
-              id="colorPrimario"
-              value={colorPrimario}
-              onChange={(e) => setColorPrimario(e.target.value)}
-              placeholder="oklch(0.72 0.14 192)"
-              className="font-mono text-sm"
-            />
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                aria-label="Elegir color primario"
+                value={/^#[0-9A-Fa-f]{6}$/.test(colorPrimario) ? colorPrimario : "#000000"}
+                onChange={(e) => setColorPrimario(e.target.value.toUpperCase())}
+                className="size-9 shrink-0 cursor-pointer rounded border border-input bg-transparent p-0.5"
+              />
+              <Input
+                id="colorPrimario"
+                value={colorPrimario}
+                onChange={(e) => setColorPrimario(e.target.value)}
+                placeholder="#00BFBB"
+                className="font-mono text-sm"
+              />
+            </div>
           </div>
 
           <div className="space-y-1.5">
             <Label htmlFor="colorSecundario" className="text-xs uppercase tracking-wider text-muted-foreground">
               Color secundario
             </Label>
-            <Input
-              id="colorSecundario"
-              value={colorSecundario}
-              onChange={(e) => setColorSecundario(e.target.value)}
-              placeholder="oklch(0.55 0.22 285)"
-              className="font-mono text-sm"
-            />
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                aria-label="Elegir color secundario"
+                value={/^#[0-9A-Fa-f]{6}$/.test(colorSecundario) ? colorSecundario : "#000000"}
+                onChange={(e) => setColorSecundario(e.target.value.toUpperCase())}
+                className="size-9 shrink-0 cursor-pointer rounded border border-input bg-transparent p-0.5"
+              />
+              <Input
+                id="colorSecundario"
+                value={colorSecundario}
+                onChange={(e) => setColorSecundario(e.target.value)}
+                placeholder="#6C50E9"
+                className="font-mono text-sm"
+              />
+            </div>
           </div>
 
           <div className="space-y-1.5">

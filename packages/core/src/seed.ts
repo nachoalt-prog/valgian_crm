@@ -50,8 +50,8 @@ async function ensureInterfazDefault() {
       fuente: "default",
       // Paleta Valgian — teal/cyan como primario, purple como acento.
       // Ver domain/infraestructura.md (INTERFAZ.COLOR_PRIMARIO/COLOR_SECUNDARIO).
-      colorPrimario: "oklch(0.72 0.14 192)",
-      colorSecundario: "oklch(0.55 0.22 285)",
+      colorPrimario: "#00BFBB",
+      colorSecundario: "#6C50E9",
     })
     .returning();
   return creada;
@@ -74,8 +74,8 @@ async function ensureInterfazAlt() {
       fuente: "default",
       // Paleta de prueba, deliberadamente distinta de la de "default" (teal/purple):
       // naranja como primario, magenta como acento.
-      colorPrimario: "oklch(0.75 0.15 55)",
-      colorSecundario: "oklch(0.6 0.2 340)",
+      colorPrimario: "#F59145",
+      colorSecundario: "#C841A5",
       titulo: "Valgian (Alt)",
     })
     .returning();

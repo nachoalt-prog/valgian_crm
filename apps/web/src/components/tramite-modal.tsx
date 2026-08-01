@@ -15,6 +15,7 @@ import {
   getOpcionesListaValoresAction,
   getValoresParaEditarAction,
   getEstimulosDisponiblesTramiteAction,
+  getCabeceraTramiteAction,
   gestionarTramiteAction,
   getEntidadTramitesIdAction,
   type DatoCrudoInput,
@@ -59,6 +60,8 @@ export function TramiteModal({ open, onOpenChange, idTipoTramite, idRegistro, id
   const [activeTab, setActiveTab] = useState<"datos" | "historial" | "adjuntos">("datos");
   const [revisionAdjuntos, setRevisionAdjuntos] = useState(0);
   const [idEntidadTramites, setIdEntidadTramites] = useState<string | undefined>(undefined);
+  const [cabecera, setCabecera] = useState<{ tipoNombre: string; categoriaNombre: string | null; entidadLabel: string | null } | null>(null);
+  const [estadoActual, setEstadoActual] = useState<{ id: string; nombre: string } | null>(null);
 
   // El padre debe montar este componente con una `key` que cambie según
   // (idTipoTramite, idRegistro, idTramite) — así cada trámite distinto arranca
@@ -72,7 +75,8 @@ export function TramiteModal({ open, onOpenChange, idTipoTramite, idRegistro, id
       getEstimulosDisponiblesTramiteAction(idTipoTramite, idTramite ?? null),
       idTramite ? getValoresParaEditarAction(idTipoTramite, idTramite) : Promise.resolve({ data: {} as Valores }),
       idTramite ? getEntidadTramitesIdAction() : Promise.resolve({ data: undefined }),
-    ]).then(async ([camposRes, estimulosRes, valoresRes, entidadRes]) => {
+      getCabeceraTramiteAction(idTipoTramite, idRegistro),
+    ]).then(async ([camposRes, estimulosRes, valoresRes, entidadRes, cabeceraRes]) => {
       if (cancelado) return;
       const camposData = camposRes.data ?? [];
 
@@ -88,9 +92,11 @@ export function TramiteModal({ open, onOpenChange, idTipoTramite, idRegistro, id
 
       setCampos(camposData);
       setEstimulos(estimulosRes.data?.estimulos ?? []);
+      setEstadoActual(estimulosRes.data?.estadoActual ?? null);
       setValores(valoresRes.data ?? {});
       setOpciones(Object.fromEntries(entradas));
       setIdEntidadTramites(entidadRes.data ?? undefined);
+      setCabecera(cabeceraRes.data ?? null);
     });
 
     return () => {
@@ -309,6 +315,30 @@ export function TramiteModal({ open, onOpenChange, idTipoTramite, idRegistro, id
         <DialogHeader className="border-b border-border px-5 py-4">
           <DialogTitle>{idTramite ? "Gestionar Trámite" : "Iniciar Trámite"}</DialogTitle>
         </DialogHeader>
+
+        {/* Cabecera fija tipo-ticket — visible sin importar la solapa activa. */}
+        <div className="flex shrink-0 flex-wrap gap-x-6 gap-y-1.5 border-b border-border bg-muted/30 px-5 py-2.5 text-xs">
+          <span>
+            <span className="text-muted-foreground">Tipo: </span>
+            <span className="font-medium text-foreground">{cabecera?.tipoNombre ?? "—"}</span>
+          </span>
+          <span>
+            <span className="text-muted-foreground">Categoría: </span>
+            <span className="font-medium text-foreground">{cabecera?.categoriaNombre ?? "—"}</span>
+          </span>
+          <span>
+            <span className="text-muted-foreground">Entidad: </span>
+            <span className="font-medium text-foreground">{cabecera?.entidadLabel ?? "—"}</span>
+          </span>
+          <span>
+            <span className="text-muted-foreground">N°: </span>
+            <span className="font-mono font-medium text-foreground">{idTramite ?? "(nuevo)"}</span>
+          </span>
+          <span>
+            <span className="text-muted-foreground">Estado: </span>
+            <span className="font-medium text-foreground">{estadoActual?.nombre ?? "—"}</span>
+          </span>
+        </div>
 
         {/* Sin idTramite (alta nueva) no hay historial que mostrar todavía. */}
         {idTramite && (

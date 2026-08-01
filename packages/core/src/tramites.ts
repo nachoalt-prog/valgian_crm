@@ -1,5 +1,5 @@
 import { eq, and, sql } from "drizzle-orm";
-import { db, tramites, tramitesCamposDatos, tiposTramite, entidades, clientes, cuentas, legajos, estados } from "@valgian/db";
+import { db, tramites, tramitesCamposDatos, tiposTramite, categoriasTiposTramite, entidades, clientes, cuentas, legajos, estados } from "@valgian/db";
 import { validarIdentificador, getEstimulosDesdeEstado, type EstimuloDisponible } from "./motor-estados";
 
 /**
@@ -70,6 +70,48 @@ export async function resolverCandidatosAplicarA(idTipoTramite: string, idLegajo
   }
 
   return tipo.filtro ? aplicarFiltroOrden(tipo.filtro, candidatos) : candidatos;
+}
+
+/** Label human-readable de un registro puntual, según a qué ENTIDADES pertenece — mismo criterio que resolverCandidatosAplicarA. */
+async function resolverLabelRegistro(entidadCodigo: string | null, idRegistro: string): Promise<string | null> {
+  if (entidadCodigo === "legajos") {
+    const [legajo] = await db.select({ numero: legajos.numero }).from(legajos).where(eq(legajos.id, idRegistro));
+    return legajo?.numero ?? null;
+  }
+  if (entidadCodigo === "clientes") {
+    const [cliente] = await db.select({ apellido: clientes.apellido, nombre: clientes.nombre }).from(clientes).where(eq(clientes.id, idRegistro));
+    return cliente ? `${cliente.apellido ?? ""}, ${cliente.nombre}` : null;
+  }
+  if (entidadCodigo === "cuentas") {
+    const [cuenta] = await db.select({ numero: cuentas.numero }).from(cuentas).where(eq(cuentas.id, idRegistro));
+    return cuenta?.numero ?? null;
+  }
+  return null;
+}
+
+export interface CabeceraTramite {
+  tipoNombre: string;
+  categoriaNombre: string | null;
+  entidadLabel: string | null;
+}
+
+/** Datos fijos para la cabecera tipo-ticket del Modal de Trámites (tipo/categoría/entidad). */
+export async function getCabeceraTramite(idTipoTramite: string, idRegistro: string): Promise<CabeceraTramite | null> {
+  const [tipo] = await db
+    .select({
+      tipoNombre: tiposTramite.nombre,
+      categoriaNombre: categoriasTiposTramite.nombre,
+      entidadCodigo: entidades.codigo,
+    })
+    .from(tiposTramite)
+    .leftJoin(categoriasTiposTramite, eq(categoriasTiposTramite.id, tiposTramite.idCategoria))
+    .leftJoin(entidades, eq(entidades.id, tiposTramite.idEntidad))
+    .where(eq(tiposTramite.id, idTipoTramite));
+
+  if (!tipo) return null;
+
+  const entidadLabel = await resolverLabelRegistro(tipo.entidadCodigo, idRegistro);
+  return { tipoNombre: tipo.tipoNombre, categoriaNombre: tipo.categoriaNombre, entidadLabel };
 }
 
 export interface EstimulosDisponiblesTramiteResult {

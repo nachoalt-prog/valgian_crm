@@ -17,6 +17,8 @@ Usuarios, permisos, y configuración de interfaz. No es "negocio" del CRM en sí
 | TITULO | string, nullable (texto de marca mostrado en el shell post-login, ej. donde hoy dice "Valgian") |
 | IMAGEN_FONDO | string, nullable (ruta o URL de una imagen — ver "Interfaz" más abajo para dónde y cómo se usa) |
 
+`COLOR_PRIMARIO`/`COLOR_SECUNDARIO` se guardan en formato hex (`#RRGGBB`) — editables en el ABM con un `<input type="color">` nativo junto al campo de texto (ambos sincronizados), ver "Interfaz" más abajo.
+
 ### PERFILES
 
 | Campo | Tipo |
@@ -158,3 +160,17 @@ Qué interfaz se usa en cada momento:
 `TITULO` reemplaza el nombre de marca fijo que se mostraba en el shell (sidebar). Si es nulo, el código cae a un valor por defecto.
 
 `IMAGEN_FONDO` solo se usa en la pantalla de login (nunca en el shell post-login): si tiene un valor, se muestra como imagen de fondo detrás del formulario, al 30% de opacidad (70% transparente), sin reemplazar el `COLOR_PRIMARIO`/fondo normal — se ve el color de siempre con la imagen apenas insinuada encima. Si es nulo, el fondo se ve exactamente como sin esta funcionalidad.
+
+## Tema claro/oscuro
+
+Independiente de `INTERFAZ` — es una preferencia de PANTALLA (clara/oscura), no de marca por perfil. `COLOR_PRIMARIO`/`COLOR_SECUNDARIO` (y sus derivados `--sidebar-primary`, `--ring`, `--chart-1`/`--chart-2`) son invariantes entre ambos temas, a propósito: la interfaz elegida para el perfil no cambia según el tema. El resto de la paleta (fondo, card, popover, secondary, muted, border, sidebar) sí cambia — ver `apps/web/src/app/globals.css`, bloques `.dark`/`.light`.
+
+Mecanismo (sin `next-themes`, sin dependencia nueva — mismo patrón que ya usaba este layout para `INTERFAZ`, "leer algo server-side e inyectarlo antes del render"):
+- Preferencia guardada en cookie `theme` (`light`/`dark`), NO en localStorage — así el servidor la lee con `cookies()` en `apps/web/src/app/layout.tsx` y setea la clase `light`/`dark` en `<html>` en el primer render, sin flash.
+- Sin cookie todavía: se renderiza `dark` como default y un script `next/script` con `strategy="beforeInteractive"` corrige la clase antes del primer paint si `prefers-color-scheme: light` — no escribe cookie (sigue "siguiendo" al SO hasta que el usuario elija explícitamente).
+- El switch vive en `apps/web/src/components/app-sidebar.tsx`, arriba de "Cerrar sesión". Al togglear, escribe la cookie (`apps/web/src/lib/theme.ts`) y cambia la clase en `<html>` en el momento, sin reload.
+- `<html>` lleva `suppressHydrationWarning` — esperado con este patrón (React no puede saber de antemano si el script beforeInteractive tocó la clase).
+
+## Menú lateral — grupos colapsables
+
+Cada grupo del menú (`MenuGrupo.nombre`, ej. "ABMs", "Configuración") tiene su propio botón con chevron que oculta/muestra sus opciones — independiente del colapso GLOBAL del sidebar (que angosta todo a solo íconos). Estado en memoria (`useState` en `app-sidebar.tsx`, no persistido) — todos los grupos abiertos por default.

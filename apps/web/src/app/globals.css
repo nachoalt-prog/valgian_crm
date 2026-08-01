@@ -49,16 +49,36 @@
 }
 
 /*
- * Paleta Valgian — dark deep-space theme (ver V0/abm-perfiles-usuarios).
- * --primary y --accent son los valores de FALLBACK (antes de que cargue
- * cualquier dato) — el valor real en runtime viene de INTERFAZ.COLOR_PRIMARIO/
- * COLOR_SECUNDARIO, inyectado como override inline por apps/web/src/app/layout.tsx.
- * Mapeo: COLOR_PRIMARIO -> --primary (+ --sidebar-primary, --ring, --chart-1),
- * COLOR_SECUNDARIO -> --accent (+ --chart-2). El resto de la paleta (fondo,
- * --secondary muted) queda fija en CSS — domain/infraestructura.md solo define
- * esos dos campos de theming, no la paleta completa.
+ * Paleta Valgian. --primary/--primary-foreground/--accent/--accent-foreground
+ * (+ sus derivados --sidebar-primary, --ring, --sidebar-ring, --chart-1,
+ * --chart-2) son INVARIANTES entre modo claro/oscuro — vienen de
+ * INTERFAZ.COLOR_PRIMARIO/COLOR_SECUNDARIO (hex), inyectados como override
+ * inline por apps/web/src/app/layout.tsx, y no cambian con el tema (pedido
+ * explícito: la interfaz elegida por perfil no se ve afectada por claro/oscuro).
+ * Los valores acá son el FALLBACK antes de que cargue cualquier dato.
+ * El resto de la paleta (fondo, card, popover, secondary, muted, border,
+ * sidebar) SÍ cambia con el tema — ver bloques .dark/.light más abajo.
+ * Selector de tema: clase .dark/.light en <html>, seteada server-side desde
+ * una cookie (ver layout.tsx) — @custom-variant dark arriba ya apunta a .dark.
  */
 :root {
+  --primary: #00bfbb;
+  --primary-foreground: oklch(0.12 0.04 268);
+  --accent: #6c50e9;
+  --accent-foreground: oklch(0.97 0 0);
+  --ring: #00bfbb;
+  --chart-1: #00bfbb;
+  --chart-2: #6c50e9;
+  --chart-3: oklch(0.65 0.18 220);
+  --chart-4: oklch(0.6 0.16 180);
+  --chart-5: oklch(0.5 0.2 300);
+  --radius: 0.625rem;
+  --sidebar-primary: #00bfbb;
+  --sidebar-primary-foreground: oklch(0.12 0.04 268);
+  --sidebar-ring: #00bfbb;
+}
+
+.dark {
   color-scheme: dark;
   --background: oklch(0.12 0.04 268);
   --foreground: oklch(0.97 0 0);
@@ -66,32 +86,40 @@
   --card-foreground: oklch(0.97 0 0);
   --popover: oklch(0.17 0.04 268);
   --popover-foreground: oklch(0.97 0 0);
-  --primary: oklch(0.72 0.14 192);
-  --primary-foreground: oklch(0.12 0.04 268);
   --secondary: oklch(0.27 0.08 285);
   --secondary-foreground: oklch(0.97 0 0);
   --muted: oklch(0.22 0.05 275);
   --muted-foreground: oklch(0.65 0.04 268);
-  --accent: oklch(0.55 0.22 285);
-  --accent-foreground: oklch(0.97 0 0);
   --destructive: oklch(0.65 0.22 25);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 12%);
-  --ring: oklch(0.72 0.14 192);
-  --chart-1: oklch(0.72 0.14 192);
-  --chart-2: oklch(0.55 0.22 285);
-  --chart-3: oklch(0.65 0.18 220);
-  --chart-4: oklch(0.6 0.16 180);
-  --chart-5: oklch(0.5 0.2 300);
-  --radius: 0.625rem;
   --sidebar: oklch(0.15 0.045 268);
   --sidebar-foreground: oklch(0.97 0 0);
-  --sidebar-primary: oklch(0.72 0.14 192);
-  --sidebar-primary-foreground: oklch(0.12 0.04 268);
   --sidebar-accent: oklch(0.22 0.05 275);
   --sidebar-accent-foreground: oklch(0.97 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.72 0.14 192);
+}
+
+.light {
+  color-scheme: light;
+  --background: oklch(0.98 0.005 268);
+  --foreground: oklch(0.16 0.02 268);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.16 0.02 268);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.16 0.02 268);
+  --secondary: oklch(0.94 0.015 285);
+  --secondary-foreground: oklch(0.2 0.02 268);
+  --muted: oklch(0.95 0.01 275);
+  --muted-foreground: oklch(0.48 0.02 268);
+  --destructive: oklch(0.58 0.22 25);
+  --border: oklch(0 0 0 / 10%);
+  --input: oklch(0 0 0 / 12%);
+  --sidebar: oklch(0.97 0.008 268);
+  --sidebar-foreground: oklch(0.16 0.02 268);
+  --sidebar-accent: oklch(0.93 0.015 285);
+  --sidebar-accent-foreground: oklch(0.16 0.02 268);
+  --sidebar-border: oklch(0 0 0 / 10%);
 }
 
 @layer base {

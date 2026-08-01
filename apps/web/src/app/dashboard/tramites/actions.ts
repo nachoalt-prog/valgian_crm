@@ -11,6 +11,7 @@ import {
   listTramitesPorLegajo,
   getTramiteDetalle,
   getEstimulosDisponiblesTramite,
+  getCabeceraTramite,
   gestionarTramite,
   reconstruirValorCampo,
   mapearValorCampo,
@@ -109,6 +110,13 @@ export async function getEstimulosDisponiblesTramiteAction(idTipoTramite: string
   const check = await requireAcceso();
   if (check.error || !check.perfilId) return { error: check.error ?? "No autenticado." };
   return { data: await getEstimulosDisponiblesTramite(idTipoTramite, idTramite, check.perfilId) };
+}
+
+/** Datos fijos (tipo/categoría/entidad) para la cabecera tipo-ticket del Modal de Trámites. */
+export async function getCabeceraTramiteAction(idTipoTramite: string, idRegistro: string) {
+  const check = await requireAcceso();
+  if (check.error) return { error: check.error };
+  return { data: await getCabeceraTramite(idTipoTramite, idRegistro) };
 }
 
 /** Valores ya reconstruidos (crudos, listos para el formulario) de un trámite existente. */

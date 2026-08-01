@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getSessionUser, getMenuForPerfil, getTemaPorInterfaz } from "@valgian/core";
 import { SESSION_COOKIE } from "@/lib/session";
+import { THEME_COOKIE } from "@/lib/theme";
 import { AppSidebar } from "@/components/app-sidebar";
 import { AppTopbar } from "@/components/app-topbar";
 
@@ -10,6 +11,7 @@ import { AppTopbar } from "@/components/app-topbar";
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
+  const temaInicial = cookieStore.get(THEME_COOKIE)?.value === "light" ? "light" : "dark";
 
   if (!token) {
     redirect("/");
@@ -26,7 +28,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
-      <AppSidebar menu={menu} titulo={tema?.titulo} />
+      <AppSidebar menu={menu} titulo={tema?.titulo} temaInicial={temaInicial} />
       <div className="flex flex-col flex-1 min-w-0">
         <AppTopbar username={usuario.username} perfilNombre={perfil?.nombre} idArchivoAdjunto={usuario.idArchivoAdjunto} />
         <main className="flex-1 overflow-y-auto p-6">{children}</main>
