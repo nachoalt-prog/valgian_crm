@@ -137,6 +137,10 @@ Config libre por diseño (`Record<string, unknown>`, editada como JSON crudo en 
 
 **Primer y único consumidor real hoy**: `LEGAJO_ADJ_1` (Archivos Adjuntos) interpreta `{"crear": false, "reemplazar": false, "descargar": false, "borrar": false}` en `LAYOUTS_LEGAJO_SOLAPAS.PARAMETROS` — ver `domain/archivos-adjuntos.md`. `MENUES_OPCIONES.PARAMETROS` existe con el mismo mecanismo pero sin ningún caso real que lo ejercite todavía (ninguna herramienta con entrada de menú lo necesita hoy).
 
+**Autodocumentado por herramienta** — `HERRAMIENTAS.PARAMETROS_EJEMPLO` (`jsonb`) y `HERRAMIENTAS.PARAMETROS_GUIA` (`text`), seteados por seed (sin ABM propio — `HERRAMIENTAS` sigue siendo solo-seed). En los dos editores de `PARAMETROS` (`LayoutSolapaDialog`, `MenuOpcionDialog`), al elegir una herramienta en el combo, el textarea de `PARAMETROS` toma como `placeholder` el `PARAMETROS_EJEMPLO` de esa herramienta, y debajo del campo se agrega su `PARAMETROS_GUIA` (después de un texto fijo genérico que no cambia). `PARAMETROS_EJEMPLO` admite dos formas válidas de contenido, ambas jsonb:
+- Un objeto real (ej. `{"crear": true, "borrar": false, "reemplazar": true, "descargar": false}` para `LEGAJO_ADJ_1`) → el placeholder muestra ese JSON con formato.
+- Un string JSON simple (ej. `"De momento esta herramienta no soporta parámetros"`, el valor por default para toda herramienta sin operaciones granulares) → el placeholder muestra ese texto tal cual, sin comillas.
+
 ## Imágenes y archivos
 
 Íconos de menú: `MENUES_OPCIONES.ICONO` guarda una clave propia y estable (no el nombre de un ícono de librería directamente), mapeada en código a un componente real de lucide-react. Ver ADR 0011.

@@ -66,6 +66,13 @@ export const herramientas = pgTable("HERRAMIENTAS", {
   nombre: text("NOMBRE").notNull(),
   slug: text("SLUG"),
   comodin: jsonb("COMODIN"),
+  // Ayuda para el editor de PARAMETROS en los ABMs de Layouts de Legajo y
+  // Menúes (ver domain/infraestructura.md, "Parámetros por punto de acceso").
+  // EJEMPLO puede ser un objeto real (ej. {"crear": true, ...}) o directamente
+  // un string JSON con un mensaje ("de momento no soporta parámetros") — ambos
+  // son jsonb válidos, por eso sin `.$type<>()` fijo acá.
+  parametrosEjemplo: jsonb("PARAMETROS_EJEMPLO"),
+  parametrosGuia: text("PARAMETROS_GUIA"),
 });
 
 /**
@@ -509,16 +516,20 @@ export const tramitesCamposDatos = pgTable(
  * ver ADR 0011.
  */
 
-export const tiposArchivosAdjuntos = pgTable("TIPOS_ARCHIVOS_ADJUNTOS", {
-  id: uuid("ID").primaryKey().defaultRandom(),
-  codigo: text("CODIGO").notNull(),
-  nombre: text("NOMBRE").notNull(),
-  extension: text("EXTENSION"),
-  mimetype: text("MIMETYPE"),
-  permiteCarga: boolean("PERMITE_CARGA"),
-  permiteDownload: boolean("PERMITE_DOWNLOAD"),
-  renderizar: boolean("RENDERIZAR"),
-});
+export const tiposArchivosAdjuntos = pgTable(
+  "TIPOS_ARCHIVOS_ADJUNTOS",
+  {
+    id: uuid("ID").primaryKey().defaultRandom(),
+    codigo: text("CODIGO").notNull(),
+    nombre: text("NOMBRE").notNull(),
+    extension: text("EXTENSION"),
+    mimetype: text("MIMETYPE"),
+    permiteCarga: boolean("PERMITE_CARGA"),
+    permiteDownload: boolean("PERMITE_DOWNLOAD"),
+    renderizar: boolean("RENDERIZAR"),
+  },
+  (table) => [uniqueIndex("TIPOS_ARCHIVOS_ADJUNTOS_CODIGO_UNIQUE").on(table.codigo)],
+);
 
 export const archivosAdjuntos = pgTable("ARCHIVOS_ADJUNTOS", {
   id: uuid("ID").primaryKey().defaultRandom(),

@@ -13,6 +13,7 @@ export * from "./herramientas";
 export * from "./productos";
 export * from "./bandejas";
 export * from "./filtros";
+export * from "./tipos-archivos-adjuntos";
 export * from "./bandejas-admin";
 export * from "./catalogos";
 export * from "./legajos";

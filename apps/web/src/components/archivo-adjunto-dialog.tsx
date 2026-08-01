@@ -168,10 +168,14 @@ export function ArchivoAdjuntoDialog({
               <img src={previewStagedUrl} alt={nombreMostrado ?? ""} className="max-h-full max-w-full object-contain" />
             ) : previewStagedUrl && mimetypeStaged === "application/pdf" ? (
               <embed src={previewStagedUrl} type="application/pdf" className="h-full w-full" />
+            ) : previewStagedUrl && mimetypeStaged === "text/html" ? (
+              <iframe src={previewStagedUrl} sandbox="" className="h-full w-full bg-white" title={nombreMostrado ?? "preview"} />
             ) : !staged && archivo?.renderizar && archivo.mimetype?.startsWith("image/") ? (
               <img src={urlInline!} alt={archivo.nombreOriginal ?? ""} className="max-h-full max-w-full object-contain" />
             ) : !staged && archivo?.renderizar && archivo.mimetype === "application/pdf" ? (
               <embed src={urlInline!} type="application/pdf" className="h-full w-full" />
+            ) : !staged && archivo?.renderizar && archivo.mimetype === "text/html" ? (
+              <iframe src={urlInline!} sandbox="" className="h-full w-full bg-white" title={archivo.nombreOriginal ?? "preview"} />
             ) : archivo === undefined ? (
               <p className="text-sm text-muted-foreground">Cargando…</p>
             ) : (

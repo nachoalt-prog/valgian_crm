@@ -147,7 +147,7 @@ Firma: `sp_gestionar_tramite(p_id_tramite uuid, p_id_tipo_tramite uuid, p_id_reg
 
 ### Modal de Trámites (`apps/web/src/components/tramite-modal.tsx`)
 
-Componente compartido, usado tanto desde el ABM de Trámites como desde la bandeja "Trámites" (ver más abajo). Recibe `idTipoTramite`, `idRegistro`, `idUsuario` (resuelto siempre server-side desde la sesión, nunca del cliente) y **`idTramite` opcional**: si viene, carga y edita ese trámite; si no, es una alta nueva — esto último solo puede pasar desde el botón "Iniciar" del ABM.
+Componente compartido, usado tanto desde el ABM de Trámites como desde la bandeja "Trámites" (ver más abajo). Recibe `idTipoTramite`, `idRegistro`, `idUsuario` (resuelto siempre server-side desde la sesión, nunca del cliente) y **`idTramite` opcional**: si viene, carga y edita ese trámite; si no, es una alta nueva — esto último solo puede pasar desde el botón "Iniciar" del ABM. Mismo tamaño que el modal de legajo (`h-[85vh] max-w-5xl`) — hasta hace poco era más chico (`max-w-3xl`), pero le quedaba justo con las solapas Historial/Adjuntos sumadas.
 
 - Dibuja los campos según `TIPOS_TRAMITE_CAMPOS` de ese tipo (respetando `ORDEN`, `OBLIGATORIO`, `PLACEHOLDER`, `AYUDA`, `REGEX`, `LONGITUD_MAX`, `NUM_MIN`/`MAX`/`STEP`). `TIPOS_TRAMITE.COMPONENTE` no se usa todavía (ver arriba).
 - Selector de estímulo: si `idTramite` existe, parte de su `ID_ESTADO` real; si no, del estado inicial de la estrategia del tipo de trámite (`getEstimulosDisponiblesTramite` en `packages/core/src/tramites.ts`, que reusa `getEstimulosDesdeEstado` — extraído de `motor-estados.ts` para no duplicar el filtro por `PERFILES_ESTIMULOS`).

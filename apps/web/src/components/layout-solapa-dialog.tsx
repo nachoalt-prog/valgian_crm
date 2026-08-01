@@ -13,6 +13,15 @@ interface HerramientaOption {
   id: string;
   codigo: string;
   nombre: string;
+  parametrosEjemplo: unknown;
+  parametrosGuia: string | null;
+}
+
+/** PARAMETROS_EJEMPLO puede ser un objeto real (placeholder = JSON pretty) o un string mensaje (placeholder = el texto tal cual). */
+function placeholderDeEjemplo(ejemplo: unknown): string {
+  if (ejemplo == null) return "";
+  if (typeof ejemplo === "string") return ejemplo;
+  return JSON.stringify(ejemplo, null, 2);
 }
 
 interface LayoutSolapaDialogProps {
@@ -46,6 +55,8 @@ export function LayoutSolapaDialog({ open, onOpenChange, solapa, herramientasDis
   const [parametrosTexto, setParametrosTexto] = useState(solapa?.parametros ? JSON.stringify(solapa.parametros, null, 2) : "");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+
+  const herramientaSeleccionada = herramientasDisponibles.find((h) => h.id === idHerramienta) ?? null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -139,12 +150,17 @@ export function LayoutSolapaDialog({ open, onOpenChange, solapa, herramientasDis
               value={parametrosTexto}
               onChange={(e) => setParametrosTexto(e.target.value)}
               rows={3}
-              placeholder={'ej. { "crear": false, "borrar": false }'}
+              placeholder={placeholderDeEjemplo(herramientaSeleccionada?.parametrosEjemplo)}
               className="w-full rounded-lg border border-input bg-transparent px-3 py-2 font-mono text-xs text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
             />
             <p className="text-xs text-muted-foreground">
-              Restringe qué puede hacer la herramienta embebida en ESTA solapa puntual, además del permiso del perfil. Hoy solo lo interpreta
-              Archivos Adjuntos (claves: crear, reemplazar, descargar, borrar). Vacío = sin restricción extra.
+              Restringe qué puede hacer la herramienta embebida en este punto de acceso puntual, además del permiso del perfil.
+              {herramientaSeleccionada?.parametrosGuia && (
+                <>
+                  <br />
+                  {herramientaSeleccionada.parametrosGuia}
+                </>
+              )}
             </p>
           </div>
 

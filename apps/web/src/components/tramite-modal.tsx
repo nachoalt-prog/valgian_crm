@@ -305,7 +305,7 @@ export function TramiteModal({ open, onOpenChange, idTipoTramite, idRegistro, id
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[85vh] max-w-3xl! flex-col gap-0 p-0">
+      <DialogContent className="flex h-[85vh] max-w-5xl! flex-col gap-0 p-0">
         <DialogHeader className="border-b border-border px-5 py-4">
           <DialogTitle>{idTramite ? "Gestionar Trámite" : "Iniciar Trámite"}</DialogTitle>
         </DialogHeader>

@@ -36,6 +36,7 @@ const RUTA_POR_CODIGO: Record<string, string> = {
   perfiles_estimulos: "/dashboard/perfiles-estimulos",
   placeholders: "/dashboard/placeholders",
   plantillas_adjuntos: "/dashboard/plantillas-adjuntos",
+  tipos_archivos_adjuntos: "/dashboard/tipos-archivos-adjuntos",
 };
 
 export function AppSidebar({ menu, titulo }: { menu: MenuGrupo[]; titulo?: string | null }) {

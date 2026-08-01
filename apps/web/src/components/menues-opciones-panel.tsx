@@ -13,6 +13,8 @@ interface HerramientaOption {
   id: string;
   codigo: string;
   nombre: string;
+  parametrosEjemplo: unknown;
+  parametrosGuia: string | null;
 }
 
 interface MenuesOpcionesPanelProps {

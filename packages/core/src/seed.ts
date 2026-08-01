@@ -278,6 +278,7 @@ async function main() {
   const herramientaPerfilesEstimulos = await ensureHerramienta("perfiles_estimulos", "Perfiles-Estímulos", "perfiles_estimulos.gestionar");
   const herramientaPlaceholders = await ensureHerramienta("placeholders", "Placeholders", "placeholders.gestionar");
   const herramientaPlantillasAdjuntos = await ensureHerramienta("plantillas_adjuntos", "Plantillas de Documento", "plantillas_adjuntos.gestionar");
+  const herramientaTiposAdjuntos = await ensureHerramienta("tipos_archivos_adjuntos", "Tipos de Adjunto", "tipos_archivos_adjuntos.gestionar");
   // Estas no se navegan desde el sidebar — se cargan embebidas dentro de un
   // LAYOUTS_LEGAJO dentro del modal de legajo abierto desde Bandejas.
   const herramientaLegajoDatos = await ensureHerramienta("LEGAJO_DAT_1", "Datos de Legajo", "legajo_dat_1.gestionar");
@@ -304,6 +305,7 @@ async function main() {
     herramientaPerfilesEstimulos,
     herramientaPlaceholders,
     herramientaPlantillasAdjuntos,
+    herramientaTiposAdjuntos,
     herramientaLegajoDatos,
     herramientaLegajoClientes,
     herramientaGestionEntidad,
@@ -327,6 +329,42 @@ async function main() {
     await ensurePermisoOperacion(perfilAdmin.id, operacion.id);
   }
 
+  // Ayuda del editor de PARAMETROS en los ABMs de Layouts de Legajo/Menúes —
+  // se resetea en cada corrida del seed (no hay ABM para tocarlo a mano
+  // todavía, así que no hace falta el criterio de "solo si no existe").
+  const SIN_PARAMETROS_GUIA = "De momento esta herramienta no soporta parámetros";
+  for (const h of [
+    herramientaDashboard,
+    herramientaUsuarios,
+    herramientaMenues,
+    herramientaInterfaces,
+    herramientaPermisos,
+    herramientaProductos,
+    herramientaBandejas,
+    herramientaFiltros,
+    herramientaBandejasAdmin,
+    herramientaLayoutsLegajo,
+    herramientaPerfilesEstimulos,
+    herramientaPlaceholders,
+    herramientaPlantillasAdjuntos,
+    herramientaTiposAdjuntos,
+    herramientaLegajoDatos,
+    herramientaLegajoClientes,
+    herramientaGestionEntidad,
+    herramientaHistorial,
+    herramientaTramites,
+  ]) {
+    await db.update(herramientas).set({ parametrosEjemplo: SIN_PARAMETROS_GUIA, parametrosGuia: SIN_PARAMETROS_GUIA }).where(eq(herramientas.id, h.id));
+  }
+  await db
+    .update(herramientas)
+    .set({
+      parametrosEjemplo: { crear: true, borrar: false, reemplazar: true, descargar: false },
+      parametrosGuia:
+        "Hoy solo lo interpreta Archivos Adjuntos (claves: crear, reemplazar, descargar, borrar). Vacío = sin restricción extra.",
+    })
+    .where(eq(herramientas.id, herramientaArchivosAdjuntos.id));
+
   const menuPrincipal = await ensureMenu("principal", "Principal");
   const menuConfiguracion = await ensureMenu("configuracion", "Configuración");
   const menuHerramientas = await ensureMenu("herramientas", "Herramientas");
@@ -343,6 +381,7 @@ async function main() {
   await ensureMenuOpcion(menuConfiguracion.id, herramientaPerfilesEstimulos.id, "perfiles_estimulos", "Perfiles-Estímulos", "icon.perfilesEstimulos", 9);
   await ensureMenuOpcion(menuConfiguracion.id, herramientaPlaceholders.id, "placeholders", "Placeholders", "icon.placeholders", 10);
   await ensureMenuOpcion(menuConfiguracion.id, herramientaPlantillasAdjuntos.id, "plantillas_adjuntos", "Plantillas de Documento", "icon.plantillasAdjuntos", 11);
+  await ensureMenuOpcion(menuConfiguracion.id, herramientaTiposAdjuntos.id, "tipos_archivos_adjuntos", "Tipos de Adjunto", "icon.tiposAdjuntos", 12);
   await ensureMenuOpcion(menuHerramientas.id, herramientaBandejas.id, "bandejas", "Bandejas", "icon.bandejas", 1);
 
   await ensureInterfazMenu(interfazDefault.id, menuPrincipal.id);
@@ -389,7 +428,7 @@ async function main() {
     { codigo: "webp", nombre: "Imagen WEBP", extension: "webp", mimetype: "image/webp", permiteCarga: true, permiteDownload: true, renderizar: true },
     { codigo: "pdf", nombre: "Documento PDF", extension: "pdf", mimetype: "application/pdf", permiteCarga: true, permiteDownload: true, renderizar: true },
     { codigo: "txt", nombre: "Texto plano", extension: "txt", mimetype: "text/plain", permiteCarga: true, permiteDownload: true, renderizar: true },
-    { codigo: "html", nombre: "HTML", extension: "html", mimetype: "text/html", permiteCarga: true, permiteDownload: true, renderizar: false },
+    { codigo: "html", nombre: "HTML", extension: "html", mimetype: "text/html", permiteCarga: true, permiteDownload: true, renderizar: true },
     {
       codigo: "docx",
       nombre: "Word (DOCX)",

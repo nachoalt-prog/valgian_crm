@@ -148,6 +148,20 @@
       "when": 1785534756629,
       "tag": "0020_little_mantis",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1785541089375,
+      "tag": "0021_silent_zaladane",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1785541252953,
+      "tag": "0022_wise_bloodstorm",
+      "breakpoints": true
     }
   ]
 }

@@ -17,7 +17,9 @@ Almacenamiento genérico de archivos, asociado a cualquier cantidad de registros
 | PERMITE_DOWNLOAD    | boolean, nullable |
 | RENDERIZAR          | boolean, nullable |
 
-Catálogo de **formatos** (jpg, pdf, docx, etc.) — no tiene relación con la semántica de qué representa el archivo (eso no está modelado hoy; ver "Alcance" más abajo). El match contra un archivo subido es por el par exacto `(EXTENSION, MIMETYPE)`.
+Catálogo de **formatos** (jpg, pdf, docx, etc.) — no tiene relación con la semántica de qué representa el archivo (eso no está modelado hoy; ver "Alcance" más abajo). El match contra un archivo subido es por el par exacto `(EXTENSION, MIMETYPE)`. `CODIGO` es unique.
+
+**ABM** (`/dashboard/tipos-archivos-adjuntos`, `HERRAMIENTAS.CODIGO = 'tipos_archivos_adjuntos'`, con entrada en el menú Configuración): ABM plano, mismo patrón que Filtros — no se puede borrar un tipo si hay `ARCHIVOS_ADJUNTOS` que lo usan. `RENDERIZAR` es lo que habilita la previsualización inline en `ArchivoAdjuntoDialog` (ver más abajo) — hoy en `true` para imágenes, PDF y HTML.
 
 ### ARCHIVOS_ADJUNTOS
 
@@ -85,7 +87,7 @@ Solapa 6 del Layout Legajo Default (ver `domain/layouts-legajo.md`). Recibe `idL
 
 Cada tarjeta abre la misma "ventanita" (`ArchivoAdjuntoDialog`, `apps/web/src/components/archivo-adjunto-dialog.tsx`) — mismo porte que el modal de legajo (`h-[85vh] max-w-5xl`), para que un PDF se pueda previsualizar cómodo:
 
-- **Previsualización**: si hay un archivo recién seleccionado (todavía sin guardar), se previsualiza local (`URL.createObjectURL`) según el `mimetype` del navegador. Si es un archivo ya guardado, se previsualiza vía el route handler con `?inline=1` (ver "Acceso HTTP" arriba), solo si `TIPOS_ARCHIVOS_ADJUNTOS.RENDERIZAR` es true (imagen o PDF); si no, ícono genérico.
+- **Previsualización**: si hay un archivo recién seleccionado (todavía sin guardar), se previsualiza local (`URL.createObjectURL`) según el `mimetype` del navegador. Si es un archivo ya guardado, se previsualiza vía el route handler con `?inline=1` (ver "Acceso HTTP" arriba), solo si `TIPOS_ARCHIVOS_ADJUNTOS.RENDERIZAR` es true; si no, ícono genérico. Tres mimetypes soportados hoy: `image/*` (`<img>`), `application/pdf` (`<embed>`), `text/html` (`<iframe sandbox="">` — sandbox vacío a propósito: bloquea scripts, same-origin y forms, un HTML subido por cualquier usuario con permiso de carga es contenido no confiable).
 - **Cargar / Reemplazar**: abre el selector de archivo y solo **stagea** el archivo elegido — todavía no se sube. El botón es "Cargar" (gateado por `canCrear`) si no hay archivo previo, "Reemplazar" (gateado por `canReemplazar`) si ya existía uno.
 - **Guardar**: recién acá se sube de verdad (`POST` si es alta, `PUT` si ya existía), habilitado solo cuando hay un archivo stageado. Gateado por `canGuardar` **y** el `canCrear`/`canReemplazar` que corresponda según el modo — un perfil con `crear` pero sin `guardar` puede seleccionar un archivo pero no confirmarlo (permiso deliberadamente en dos capas: staging vs. commit). Si el servidor rechaza el tipo, el error se muestra en la ventanita sin tocar el archivo/fila anteriores.
 - **Descargar**: habilitado solo si hay un archivo guardado, `PERMITE_DOWNLOAD` es true, **y** `canDescargar` — navega al route handler de descarga.
