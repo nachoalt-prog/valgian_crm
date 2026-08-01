@@ -467,6 +467,51 @@ LEFT JOIN "ARCHIVOS_ADJUNTOS" AR ON AR."ID" = G."ID_ARCHIVO_RESULTADO"
 
   await ensureReportePerfil(reporteAuditoriaGeneraciones.id, perfilAdmin.id);
 
+  // --- Reporte de Cotizaciones ---
+  // Query 100% genérica (no referencia nada específico de Argentina) — lo que
+  // sí es de Argentina son los datos que hoy pueblan MONEDAS/COTIZACIONES
+  // (ver seed-configuracion-argentina.ts y el módulo cotizaciones-argentina).
+
+  const filtroMoneda = await ensureFiltro(
+    "select_monedas",
+    "Moneda",
+    "select",
+    `SELECT "ID" AS value, "NOMBRE" AS label FROM "MONEDAS" ORDER BY "NOMBRE"`,
+  );
+  const filtroFechaCotizacion = await ensureFiltro("fecha_cotizacion", "Fecha de Cotización", "fecha_rango", null);
+
+  const REPORTE_COTIZACIONES_QUERY = `
+SELECT
+  C."ID" AS id,
+  M."NOMBRE" AS moneda,
+  M."ID" AS moneda_id,
+  C."VENTA" AS venta,
+  C."COMPRA" AS compra,
+  C."FECHA_CONSULTA" AS fecha
+FROM "COTIZACIONES" C
+JOIN "MONEDAS" M ON M."ID" = C."ID_MONEDA"
+`.trim();
+
+  const REPORTE_COTIZACIONES_COLUMNAS = [
+    { campo: "moneda", label: "Moneda" },
+    { campo: "venta", label: "Valor Venta" },
+    { campo: "compra", label: "Valor Compra" },
+    { campo: "fecha", label: "Fecha", tipo: "fecha" },
+  ];
+
+  const reporteCotizaciones = await ensureReporte(
+    "cotizaciones",
+    "Cotizaciones",
+    "Histórico de cotizaciones consultadas (COTIZACIONES), por moneda.",
+    REPORTE_COTIZACIONES_QUERY,
+    REPORTE_COTIZACIONES_COLUMNAS,
+  );
+
+  await ensureReporteFiltro(reporteCotizaciones.id, filtroMoneda.id, "moneda_id", 1);
+  await ensureReporteFiltro(reporteCotizaciones.id, filtroFechaCotizacion.id, "fecha", 2);
+
+  await ensureReportePerfil(reporteCotizaciones.id, perfilAdmin.id);
+
   console.log("Seed de configuración modelo aplicado (idempotente).");
 }
 

@@ -117,6 +117,18 @@ Histórico — cada consulta inserta filas nuevas, nunca actualiza una existente
 | FECHA_CONSULTA | timestamp — cuándo se hizo ESA consulta puntual |
 | ID_ACCION_EXTERNA_COLA | FK nullable → ACCIONES_EXTERNAS_COLA — trazabilidad |
 
+### ABM de Monedas (`/dashboard/monedas`, `HERRAMIENTAS.CODIGO = 'monedas'`)
+
+Vive en `apps/web`, **no** en `packages/modules/cotizaciones-argentina` — `MONEDAS` es tabla de core, así que su ABM sigue el mismo criterio que cualquier otro ABM de una tabla de core (Filtros, Tipos de Adjunto, etc.), no el de un módulo. Un módulo tampoco podría contener hoy este tipo de pantalla aunque quisiera: no existe todavía un paquete compartido de componentes de UI del que un módulo pueda importar `Button`/`Table`/`Dialog` — esos viven solo dentro de `apps/web`.
+
+CRUD estándar (`packages/core/src/monedas.ts`: `listMonedasAdmin`, `createMoneda`, `updateMoneda`, `deleteMoneda`) — `deleteMoneda` bloquea el borrado si hay alguna fila de `COTIZACIONES` con esa `ID_MONEDA` (mismo patrón que `deleteTipoArchivoAdjunto`/`deleteReporte`). Editar `CODIGO_API` desde acá es exactamente cómo se suma un tipo de cotización nuevo sin tocar código (ej. `USD_CRIPTO` → `CODIGO_API = 'cripto'`) — el handler `consultarCotizacion` lo recoge solo en la siguiente pasada del barrido.
+
+### Reporte "Cotizaciones"
+
+Reusa el motor de Reportes (ADR 0014) tal cual — cero código nuevo, solo datos (`packages/core/src/seed-config.ts`, junto al reporte de Auditoría de Generación de Documentos). Columnas: Moneda (`MONEDAS.NOMBRE`), Valor Venta, Valor Compra, Fecha. Filtros: Moneda (`select`, opciones de `MONEDAS`) y Fecha de Cotización (`fecha_rango` sobre `COTIZACIONES.FECHA_CONSULTA`).
+
+La query del reporte es genérica (no menciona nada de Argentina) — vive en `seed-config.ts`, no en `seed-configuracion-argentina.ts`, porque lo específico de Argentina es solo qué `MONEDAS` existen, no el reporte en sí. Funcionaría igual para cualquier país que sume su propio módulo de consulta de cotizaciones el día de mañana.
+
 ## Cómo lo alimenta un caller (ej. un futuro PASO de Procesos)
 
 ```sql

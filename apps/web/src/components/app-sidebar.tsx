@@ -41,6 +41,7 @@ const RUTA_POR_CODIGO: Record<string, string> = {
   tipos_archivos_adjuntos: "/dashboard/tipos-archivos-adjuntos",
   reportes: "/dashboard/reportes",
   reportes_admin: "/dashboard/reportes-admin",
+  monedas: "/dashboard/monedas",
 };
 
 export function AppSidebar({

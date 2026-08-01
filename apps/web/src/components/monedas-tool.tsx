@@ -1,0 +1,150 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { PlusCircle, Pencil, Trash2, Coins } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { MonedaDialog } from "@/components/moneda-dialog";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import type { MonedaInput } from "@valgian/core";
+import { createMonedaAction, updateMonedaAction, deleteMonedaAction } from "@/app/dashboard/monedas/actions";
+
+interface MonedaRow {
+  id: string;
+  codigo: string;
+  nombre: string;
+  codigoApi: string | null;
+}
+
+interface MonedasToolProps {
+  monedasIniciales: MonedaRow[];
+  canGestionar: boolean;
+}
+
+export function MonedasTool({ monedasIniciales, canGestionar }: MonedasToolProps) {
+  const router = useRouter();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<MonedaRow | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<MonedaRow | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
+
+  function avisarSinPermiso() {
+    setAviso("No tenés permiso de gestión sobre esta herramienta.");
+    setTimeout(() => setAviso(null), 3500);
+  }
+
+  function abrirNuevo() {
+    if (!canGestionar) return avisarSinPermiso();
+    setEditing(null);
+    setDialogOpen(true);
+  }
+
+  function abrirEdicion(m: MonedaRow) {
+    if (!canGestionar) return avisarSinPermiso();
+    setEditing(m);
+    setDialogOpen(true);
+  }
+
+  function pedirBorrado(m: MonedaRow) {
+    if (!canGestionar) return avisarSinPermiso();
+    setDeleteError(null);
+    setDeleteConfirm(m);
+  }
+
+  async function handleSave(data: MonedaInput, id?: string) {
+    const result = id ? await updateMonedaAction(id, data) : await createMonedaAction(data);
+    if (!result.error) router.refresh();
+    return result;
+  }
+
+  async function confirmarBorrado() {
+    if (!deleteConfirm) return;
+    const result = await deleteMonedaAction(deleteConfirm.id);
+    if (result?.error) {
+      setDeleteError(result.error);
+      return;
+    }
+    setDeleteConfirm(null);
+    router.refresh();
+  }
+
+  return (
+    <div className="h-full overflow-hidden rounded-xl border border-border">
+      {aviso && (
+        <div className="fixed top-20 right-4 z-50 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-2.5 text-sm text-destructive shadow-lg">
+          {aviso}
+        </div>
+      )}
+
+      <section className="flex h-full flex-col">
+        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+          <div className="flex items-center gap-2">
+            <Coins className="size-4 text-primary" />
+            <h2 className="text-sm font-semibold uppercase tracking-widest text-primary">Monedas</h2>
+          </div>
+          <Button size="sm" onClick={abrirNuevo} className="h-8 gap-1.5 text-xs">
+            <PlusCircle className="size-3.5" />
+            Nueva
+          </Button>
+        </div>
+
+        <div className="flex-1 overflow-auto">
+          {monedasIniciales.length === 0 ? (
+            <div className="flex h-40 flex-col items-center justify-center gap-2 text-muted-foreground">
+              <Coins className="size-8 opacity-30" />
+              <p className="text-sm">Sin monedas creadas.</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Código</TableHead>
+                  <TableHead>Nombre</TableHead>
+                  <TableHead>Código API</TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {monedasIniciales.map((m) => (
+                  <TableRow key={m.id} className="group">
+                    <TableCell className="font-mono text-xs text-primary">{m.codigo}</TableCell>
+                    <TableCell>{m.nombre}</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">{m.codigoApi ?? "—"}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                        <Button variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-primary" onClick={() => abrirEdicion(m)}>
+                          <Pencil className="size-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-destructive" onClick={() => pedirBorrado(m)}>
+                          <Trash2 className="size-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </div>
+      </section>
+
+      <MonedaDialog key={editing?.id ?? "new"} open={dialogOpen} onOpenChange={setDialogOpen} moneda={editing} onSave={handleSave} />
+
+      <ConfirmDialog
+        open={!!deleteConfirm}
+        onOpenChange={(o) => {
+          if (!o) {
+            setDeleteConfirm(null);
+            setDeleteError(null);
+          }
+        }}
+        title="Eliminar Moneda"
+        description={deleteError ?? `¿Eliminás la moneda "${deleteConfirm?.nombre}"? Esta acción no se puede deshacer.`}
+        isError={!!deleteError}
+        onConfirm={confirmarBorrado}
+      />
+    </div>
+  );
+}
