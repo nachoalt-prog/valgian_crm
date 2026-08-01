@@ -15,6 +15,7 @@ import {
   escucharAccionesExternasPendientes,
 } from "@valgian/core";
 import { registrar as registrarCotizacionesArgentina } from "@valgian/module-cotizaciones-argentina";
+import { registrar as registrarMensajeriaSmtp } from "@valgian/module-mensajeria-smtp";
 
 const SEGUNDOS_BARRIDO_SEGURIDAD = 15 * 60;
 const SEGUNDOS_BARRIDO_ACCIONES_EXTERNAS = 60;
@@ -66,9 +67,9 @@ async function barrerAccionesExternas(origen: string) {
 }
 
 try {
-  // Registro explícito de módulos opcionales (ver docs/contracts/modulo.md) —
-  // nada de autodescubrimiento. Este es hoy el único módulo instalado en apps/web.
+  // Registro explícito de módulos opcionales (ver docs/contracts/modulo.md) — nada de autodescubrimiento.
   registrarCotizacionesArgentina();
+  registrarMensajeriaSmtp();
 
   await escucharAccionesExternasPendientes(() => {
     void barrerAccionesExternas("notify");

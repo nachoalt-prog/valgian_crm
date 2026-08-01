@@ -83,12 +83,17 @@ interface Resultado<T> {
   error?: string;
 }
 
-/** Ejecuta SP_APLICAR_ESTIMULO — ver packages/db/sql/0002_sp_aplicar_estimulo.sql. */
+/**
+ * Ejecuta SP_APLICAR_ESTIMULO — ver packages/db/sql/0002_sp_aplicar_estimulo.sql.
+ * `idUsuario` nullable para disparos automáticos sin usuario logueado detrás
+ * (ej. mensajería, ver packages/core/src/mensajeria.ts) — mismo criterio que
+ * `guardarArchivo` para la generación de documentos.
+ */
 export async function aplicarEstimulo(
   idEntidad: string,
   idRelacion: string,
   idEstimulo: string,
-  idUsuario: string,
+  idUsuario: string | null,
   observacion: string | null,
 ): Promise<Resultado<true>> {
   try {

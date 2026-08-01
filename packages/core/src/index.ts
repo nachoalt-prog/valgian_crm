@@ -36,3 +36,5 @@ export * from "./html-a-pdf";
 export * from "./generacion-documentos";
 export * from "./acciones-externas";
 export * from "./monedas";
+export * from "./mensajeria";
+export * from "./mensajeria-plantillas";

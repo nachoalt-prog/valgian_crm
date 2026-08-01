@@ -13,7 +13,7 @@ Puente entre SQL de confianza (`ACCIONES.COMANDO`, o cualquier otro que lo neces
 | ID | UUID, PK |
 | CODIGO | string, unique |
 | NOMBRE | string |
-| COMPONENTE | string — cerrado, mapea a un handler Node registrado a mano (ver "Componentes" más abajo). Hoy solo `'consulta_cotizacion'` |
+| COMPONENTE | string — cerrado, mapea a un handler Node registrado a mano (ver "Componentes" más abajo). Hoy `'consulta_cotizacion'` y `'mensajeria_smtp'` |
 | PARAMETROS | jsonb — parámetros FIJOS que el despachador le pasa al handler (credenciales, config propia del componente). Distinto de `ACCIONES_EXTERNAS_COLA.PARAMETROS` (dinámico, por llamada) |
 | TOKEN | string, nullable — sesión con el servicio externo, cuando el `COMPONENTE` la necesita (mismo patrón que `USUARIOS.TOKEN`) |
 | TOKEN_EXPIRACION | timestamp, nullable |
@@ -138,11 +138,92 @@ VALUES ((SELECT "ID" FROM "ACCIONES_EXTERNAS" WHERE "CODIGO" = 'consulta_cotizac
 
 El `INSERT` es instantáneo — quien encola no espera respuesta, sigue de largo apenas confirma.
 
+## Mensajería
+
+Segundo nivel de cola, anidado bajo `ACCIONES_EXTERNAS`/`ACCIONES_EXTERNAS_COLA` — ver ADR 0018 para el razonamiento completo (por qué es un segundo nivel y no una fila más de `ACCIONES_EXTERNAS_COLA`). Un mismo proveedor (SMTP, a futuro SMS/WhatsApp) puede mandar muchos mensajes independientes, cada uno con su propio destino de reintento.
+
+### MENSAJERIA_PLANTILLAS (catálogo, `ABM /dashboard/mensajeria-plantillas`)
+
+| Campo | Tipo |
+|---|---|
+| ID | UUID, PK |
+| CODIGO | string, unique |
+| NOMBRE | string |
+| ID_ARCHIVO_ADJUNTO | FK → ARCHIVOS_ADJUNTOS — HTML del cuerpo, con `##CODIGO##` (mismo mecanismo que `PLANTILLAS_ADJUNTOS`) |
+| DESCRIPCION | string, nullable |
+| ASUNTO | string, nullable — también admite `##CODIGO##`, se resuelve con el mismo motor que el cuerpo |
+| COMODIN | jsonb, nullable |
+| ID_ESTIMULO_OK | FK → ESTIMULOS, nullable |
+| OBSERVACION_OK | string, nullable |
+| ID_ESTIMULO_ERROR | FK → ESTIMULOS, nullable |
+| OBSERVACION_ERROR | string, nullable |
+
+Al mandar con éxito, si `ID_ESTIMULO_OK` está configurado, se aplica ese estímulo sobre `(MENSAJERIA_COLA.ID_ENTIDAD, MENSAJERIA_COLA.ID_REGISTRO)` vía `sp_aplicar_estimulo`, con `OBSERVACION_OK` como observación. `ID_ESTIMULO_ERROR` se aplica **recién cuando `MENSAJERIA_COLA.REINTENTOS_SUPERADOS` pasa a `true`** — nunca en cada intento fallido individual, solo cuando ya no se va a reintentar más. Sin usuario logueado detrás (`aplicarEstimulo` con `idUsuario=null` — mismo criterio que `guardarArchivo` en Generación de Documentos).
+
+ABM (`packages/core/src/mensajeria-plantillas.ts`, calcado de `plantillas-adjunto.ts`): CRUD estándar + carga del HTML (igual mecánica que Plantillas de Documento — el archivo se reemplaza abriendo la plantilla desde el listado, no desde el diálogo de alta/edición). El selector de Estímulo usa `listEstimulosConEstrategia()` (ya existía, de Perfiles-Estímulos) — lista TODOS los estímulos de TODAS las estrategias, porque una plantilla no está atada a una sola estrategia (se usa contra cualquier `ID_ENTIDAD`/`ID_REGISTRO` que le pase el que encola).
+
+### MENSAJERIA_COLA (cada fila = un mensaje)
+
+| Campo | Tipo |
+|---|---|
+| ID | UUID, PK |
+| ID_ACCION_EXTERNA | FK → ACCIONES_EXTERNAS — qué proveedor lo manda. NO es `ACCIONES_EXTERNAS_COLA`: un mensaje puede quedar encolado antes de que exista ningún disparo (ver ADR 0018) |
+| ID_MENSAJERIA_PLANTILLA | FK → MENSAJERIA_PLANTILLAS |
+| ID_ENTIDAD | FK → ENTIDADES, nullable |
+| ID_REGISTRO | UUID, nullable, sin FK (asociación polimórfica, mismo criterio que `ARCHIVOS_ADJUNTOS.ID_REGISTRO`) |
+| ASUNTO | string, nullable — copia de `MENSAJERIA_PLANTILLAS.ASUNTO` al encolar, todavía sin resolver |
+| DATOS_RAIZ | jsonb, nullable — datos raíz para resolver placeholders (mismo rol que `GENERACIONES_DOCUMENTO.DATOS`), los guarda `SP_MENSAJERIA_ENCOLAR` |
+| PLACEHOLDERS | jsonb, nullable — mapa `código -> valor` YA resuelto, lo escribe el componente al mandar, para auditoría. **Nunca** el crudo de `DATOS_RAIZ` (columna separada a propósito, ver ADR 0018) |
+| RESULTADO | integer, nullable — `null`=no intentado, `0`=éxito, otro=error (mismo criterio que `ACCIONES_EXTERNAS_COLA`) |
+| RESULTADO_DESC | string, nullable — lo arma el componente (para SMTP, algo como `"Enviado a x@y.com."` o el mensaje de error) |
+| RESULTADO_FECHA | timestamp, nullable |
+| REINTENTO | integer, default 0 — se incrementa EN LA MISMA fila (no se crea una fila nueva por reintento) |
+| REINTENTOS_SUPERADOS | boolean, default false |
+| FECHA_ENCOLADO | timestamp, `DEFAULT now()` |
+
+`REINTENTOS_MAX`/`REINTENTOS_MARGEN` no están acá — se heredan de la `ACCIONES_EXTERNAS` asociada (misma fila para todos los mensajes de ese proveedor).
+
+### MENSAJERIA_COLA_ADJUNTOS
+
+Join simple: `ID_MENSAJERIA_COLA` FK → `MENSAJERIA_COLA`, `ID_ARCHIVO_ADJUNTO` FK → `ARCHIVOS_ADJUNTOS`. Varios adjuntos por mensaje.
+
+### SP_MENSAJERIA_ENCOLAR (`packages/db/sql/0008_sp_mensajeria_encolar.sql`)
+
+`PROCEDURE(p_id_mensajeria_cola, p_id_plantilla, p_id_accion_externa, p_id_entidad, p_id_registro, p_ids_adjuntos uuid[], p_datos jsonb)`. El `ID` lo genera el llamador (`packages/core`, mismo criterio que `sp_gestionar_tramite` — evita parámetros `OUT` en un `CALL` desde postgres.js). Inserta `MENSAJERIA_COLA` + `MENSAJERIA_COLA_ADJUNTOS`, y si `ACCIONES_EXTERNAS.INMEDIATO=true`, dispara además `ACCIONES_EXTERNAS_COLA` con `ID_ENTIDAD` = la entidad `mensajeria_cola` e `ID_REGISTRO` = el `MENSAJERIA_COLA.ID` recién creado — esa combinación es la señal de "procesá SOLO este mensaje" (ver "Modo de despacho" abajo). Con `INMEDIATO=false`, no dispara nada — se asume que algo más (a futuro, un `PASO` de Procesos) va a insertar esa fila más tarde, de una sola vez para varios mensajes juntos.
+
+Wrapper Node: `encolarMensaje(input)` en `packages/core/src/mensajeria.ts`.
+
+### Contrato compartido de componente (`packages/core/src/mensajeria.ts`)
+
+Cualquier proveedor de mensajería (SMTP, a futuro SMS/WhatsApp) llama a **una única función**, `procesarComponenteMensajeria(fila, enviarUno)`, pasándole solo su propia función de envío (`EnviarUnMensaje = (mensaje, parametrosAccion) => Promise<{exito, descripcion?}>`). Todo lo demás es compartido, una sola implementación:
+
+1. **Modo de despacho**: si `fila.ID_ENTIDAD` es la entidad `mensajeria_cola` y `fila.ID_REGISTRO` es válido → procesa SOLO ese `MENSAJERIA_COLA`. Si no → barre TODOS los mensajes elegibles (`RESULTADO` null o != 0, no superados) de esa `ACCIONES_EXTERNAS`.
+2. Por cada mensaje: resuelve la plantilla (`leerArchivoCrudo` + `resolverPlaceholders`, mismo mecanismo que `GENERACIONES_DOCUMENTO`) para cuerpo Y asunto, carga los adjuntos (`MENSAJERIA_COLA_ADJUNTOS`), llama a `enviarUno(...)`.
+3. Escribe el resultado en `MENSAJERIA_COLA` (`finalizarIntentoMensaje` — misma aritmética de reintento que `finalizarIntentoAccionExterna`, pero usando `REINTENTOS_MAX`/`REINTENTOS_MARGEN` de la `ACCIONES_EXTERNAS` asociada) y aplica el estímulo OK/error correspondiente.
+4. Al terminar todos los mensajes de esta pasada, reporta un resultado agregado a `ACCIONES_EXTERNAS_COLA` vía `finalizarIntentoAccionExterna` (éxito solo si TODOS los mensajes de esta pasada salieron bien).
+
+Cada proveedor solo escribe la parte que lo distingue de los demás — hoy, `enviarPorSmtp` en `packages/modules/mensajeria-smtp`.
+
+### Componente `mensajeria_smtp` (`packages/modules/mensajeria-smtp`) — segundo módulo real
+
+`nodemailer` sobre SMTP genérico (cualquier proveedor: Brevo, Gmail, un relay propio). Credenciales en `ACCIONES_EXTERNAS.PARAMETROS` (`{host, port, secure?, usuario, contrasena, remitente}`) — **no en `.env`**, a diferencia del resto de config de infraestructura (ADR 0013): puede haber más de un proveedor SMTP configurado a la vez, cada uno su propia fila de `ACCIONES_EXTERNAS`, no encaja en una variable global única. El destinatario sale de `MENSAJERIA_COLA.DATOS_RAIZ.destinatario` — convención del proveedor, no forzada por schema (otro proveedor podría leer `telefono` en vez de `destinatario`).
+
+Seed propio del módulo (`packages/modules/mensajeria-smtp/src/seed.ts`, script `seed` del paquete): crea la fila `ACCIONES_EXTERNAS` (`CODIGO='mensajeria_smtp'`) con `PARAMETROS` tomados de `.env` si están (`SMTP_HOST`/`SMTP_PORT`/`SMTP_USER`/`SMTP_PASS`/`SMTP_REMITENTE`) — así el secreto real nunca queda hardcodeado en el seed, pero sigue habiendo un lugar consistente (`.env` local) para que un desarrollador cargue sus propias credenciales de prueba (ej. Brevo, ver brainstorm original de este sprint). Sin esas variables, la fila se crea con `PARAMETROS=null` y no manda nada hasta que alguien las cargue.
+
+Verificado en vivo con un SMTP de prueba real (Ethereal, vía `nodemailer.createTestAccount()`) — encolar → despacho casi instantáneo vía `NOTIFY` → envío real exitoso → `PLACEHOLDERS` con el mapa resuelto → `DATOS_RAIZ` intacto. También se verificó el reintento: un mensaje con un placeholder roto falló, quedó elegible, y en la siguiente pasada del barrido (tras arreglar el placeholder) se reintentó y mandó bien — `REINTENTO` incrementado en la misma fila de `ACCIONES_EXTERNAS_COLA`, sin fila nueva.
+
+### Reporte "Mensajería"
+
+Reusa el motor de Reportes igual que "Cotizaciones" — cero código nuevo salvo un tipo de columna nuevo (`tipo: "adjuntos"`, ver más abajo). Columnas: Plantilla, Resultado (`badge`, con `CASE` en la query para texto legible: Pendiente/Éxito/Error), Detalle (`RESULTADO_DESC`), Fecha, Adjuntos. Filtros: Plantilla de Mensajería (`select`) y Fecha de Encolado (`fecha_rango`). Seed en `packages/core/src/seed-config.ts` (genérico, no específico de ningún proveedor).
+
+**Columna "adjuntos" (nueva en el motor de Reportes, ADR 0014 ya preveía que el vocabulario de tipos iba a crecer)**: el valor de la columna es el `ID` de la fila dueña de los adjuntos (acá, `MENSAJERIA_COLA.ID`, aliaseado dos veces en la query — una vez como `id` para la key de React, otra como `adjuntos_id` para esta columna puntual). `formatearValor` (`apps/web/src/lib/resultados-formato.tsx`) renderiza un botón ícono-only que dispara un callback `onVerAdjuntos`, manejado por `ReportesTool`, que abre `MensajeriaColaAdjuntosDialog` — **estrictamente de solo lectura** (lista nombre + link de descarga, nada de cargar/reemplazar/borrar), a diferencia de `ArchivoAdjuntoDialog`.
+
 ## Pendiente
 
-- Canales de mensajería (`email`, `webhook`, Telegram/WhatsApp) — sprint posterior, dependen de que este módulo ya esté andando.
-- ABM/pantalla admin para `ACCIONES_EXTERNAS` — queda dev-seeded por ahora (mismo criterio que `ACCIONES.COMANDO`, ADR 0009).
-- Bootstrap genérico de módulos (`registrarModulo`, `apps/<client>/src/modules.ts`) — se construye con el segundo módulo real.
-- `INMEDIATO`: creado, sin ningún caller que lo interprete todavía.
+- ABM/pantalla admin para `ACCIONES_EXTERNAS`/`MENSAJERIA_COLA` (más allá del reporte de solo lectura) — queda dev-seeded por ahora (mismo criterio que `ACCIONES.COMANDO`, ADR 0009).
+- Bootstrap genérico de módulos (`registrarModulo`, `apps/<client>/src/modules.ts`) — ya hay DOS módulos reales (`cotizaciones-argentina`, `mensajeria-smtp`), ambos registrados a mano en `instrumentation-node.ts`. Sigue sin construirse el mecanismo genérico de ADR 0012 — no bloqueó a ninguno de los dos, pero con un tercero probablemente valga la pena.
+- `INMEDIATO`: creado, sin ningún caller que lo interprete todavía (se activa cuando exista Procesos y algún `PASO` encole mensajes en lote).
+- Canales de mensajería adicionales (SMS, WhatsApp) — mismo contrato compartido (`procesarComponenteMensajeria`), solo falta el `EnviarUnMensaje` de cada proveedor.
+- Componente `webhook` genérico (ADR 0016 original) — todavía no se construyó, sigue siendo válido para cuando haga falta.
 
-Ver ADR 0016 para el razonamiento completo de las decisiones de diseño (incluida la revisión del mecanismo original).
+Ver ADR 0016 y ADR 0018 para el razonamiento completo de las decisiones de diseño.

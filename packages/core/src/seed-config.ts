@@ -512,6 +512,50 @@ JOIN "MONEDAS" M ON M."ID" = C."ID_MONEDA"
 
   await ensureReportePerfil(reporteCotizaciones.id, perfilAdmin.id);
 
+  // --- Reporte de Mensajería (MENSAJERIA_COLA) ---
+
+  const filtroPlantillaMensajeria = await ensureFiltro(
+    "select_mensajeria_plantillas",
+    "Plantilla de Mensajería",
+    "select",
+    `SELECT "ID" AS value, "NOMBRE" AS label FROM "MENSAJERIA_PLANTILLAS" ORDER BY "NOMBRE"`,
+  );
+  const filtroFechaEncolado = await ensureFiltro("fecha_encolado", "Fecha de Encolado", "fecha_rango", null);
+
+  const REPORTE_MENSAJERIA_QUERY = `
+SELECT
+  MC."ID" AS id,
+  MC."ID" AS adjuntos_id,
+  MP."NOMBRE" AS plantilla,
+  MP."ID" AS plantilla_id,
+  CASE WHEN MC."RESULTADO" IS NULL THEN 'Pendiente' WHEN MC."RESULTADO" = 0 THEN 'Éxito' ELSE 'Error' END AS resultado,
+  MC."RESULTADO_DESC" AS resultado_desc,
+  MC."FECHA_ENCOLADO" AS fecha_encolado
+FROM "MENSAJERIA_COLA" MC
+LEFT JOIN "MENSAJERIA_PLANTILLAS" MP ON MP."ID" = MC."ID_MENSAJERIA_PLANTILLA"
+`.trim();
+
+  const REPORTE_MENSAJERIA_COLUMNAS = [
+    { campo: "plantilla", label: "Plantilla" },
+    { campo: "resultado", label: "Resultado", tipo: "badge" },
+    { campo: "resultado_desc", label: "Detalle" },
+    { campo: "fecha_encolado", label: "Fecha", tipo: "fecha" },
+    { campo: "adjuntos_id", label: "Adjuntos", tipo: "adjuntos" },
+  ];
+
+  const reporteMensajeria = await ensureReporte(
+    "mensajeria_cola",
+    "Mensajería",
+    "Todos los mensajes encolados (MENSAJERIA_COLA) — mail, SMS, WhatsApp o lo que sea —, su resultado y los adjuntos de cada uno.",
+    REPORTE_MENSAJERIA_QUERY,
+    REPORTE_MENSAJERIA_COLUMNAS,
+  );
+
+  await ensureReporteFiltro(reporteMensajeria.id, filtroPlantillaMensajeria.id, "plantilla_id", 1);
+  await ensureReporteFiltro(reporteMensajeria.id, filtroFechaEncolado.id, "fecha_encolado", 2);
+
+  await ensureReportePerfil(reporteMensajeria.id, perfilAdmin.id);
+
   console.log("Seed de configuración modelo aplicado (idempotente).");
 }
 

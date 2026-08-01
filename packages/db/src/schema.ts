@@ -760,3 +760,65 @@ export const cotizaciones = pgTable("COTIZACIONES", {
   // Trazabilidad — qué disparo puntual generó esta fila.
   idAccionExternaCola: uuid("ID_ACCION_EXTERNA_COLA").references(() => accionesExternasCola.id),
 });
+
+/**
+ * Mensajería: envío de mensajes (mail, SMS, WhatsApp, lo que sea) sobre
+ * ACCIONES_EXTERNAS — ver domain/acciones-externas.md. Segundo nivel de cola,
+ * anidado bajo ACCIONES_EXTERNAS_COLA: con ACCIONES_EXTERNAS.INMEDIATO=false
+ * un solo disparo puede procesar N mensajes, cada uno con su propio destino
+ * de reintento (por eso REINTENTO/REINTENTOS_SUPERADOS están acá TAMBIÉN,
+ * no solo en ACCIONES_EXTERNAS_COLA).
+ */
+
+export const mensajeriaPlantillas = pgTable(
+  "MENSAJERIA_PLANTILLAS",
+  {
+    id: uuid("ID").primaryKey().defaultRandom(),
+    codigo: text("CODIGO").notNull(),
+    nombre: text("NOMBRE").notNull(),
+    // HTML del cuerpo del mensaje, con ##CODIGO## — mismo mecanismo que PLANTILLAS_ADJUNTOS.
+    idArchivoAdjunto: uuid("ID_ARCHIVO_ADJUNTO").references(() => archivosAdjuntos.id),
+    descripcion: text("DESCRIPCION"),
+    // También admite ##CODIGO## — se resuelve con el mismo motor que el cuerpo.
+    asunto: text("ASUNTO"),
+    comodin: jsonb("COMODIN"),
+    // Al enviar OK/al agotar reintentos en error, aplica este estímulo sobre
+    // (MENSAJERIA_COLA.ID_ENTIDAD, MENSAJERIA_COLA.ID_REGISTRO) — ver mensajeria.ts.
+    idEstimuloOk: uuid("ID_ESTIMULO_OK").references(() => estimulos.id),
+    observacionOk: text("OBSERVACION_OK"),
+    idEstimuloError: uuid("ID_ESTIMULO_ERROR").references(() => estimulos.id),
+    observacionError: text("OBSERVACION_ERROR"),
+  },
+  (table) => [uniqueIndex("MENSAJERIA_PLANTILLAS_CODIGO_UNIQUE").on(table.codigo)],
+);
+
+export const mensajeriaCola = pgTable("MENSAJERIA_COLA", {
+  id: uuid("ID").primaryKey().defaultRandom(),
+  // Qué proveedor la va a mandar — no ACCIONES_EXTERNAS_COLA: un mensaje puede
+  // quedar encolado bastante antes de que exista ninguna fila de disparo.
+  idAccionExterna: uuid("ID_ACCION_EXTERNA").references(() => accionesExternas.id),
+  idMensajeriaPlantilla: uuid("ID_MENSAJERIA_PLANTILLA").references(() => mensajeriaPlantillas.id),
+  idEntidad: uuid("ID_ENTIDAD").references(() => entidades.id),
+  // Sin FK real (asociación polimórfica) — mismo criterio que ARCHIVOS_ADJUNTOS.ID_REGISTRO.
+  idRegistro: uuid("ID_REGISTRO"),
+  // Copia de MENSAJERIA_PLANTILLAS.ASUNTO al encolar (todavía sin resolver).
+  asunto: text("ASUNTO"),
+  // Datos raíz para la resolución de placeholders (mismo rol que
+  // GENERACIONES_DOCUMENTO.DATOS) — los guarda SP_MENSAJERIA_ENCOLAR.
+  datosRaiz: jsonb("DATOS_RAIZ"),
+  // Mapa código->valor YA resueltos — lo escribe el componente al mandar, para auditoría (nunca el crudo de DATOS_RAIZ).
+  placeholders: jsonb("PLACEHOLDERS"),
+  // null = no intentado, 0 = éxito, cualquier otro valor = error — mismo criterio que ACCIONES_EXTERNAS_COLA.
+  resultado: integer("RESULTADO"),
+  resultadoDesc: text("RESULTADO_DESC"),
+  resultadoFecha: timestamp("RESULTADO_FECHA", { withTimezone: true }),
+  reintento: integer("REINTENTO").default(0),
+  reintentosSuperados: boolean("REINTENTOS_SUPERADOS").default(false),
+  fechaEncolado: timestamp("FECHA_ENCOLADO", { withTimezone: true }).defaultNow(),
+});
+
+export const mensajeriaColaAdjuntos = pgTable("MENSAJERIA_COLA_ADJUNTOS", {
+  id: uuid("ID").primaryKey().defaultRandom(),
+  idMensajeriaCola: uuid("ID_MENSAJERIA_COLA").references(() => mensajeriaCola.id),
+  idArchivoAdjunto: uuid("ID_ARCHIVO_ADJUNTO").references(() => archivosAdjuntos.id),
+});

@@ -58,8 +58,10 @@ export async function deletePlaceholder(id: string): Promise<Resultado<true>> {
  * informa cuál, no se sigue con los demás.
  */
 
-interface ResolverPlaceholdersResult {
+export interface ResolverPlaceholdersResult {
   html?: string;
+  /** Mapa código -> valor final sustituido (para auditoría, ej. MENSAJERIA_COLA.PLACEHOLDERS) — solo incluye los que existían en PLACEHOLDERS. */
+  valores?: Record<string, string>;
   error?: string;
 }
 
@@ -91,6 +93,7 @@ export async function resolverPlaceholders(htmlTemplate: string, datos: unknown)
   const porCodigo = new Map(filas.map((f) => [f.codigo, f]));
 
   let html = htmlTemplate;
+  const valores: Record<string, string> = {};
   for (const codigo of codigos) {
     const placeholder = porCodigo.get(codigo);
     if (!placeholder) continue; // No existe -> se ignora, el ##CODIGO## queda literal.
@@ -106,7 +109,8 @@ export async function resolverPlaceholders(htmlTemplate: string, datos: unknown)
     // por default, nunca inseguro por default.
     const valorFinal = placeholder.escapar !== false ? escapeHtml(valor) : valor;
     html = html.replaceAll(`##${codigo}##`, valorFinal);
+    valores[codigo] = valorFinal;
   }
 
-  return { html };
+  return { html, valores };
 }

@@ -18,3 +18,5 @@ psql "$DATABASE_URL" -f sql/0001_trigger_clientes_titular.sql
 - `0004_trigger_notify_generacion_documento.sql`: `NOTIFY` para el worker de generación de documentos (ver `domain/generacion-documentos.md`).
 - `0005_trigger_cascade_archivos_adjuntos_entidades.sql`: borra en cascada las filas de `ARCHIVOS_ADJUNTOS_ENTIDADES` al borrar el adjunto dueño.
 - `0006_trigger_historial_vincular_adjuntos.sql`: auto-vincula a un movimiento de `HISTORIAL` los adjuntos recién subidos al mismo legajo/trámite (ver `domain/motor-de-estados.md`, sección "Adjuntos ↔ Historial").
+- `0007_trigger_notify_acciones_externas_cola.sql`: `NOTIFY` para el worker de Acciones Externas (ver `domain/acciones-externas.md`).
+- `0008_sp_mensajeria_encolar.sql`: `PROCEDURE` que encola un mensaje (mail/SMS/WhatsApp/...) + sus adjuntos, y opcionalmente dispara la cola genérica de Acciones Externas (ver `domain/acciones-externas.md`, sección Mensajería).

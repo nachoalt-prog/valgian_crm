@@ -42,6 +42,7 @@ const RUTA_POR_CODIGO: Record<string, string> = {
   reportes: "/dashboard/reportes",
   reportes_admin: "/dashboard/reportes-admin",
   monedas: "/dashboard/monedas",
+  mensajeria_plantillas: "/dashboard/mensajeria-plantillas",
 };
 
 export function AppSidebar({

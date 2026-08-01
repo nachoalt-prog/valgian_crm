@@ -282,6 +282,7 @@ async function main() {
   const herramientaReportes = await ensureHerramienta("reportes", "Reportes", "reportes.ver");
   const herramientaReportesAdmin = await ensureHerramienta("reportes_admin", "Reportes (ABM)", "reportes_admin.gestionar");
   const herramientaMonedas = await ensureHerramienta("monedas", "Monedas", "monedas.gestionar");
+  const herramientaMensajeriaPlantillas = await ensureHerramienta("mensajeria_plantillas", "Plantillas de Mensajería", "mensajeria_plantillas.gestionar");
   // Estas no se navegan desde el sidebar — se cargan embebidas dentro de un
   // LAYOUTS_LEGAJO dentro del modal de legajo abierto desde Bandejas.
   const herramientaLegajoDatos = await ensureHerramienta("LEGAJO_DAT_1", "Datos de Legajo", "legajo_dat_1.gestionar");
@@ -312,6 +313,7 @@ async function main() {
     herramientaReportes,
     herramientaReportesAdmin,
     herramientaMonedas,
+    herramientaMensajeriaPlantillas,
     herramientaLegajoDatos,
     herramientaLegajoClientes,
     herramientaGestionEntidad,
@@ -357,6 +359,7 @@ async function main() {
     herramientaReportes,
     herramientaReportesAdmin,
     herramientaMonedas,
+    herramientaMensajeriaPlantillas,
     herramientaLegajoDatos,
     herramientaLegajoClientes,
     herramientaGestionEntidad,
@@ -393,6 +396,7 @@ async function main() {
   await ensureMenuOpcion(menuConfiguracion.id, herramientaTiposAdjuntos.id, "tipos_archivos_adjuntos", "Tipos de Adjunto", "icon.tiposAdjuntos", 12);
   await ensureMenuOpcion(menuConfiguracion.id, herramientaReportesAdmin.id, "reportes_admin", "Reportes", "icon.reportes", 13);
   await ensureMenuOpcion(menuConfiguracion.id, herramientaMonedas.id, "monedas", "Monedas", "icon.monedas", 14);
+  await ensureMenuOpcion(menuConfiguracion.id, herramientaMensajeriaPlantillas.id, "mensajeria_plantillas", "Plantillas de Mensajería", "icon.mensajeriaPlantillas", 15);
   await ensureMenuOpcion(menuHerramientas.id, herramientaBandejas.id, "bandejas", "Bandejas", "icon.bandejas", 1);
   await ensureMenuOpcion(menuHerramientas.id, herramientaReportes.id, "reportes", "Reportes", "icon.reportes", 2);
 
@@ -421,6 +425,11 @@ async function main() {
   await ensureEntidad("tramites", "TRAMITES");
   await ensureEntidad("usuarios", "USUARIOS");
   await ensureEntidad("historial", "HISTORIAL");
+  // Nombre "lindo" a propósito (no MENSAJERIA_COLA) — a diferencia del resto,
+  // esta entidad nunca se muestra como "la tabla X" en ningún lado de negocio,
+  // solo la usa el despachador de Acciones Externas para distinguir el modo
+  // "mensaje específico" del modo "barrer todo pendiente" — ver domain/acciones-externas.md.
+  await ensureEntidad("mensajeria_cola", "Mensaje Encolado");
 
   // Catálogo de formatos soportados por archivos adjuntos (ver ADR 0011) — no
   // tiene relación con "tipos de documento" semánticos, es puro formato.
