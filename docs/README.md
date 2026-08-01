@@ -10,7 +10,8 @@ Este repositorio de documentación es la fuente de verdad técnica del proyecto.
 - **`decisions/`** — Architecture Decision Records (ADR). El por qué de cada decisión importante, con sus alternativas descartadas. A diferencia de todo lo anterior, no se edita: si una decisión cambia, se agrega una ADR nueva que reemplaza a la anterior, y la vieja queda intacta como registro histórico.
 - **`open-issues.md`** — todo lo que está pendiente de resolver en el sistema, sin importar de qué subsistema se trate. Cuando algo se resuelve, sale de acá y su resolución pasa a vivir en `architecture/`, `domain/` o como una nueva ADR, según corresponda.
 - **`desarrollo-local.md`** — guía práctica de comandos para levantar el ambiente de desarrollo (Docker, migraciones, seed, troubleshooting). Referencia viva, se edita in-place.
-- **`project/`** — gestión de proyecto (roadmap, planificación). No es documentación técnica del sistema en sí.
+- **`runbooks/`** — manuales paso a paso para operaciones concretas (instalar un cliente nuevo, actualizar el core/un módulo, corregir un dato puntual en soporte). A diferencia de `desarrollo-local.md` (ambiente de desarrollo compartido), estos son procedimientos sobre instancias reales de cliente.
+- **`project/`** — gestión de proyecto (roadmap, planificación) y catálogos operativos que no son modelo de datos (ej. `catalogo-recursos-estandar.md`). No es documentación técnica del sistema en sí en el sentido de `domain/`.
 
 ## Regla general
 
