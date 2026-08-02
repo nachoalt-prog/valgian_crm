@@ -46,9 +46,10 @@ El seed base está partido en tres, cada uno pensado para un momento distinto, m
 | Principal | `pnpm db:seed` | Lo mínimo para que el sistema funcione: usuario admin, catálogos base (géneros, país/provincias, tipo de documento, carácter Titular), menúes/herramientas/permisos del core | Sí — es obligatorio |
 | Config modelo | `pnpm db:seed:config` | Configuración reusable de ejemplo para arrancar rápido: caracteres Secundario/Pariente, una estrategia de estados para legajos, y una bandeja de búsqueda ya armada y funcional | Sí — opcional, pensado como plantilla de arranque rápido |
 | Demo/mock | `pnpm db:seed:demo` | Datos ficticios de prueba: 10 legajos + 20 clientes inventados | No — solo para desarrollo/pruebas |
+| Demo emails/mensajería | `pnpm db:seed:demo:emails` | Datos ficticios de prueba para el circuito de placeholders → plantillas → trámites → mensajería (ver `domain/acciones-externas.md`) | No — solo para desarrollo/pruebas |
 | Configuración Argentina | `pnpm db:seed:configuracion-argentina` | Catálogo `MONEDAS` (peso + tipos de dólar) — ver `domain/acciones-externas.md` | Solo para clientes en Argentina — separado de "Config modelo" a propósito, no es genérico para cualquier instalación |
 
-`db:seed:demo` depende de `db:seed:config` (usa la estrategia/estado y los caracteres que crea), que a su vez depende de `db:seed` (usa el usuario admin y los catálogos base). Correr en ese orden. `db:seed:configuracion-argentina` solo depende de `db:seed` (los catálogos base) — independiente de `db:seed:config`/`db:seed:demo`.
+`db:seed:demo` depende de `db:seed:config` (usa la estrategia/estado y los caracteres que crea), que a su vez depende de `db:seed` (usa el usuario admin y los catálogos base). `db:seed:demo:emails` depende de `db:seed:demo` (usa los legajos/clientes/`EMAILS` que ese seed crea). Correr en ese orden. `db:seed:configuracion-argentina` solo depende de `db:seed` (los catálogos base) — independiente del resto.
 
 ## Día a día
 

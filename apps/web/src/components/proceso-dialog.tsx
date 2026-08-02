@@ -1,12 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { ListOrdered } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import type { ProcesoInput } from "@valgian/core";
+import { listPasosPorProcesoAction } from "@/app/dashboard/procesos/actions";
+
+interface PasoRow {
+  id: string;
+  orden: number;
+  nombre: string;
+  timeoutMinutos: number | null;
+}
 
 interface ProcesoRow {
   id: string;
@@ -37,6 +46,21 @@ export function ProcesoDialog({ open, onOpenChange, proceso, onSave }: ProcesoDi
   const [reintentosMax, setReintentosMax] = useState(proceso?.reintentosMax != null ? String(proceso.reintentosMax) : "");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [pasos, setPasos] = useState<PasoRow[] | null>(null);
+
+  useEffect(() => {
+    if (!proceso) {
+      setPasos(null);
+      return;
+    }
+    let cancelado = false;
+    listPasosPorProcesoAction(proceso.id).then((filas) => {
+      if (!cancelado) setPasos(filas);
+    });
+    return () => {
+      cancelado = true;
+    };
+  }, [proceso]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -125,6 +149,27 @@ export function ProcesoDialog({ open, onOpenChange, proceso, onSave }: ProcesoDi
             </div>
           </div>
           <p className="text-xs text-muted-foreground">Vacío en cualquiera de los dos = no reintenta ante un fallo.</p>
+
+          {proceso && pasos && pasos.length > 0 && (
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-muted-foreground">
+                <ListOrdered className="size-3.5" />
+                Pasos (solo lectura)
+              </Label>
+              <ul className="divide-y divide-border rounded-lg border border-border">
+                {pasos.map((paso) => (
+                  <li key={paso.id} className="flex items-center justify-between px-3 py-2 text-xs">
+                    <span className="text-foreground">
+                      <span className="mr-2 font-mono text-muted-foreground">{paso.orden}.</span>
+                      {paso.nombre}
+                    </span>
+                    {paso.timeoutMinutos != null && <span className="text-muted-foreground">timeout {paso.timeoutMinutos} min</span>}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs text-muted-foreground">Los pasos son configuración de desarrollo — no se editan desde acá.</p>
+            </div>
+          )}
 
           {error && <p className="text-sm text-destructive">{error}</p>}
 

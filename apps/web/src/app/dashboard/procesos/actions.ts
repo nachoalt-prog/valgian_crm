@@ -6,6 +6,7 @@ import {
   updateProceso,
   deleteProceso,
   dispararProcesoManual,
+  listPasosPorProceso,
   getPermisoParaOperacion,
   OPERACION_ACCESO,
   type ProcesoInput,
@@ -50,6 +51,13 @@ export async function deleteProcesoAction(id: string) {
   const result = await deleteProceso(id);
   if (result.data) revalidatePath("/dashboard/procesos");
   return result;
+}
+
+export async function listPasosPorProcesoAction(id: string) {
+  const check = await requireGestion();
+  if (check.error) return [];
+
+  return listPasosPorProceso(id);
 }
 
 export async function dispararProcesoManualAction(id: string) {

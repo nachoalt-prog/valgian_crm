@@ -671,6 +671,45 @@ LEFT JOIN "ACCIONES_EXTERNAS" AE ON AE."ID" = AEC."ID_ACCION_EXTERNA"
     timeoutMinutos: 5,
   });
 
+  // Otro proceso genérico: red de contención para mensajes que quedaron
+  // pendientes sin disparo propio — el caso previsto es INMEDIATO=false
+  // (mensajes que se encolan de a uno pero se despachan en lote más tarde,
+  // ver domain/acciones-externas.md), pero también sirve como reintento de
+  // respaldo si algo interrumpió el flujo normal. Agrupa por
+  // ID_ACCION_EXTERNA (no un disparo por mensaje) — el "modo barrido" de
+  // procesarComponenteMensajeria ya sabe procesar TODOS los mensajes
+  // elegibles de esa acción en una sola pasada. El NOT EXISTS evita apilar
+  // disparos duplicados si ya hay uno pendiente para la misma acción.
+  const procesoEnvioMensajesPendientes = await ensureProceso({
+    codigo: "envio_mensajes_pendientes",
+    nombre: "Envío de mensajes pendientes",
+    descripcion: "Cada 5 minutos, barre MENSAJERIA_COLA agrupando por ID_ACCION_EXTERNA y encola un disparo en ACCIONES_EXTERNAS_COLA por cada una con mensajes pendientes.",
+    cron: "*/5 * * * *",
+    reintentoMinutos: 5,
+    reintentosMax: 3,
+  });
+  await ensureProcesoPaso({
+    idProceso: procesoEnvioMensajesPendientes.id,
+    orden: 1,
+    nombre: "Encolar disparos por acción externa",
+    comando: `
+      INSERT INTO "ACCIONES_EXTERNAS_COLA" ("ID_ACCION_EXTERNA")
+      SELECT DISTINCT mc."ID_ACCION_EXTERNA"
+      FROM "MENSAJERIA_COLA" mc
+      WHERE mc."ID_ACCION_EXTERNA" IS NOT NULL
+        AND (mc."RESULTADO" IS NULL OR mc."RESULTADO" != 0)
+        AND mc."REINTENTOS_SUPERADOS" = false
+        AND NOT EXISTS (
+          SELECT 1 FROM "ACCIONES_EXTERNAS_COLA" aec
+          WHERE aec."ID_ACCION_EXTERNA" = mc."ID_ACCION_EXTERNA"
+            AND aec."ID_ENTIDAD" IS NULL AND aec."ID_REGISTRO" IS NULL
+            AND (aec."RESULTADO" IS NULL OR aec."RESULTADO" != 0)
+            AND aec."REINTENTOS_SUPERADOS" = false
+        )
+    `,
+    timeoutMinutos: 5,
+  });
+
   console.log("Seed de configuración modelo aplicado (idempotente).");
 }
 

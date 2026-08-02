@@ -127,15 +127,18 @@ Un `PASO` cuyo `COMANDO` necesita algo que Postgres no puede hacer solo (mandar 
 
 ## ABM
 
-- **`/dashboard/procesos`** (`HERRAMIENTAS.CODIGO = 'procesos'`, `packages/core/src/procesos.ts`): listado de `PROCESOS`, alta/edición de `CODIGO`/`NOMBRE`/`DESCRIPCION`/`ACTIVO`/`CRON`/`REINTENTO_MINUTOS`/`REINTENTOS_MAX`, botón "Correr ahora" por proceso (`dispararProcesoManual` — `INSERT` directo en `PROCESOS_EJECUCIONES` con `ORIGEN='manual'`). **No edita `PROCESOS_PASOS`** — eso es dev-only, se carga por seed/migración (`ensureProceso`/`ensureProcesoPaso` en `packages/core/src/seed-config.ts`). Borrado bloqueado si el proceso tiene `PROCESOS_EJECUCIONES` (audit trail).
+- **`/dashboard/procesos`** (`HERRAMIENTAS.CODIGO = 'procesos'`, `packages/core/src/procesos.ts`): listado de `PROCESOS`, alta/edición de `CODIGO`/`NOMBRE`/`DESCRIPCION`/`ACTIVO`/`CRON`/`REINTENTO_MINUTOS`/`REINTENTOS_MAX`, botón "Correr ahora" por proceso (`dispararProcesoManual` — `INSERT` directo en `PROCESOS_EJECUCIONES` con `ORIGEN='manual'`). **No edita `PROCESOS_PASOS`** — eso es dev-only, se carga por seed/migración (`ensureProceso`/`ensureProcesoPaso` en `packages/core/src/seed-config.ts`). Borrado bloqueado si el proceso tiene `PROCESOS_EJECUCIONES` (audit trail). El diálogo de edición muestra los `PROCESOS_PASOS` del proceso en una lista **de solo lectura** (`listPasosPorProceso`) — nombre y timeout de cada paso, sin ningún control de edición — informativo nomás, para no tener que ir a la base a ver qué hace el proceso.
 
 ## Dónde vive cada pieza
 
 - Schema: `packages/db/src/schema.ts` (`procesos`, `procesosPasos`, `procesosEjecuciones`, `procesosEjecucionesPasos`).
-- SQL manual (ver `packages/db/sql/README.md`): `0011_fn_cron_matches.sql` (matching de cron), `0012_sp_evaluar_procesos.sql`, `0013_sp_ejecutar_un_proceso_pendiente.sql`, `0014_sp_barrer_procesos_huerfanos.sql`, `0015_pg_cron_jobs_procesos.sql` (registro de los jobs).
+- SQL manual (ver `packages/db/sql/README.md`): `0011_fn_cron_matches.sql` (matching de cron), `0012_sp_evaluar_procesos.sql`, `0013_sp_ejecutar_un_proceso_pendiente.sql`, `0014_sp_barrer_procesos_huerfanos.sql`, `0015_pg_cron_jobs_procesos.sql` (registro de los jobs), `0016_sp_encolar_mensaje_sin_commit.sql` (ver `domain/acciones-externas.md` — lo usan los `PASOS` que necesitan encolar un mensaje).
 - `pg_cron` no viene con la imagen oficial `postgres:17-alpine` — se compila desde el código fuente en `docker/postgres/Dockerfile` (ver nota abajo). Cualquier instalación nueva de este repo necesita esa imagen, no la oficial de Docker Hub a secas.
 - ABM: `packages/core/src/procesos.ts`, `apps/web/src/app/dashboard/procesos/`, `apps/web/src/components/procesos-tool.tsx` / `proceso-dialog.tsx`.
-- Proceso de ejemplo, genérico y útil para cualquier instalación (no es dato de demo ficticio): `limpieza_tokens_vencidos` (`0 3 * * *`, limpia `USUARIOS.TOKEN`/`TOKEN_EXPIRACION` vencidos — housekeeping, no hace falta para que el login funcione, `getSessionUser` ya filtra por vencimiento).
+- Procesos de ejemplo, genéricos y útiles para cualquier instalación (no son datos de demo ficticios):
+  - `limpieza_tokens_vencidos` (`packages/core/src/seed-config.ts`, `0 3 * * *`): limpia `USUARIOS.TOKEN`/`TOKEN_EXPIRACION` vencidos — housekeeping, no hace falta para que el login funcione, `getSessionUser` ya filtra por vencimiento.
+  - `envio_mensajes_pendientes` (`packages/core/src/seed-config.ts`, `*/5 * * * *`): ver `domain/acciones-externas.md`, sección "Disparar acciones externas / mensajes desde SQL de confianza sin COMMIT".
+  - `consultar_cotizacion_dolarapi` (seed propio del módulo, `packages/modules/cotizaciones-argentina/src/seed.ts`, `0 * * * *`): encola un disparo de `consulta_cotizacion_ar` cada hora — solo existe si el módulo `cotizaciones-argentina` está instalado (mismo criterio que la fila `ACCIONES_EXTERNAS` que ese módulo ya sembraba).
 
 ### `pg_cron` en Docker — compilado desde el código fuente
 

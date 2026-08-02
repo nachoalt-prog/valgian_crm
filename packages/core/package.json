@@ -10,6 +10,7 @@
     "db:seed": "tsx src/seed.ts",
     "db:seed:config": "tsx src/seed-config.ts",
     "db:seed:demo": "tsx src/seed-demo.ts",
+    "db:seed:demo:emails": "tsx src/seed-demo-emails.ts",
     "db:seed:configuracion-argentina": "tsx src/seed-configuracion-argentina.ts"
   },
   "dependencies": {

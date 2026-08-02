@@ -1,6 +1,6 @@
 import { eq, count } from "drizzle-orm";
 import { sql } from "drizzle-orm";
-import { db, procesos, procesosEjecuciones } from "@valgian/db";
+import { db, procesos, procesosPasos, procesosEjecuciones } from "@valgian/db";
 
 /**
  * ABM de PROCESOS — ver domain/procesos.md, ADR 0015. El ABM administra
@@ -20,6 +20,15 @@ function esViolacionUnica(err: unknown): boolean {
 
 export async function listProcesosAdmin() {
   return db.select().from(procesos).orderBy(procesos.nombre);
+}
+
+/** Solo lectura — el ABM de PROCESOS no edita PROCESOS_PASOS (dev-only, ver comentario de arriba). */
+export async function listPasosPorProceso(idProceso: string) {
+  return db
+    .select({ id: procesosPasos.id, orden: procesosPasos.orden, nombre: procesosPasos.nombre, timeoutMinutos: procesosPasos.timeoutMinutos })
+    .from(procesosPasos)
+    .where(eq(procesosPasos.idProceso, idProceso))
+    .orderBy(procesosPasos.orden);
 }
 
 export interface ProcesoInput {

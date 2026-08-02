@@ -27,3 +27,4 @@ psql "$DATABASE_URL" -f sql/0001_trigger_clientes_titular.sql
 - `0013_sp_ejecutar_un_proceso_pendiente.sql`: `PROCEDURE` de los N jobs ejecutores de `pg_cron` (reclama y corre una ejecución pendiente, paso a paso).
 - `0014_sp_barrer_procesos_huerfanos.sql`: `PROCEDURE` del barrido de ejecuciones `procesando` cuyo paso en curso superó su timeout (caída de Postgres a mitad de camino).
 - `0015_pg_cron_jobs_procesos.sql`: registro de los jobs de `pg_cron` (1 evaluador + 3 ejecutores + 1 barrido de huérfanas) — a diferencia de los anteriores, esto es config/infraestructura (`cron.schedule` con nombre, idempotente), no DDL.
+- `0016_sp_encolar_mensaje_sin_commit.sql`: `PROCEDURE` que encola un mensaje igual que `sp_mensajeria_encolar`, sin los `COMMIT` internos — para usar desde `ACCIONES.COMANDO`/`PROCESOS_PASOS.COMANDO` (que corren vía `EXECUTE` dinámico, nunca admiten control transaccional en la cadena).
