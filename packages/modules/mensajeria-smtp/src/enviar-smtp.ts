@@ -30,9 +30,9 @@ export async function enviarPorSmtp(mensaje: MensajeParaEnviar, parametrosAccion
     return { exito: false, descripcion: "Faltan parámetros SMTP (host/port/usuario/contrasena/remitente) en ACCIONES_EXTERNAS.PARAMETROS." };
   }
 
-  const destinatario = (mensaje.datosRaiz as { destinatario?: string } | null)?.destinatario;
+  const destinatario = mensaje.destino;
   if (!destinatario) {
-    return { exito: false, descripcion: "El mensaje no tiene 'destinatario' en DATOS_RAIZ." };
+    return { exito: false, descripcion: "El mensaje no tiene DESTINO configurado." };
   }
 
   const transporte = nodemailer.createTransport({

@@ -1,0 +1,16 @@
+CREATE TABLE "EMAILS" (
+	"ID" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"EMAIL" text NOT NULL,
+	"PRINCIPAL" boolean,
+	"ID_CLIENTE" uuid,
+	"COMODIN" jsonb,
+	"ALTA_FECHA" timestamp with time zone,
+	"ALTA_USUARIO" uuid,
+	"AUDIT_FECHA" timestamp with time zone,
+	"AUDIT_USUARIO" uuid
+);
+--> statement-breakpoint
+ALTER TABLE "MENSAJERIA_COLA" ADD COLUMN "DESTINO" text;--> statement-breakpoint
+ALTER TABLE "EMAILS" ADD CONSTRAINT "EMAILS_ID_CLIENTE_CLIENTES_ID_fk" FOREIGN KEY ("ID_CLIENTE") REFERENCES "public"."CLIENTES"("ID") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "EMAILS" ADD CONSTRAINT "EMAILS_ALTA_USUARIO_USUARIOS_ID_fk" FOREIGN KEY ("ALTA_USUARIO") REFERENCES "public"."USUARIOS"("ID") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "EMAILS" ADD CONSTRAINT "EMAILS_AUDIT_USUARIO_USUARIOS_ID_fk" FOREIGN KEY ("AUDIT_USUARIO") REFERENCES "public"."USUARIOS"("ID") ON DELETE no action ON UPDATE no action;

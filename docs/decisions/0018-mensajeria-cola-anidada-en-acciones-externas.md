@@ -37,3 +37,11 @@ También hacía falta resolver: cómo entra un mensaje al ciclo de vida de una e
 - `packages/core/src/motor-estados.ts` afloja el tipo de `idUsuario` en `aplicarEstimulo` a `string | null` — mensajería aplica estímulos sin un usuario logueado detrás (mismo criterio que `guardarArchivo` para Generación de Documentos).
 - Nuevo tipo de columna en el motor de Reportes (`tipo: "adjuntos"`, ver ADR 0014) — un botón que abre un diálogo de solo lectura con los adjuntos de la fila. Vocabulario de columnas ampliado exactamente como ADR 0014 preveía que pasaría.
 - `ENTIDADES` gana una fila (`mensajeria_cola`) que rompe la convención previa de `NOMBRE` = nombre de tabla en mayúsculas — deliberado, esta entidad nunca se usa como nombre de tabla dinámico (`sp_aplicar_estimulo` no la toca), solo la compara el despachador por `ID`.
+
+## Revisión — DESTINO + EMAILS + disparo desde el motor de estados
+
+`MENSAJERIA_COLA` gana `DESTINO` (columna real, ya no `DATOS_RAIZ.destinatario` por convención informal) y `SP_MENSAJERIA_ENCOLAR` un parámetro `p_destino` (`packages/db/sql/0009_sp_mensajeria_encolar_destino.sql`, reemplaza a `0008` vía `DROP PROCEDURE IF EXISTS` + recreate — `CREATE OR REPLACE` no alcanza cuando cambia la firma).
+
+Nueva tabla core `EMAILS` (casillas de un `CLIENTE`, `PRINCIPAL` con la misma lógica de auto-swap que `CLIENTES.ES_TITULAR`) — resuelve de dónde sale un `DESTINO` real sin inventar un campo de formulario ad hoc.
+
+Se descubrió una restricción real de Postgres al intentar que una `ACCION` del motor de estados llamara directo a `SP_MENSAJERIA_ENCOLAR`: `ACCIONES.COMANDO` corre vía `EXECUTE` dinámico (SPI), y SPI nunca permite control transaccional en la cadena — cualquier `CALL` (directo o anidado en función/procedure) a algo que haga `COMMIT` internamente falla con `invalid transaction termination`, sin excepción. La solución (ver `sp_notificar_cliente_demo` en `seed-demo.ts`) es que la `ACCION` dispare un `PROCEDURE` propio que replica el mismo `INSERT` que hace la SP, sin los `COMMIT` — no hacen falta ahí, todo confirma junto con la transacción de `sp_aplicar_estimulo`. Ver `domain/acciones-externas.md`, sección "Disparar mensajería desde una transición del motor de estados", para el detalle completo.

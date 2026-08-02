@@ -17,8 +17,10 @@ import {
   plantillasAdjunto,
   legajos,
   clientes,
+  emails,
   tramites,
   entidades,
+  historial,
   categoriasTiposTramite,
   tiposTramite,
   tiposCampos,
@@ -32,6 +34,8 @@ import {
 import { gestionarTramite, mapearValorCampo, type DatoTramiteInput } from "./tramites";
 import { crearPlantillaAdjunto } from "./plantillas-adjunto";
 import { OPERACION_ADJUNTOS_BORRAR } from "./archivos-adjuntos";
+import { aplicarEstimulo } from "./motor-estados";
+import { crearMensajeriaPlantilla, getMensajeriaPlantillaPorCodigo } from "./mensajeria-plantillas";
 
 const ADMIN_USERNAME = "admin";
 
@@ -167,6 +171,87 @@ async function getEntidadPorCodigo(codigo: string) {
   const [entidad] = await db.select().from(entidades).where(eq(entidades.codigo, codigo));
   if (!entidad) throw new Error(`No existe ENTIDADES.CODIGO = "${codigo}" — corré el seed principal primero.`);
   return entidad;
+}
+
+async function getEstadoPorCodigo(idEstrategia: string, codigo: string) {
+  const [estado] = await db.select().from(estados).where(and(eq(estados.idEstrategia, idEstrategia), eq(estados.codigo, codigo)));
+  if (!estado) throw new Error(`No existe ESTADOS.CODIGO = "${codigo}" para esa estrategia — corré el seed de configuración primero.`);
+  return estado;
+}
+
+/** No existen en seed-config.ts como exports — se duplican acá porque este seed también necesita crear estímulos/transiciones propios (demo). */
+async function ensureEstimulo(idEstrategia: string, codigo: string, nombre: string) {
+  const [existente] = await db.select().from(estimulos).where(and(eq(estimulos.idEstrategia, idEstrategia), eq(estimulos.codigo, codigo)));
+  if (existente) return existente;
+
+  const [creado] = await db.insert(estimulos).values({ idEstrategia, codigo, nombre }).returning();
+  return creado;
+}
+
+async function ensureTransicion(idEstrategia: string, idEstado0: string, idEstimulo: string, idEstado1: string) {
+  const [existente] = await db
+    .select()
+    .from(transiciones)
+    .where(and(eq(transiciones.idEstrategia, idEstrategia), eq(transiciones.idEstado0, idEstado0), eq(transiciones.idEstimulo, idEstimulo)));
+  if (existente) return existente;
+
+  const [creada] = await db.insert(transiciones).values({ idEstrategia, idEstado0, idEstimulo, idEstado1 }).returning();
+  return creada;
+}
+
+/** Idempotente por (ID_CLIENTE, EMAIL) — alcanza para el seed, no hay unique real en EMAILS. */
+async function ensureEmailDemo(params: { idCliente: string; email: string; principal: boolean; idUsuarioAudit: string }) {
+  const [existente] = await db
+    .select()
+    .from(emails)
+    .where(and(eq(emails.idCliente, params.idCliente), eq(emails.email, params.email)));
+  if (existente) return existente;
+
+  const ahora = new Date();
+  const [creado] = await db
+    .insert(emails)
+    .values({
+      idCliente: params.idCliente,
+      email: params.email,
+      principal: params.principal,
+      altaFecha: ahora,
+      altaUsuario: params.idUsuarioAudit,
+      auditFecha: ahora,
+      auditUsuario: params.idUsuarioAudit,
+    })
+    .returning();
+  return creado;
+}
+
+async function ensureMensajeriaPlantillaDemo(params: { codigo: string; nombre: string; descripcion?: string; asunto: string; html: string; idUsuario: string }) {
+  const existente = await getMensajeriaPlantillaPorCodigo(params.codigo);
+  if (existente) return existente;
+
+  const resultado = await crearMensajeriaPlantilla({
+    codigo: params.codigo,
+    nombre: params.nombre,
+    descripcion: params.descripcion ?? null,
+    asunto: params.asunto,
+    buffer: Buffer.from(params.html, "utf-8"),
+    nombreOriginal: `${params.codigo}.html`,
+    mimetype: "text/html",
+    idUsuario: params.idUsuario,
+  });
+  if (resultado.error || !resultado.data) throw new Error(`Error creando la plantilla de mensajería demo "${params.codigo}": ${resultado.error}`);
+
+  return getMensajeriaPlantillaPorCodigo(params.codigo);
+}
+
+/** Aplica un estímulo sobre un registro UNA sola vez (idempotente vía HISTORIAL) — a diferencia de ensureTramiteDemo, acá el trámite ya existe, solo hace falta no re-disparar el envío en cada corrida del seed. */
+async function ensureEstimuloAplicadoUnaVez(idEntidad: string, idRelacion: string, idEstimulo: string, idUsuario: string, observacion?: string) {
+  const [existente] = await db
+    .select()
+    .from(historial)
+    .where(and(eq(historial.idEntidad, idEntidad), eq(historial.idRelacion, idRelacion), eq(historial.idEstimulo, idEstimulo)));
+  if (existente) return;
+
+  const resultado = await aplicarEstimulo(idEntidad, idRelacion, idEstimulo, idUsuario, observacion ?? null);
+  if (resultado.error) throw new Error(`Error aplicando el estímulo demo "${idEstimulo}": ${resultado.error}`);
 }
 
 async function getTransicion(idEstrategia: string, idEstado0: string, idEstimulo: string) {
@@ -707,7 +792,7 @@ async function main() {
 
   const legajo4 = await getLegajoPorNumero("DEMO-0004");
   const titular4 = await getTitularDelLegajo(legajo4.id);
-  await ensureTramiteDemo({
+  const tramite4 = await ensureTramiteDemo({
     idTipoTramite: tipoTramiteClienteTitular.id,
     idRegistro: titular4.id,
     datos: [
@@ -719,6 +804,163 @@ async function main() {
     idUsuario: admin.id,
     observacion: "Trámite demo — sobre cliente titular, vía el tipo con filtro.",
   });
+
+  // --- Mensajería: EMAILS de clientes + plantilla + estímulo/acción demo ---
+  // Circuito completo (ver domain/acciones-externas.md, sección Mensajería):
+  // al aplicar el estímulo "notificar_demo" — un self-loop NUEVO y exclusivo
+  // sobre "resuelto", no la transición "resolver" que comparten TODOS los
+  // tipos de trámite de esta estrategia — sobre el trámite ya resuelto de
+  // titular4, se dispara una ACCION que llama a SP_MENSAJERIA_ENCOLAR con el
+  // email PRINCIPAL de ese cliente.
+  const entidadTramites = await getEntidadPorCodigo("tramites");
+  const estadoResueltoTramites = await getEstadoPorCodigo(estrategiaTramites.id, "resuelto");
+
+  const legajo5 = await getLegajoPorNumero("DEMO-0005");
+  const titular1 = await getTitularDelLegajo(legajo1.id);
+  const titular2 = await getTitularDelLegajo(legajo2.id);
+  const titular5 = await getTitularDelLegajo(legajo5.id);
+
+  // Todos con el mismo valor a propósito — permite probar un envío real sin
+  // exponer casillas de terceros (pedido explícito del sprint).
+  const EMAIL_DEMO = "nachoalt@gmail.com";
+  for (const titular of [titular1, titular2, titular3, titular4, titular5]) {
+    await ensureEmailDemo({ idCliente: titular.id, email: EMAIL_DEMO, principal: true, idUsuarioAudit: admin.id });
+  }
+
+  const phNombreClienteMensajeria = await ensurePlaceholderDemo({
+    codigo: "demo_nombre_cliente_mensajeria",
+    nombre: "Nombre del cliente (demo mensajería)",
+    query: `
+      SELECT c."NOMBRE" || ' ' || c."APELLIDO" AS valor
+      FROM "CLIENTES" c
+      WHERE c."ID" = ($1::jsonb->>'id_cliente')::uuid
+    `,
+    escapar: true,
+  });
+
+  await ensureMensajeriaPlantillaDemo({
+    codigo: "demo_recordatorio_pago_1",
+    nombre: "Recordatorio de pago (demo)",
+    descripcion: "Plantilla de prueba de Mensajería — se dispara con el estímulo demo 'notificar_demo'.",
+    asunto: `Recordatorio de pago — ##${phNombreClienteMensajeria.codigo}##`,
+    html: `<!DOCTYPE html>
+<html>
+<head>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ <style>* { margin: 0; padding: 0; box-sizing: border-box; }</style>
+</head>
+<body style="background: #f0f2f5; font-family: sans-serif; color: #1a1a2e; padding: 32px 16px;">
+ <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 8px 40px rgba(0,0,0,0.10);">
+  <div style="background: linear-gradient(135deg, #003e96 0%, #0055cc 100%); padding: 24px 32px;">
+   <p style="font-size: 18px; font-weight: 700; color: #fff;">Valgian CRM — Demo</p>
+  </div>
+  <div style="padding: 36px 40px;">
+   <p style="font-size: 18px; font-weight: 600; color: #1a1a2e; margin-bottom: 10px;">Hola, ##${phNombreClienteMensajeria.codigo}##</p>
+   <p style="font-size: 15px; color: #555; line-height: 1.6; margin-bottom: 28px;">Te recordamos que se acerca la fecha de pago de tu Préstamo <strong>Demo</strong>. Queremos ayudarte a mantener tu cuenta al día de la forma más simple.</p>
+   <div style="background: linear-gradient(135deg, #003e96 0%, #0055cc 100%); border-radius: 16px; padding: 28px 32px; color: white; margin-bottom: 20px;">
+    <div style="font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: rgba(255,255,255,0.65); margin-bottom: 6px;">Detalle de tu cuota</div>
+    <div style="font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.8); margin-bottom: 20px;">Préstamo Demo</div>
+    <div style="display: flex; align-items: flex-end; gap: 6px; margin-bottom: 24px;">
+     <span style="font-size: 22px; font-weight: 700; color: rgba(255,255,255,0.85); padding-bottom: 4px;">$</span>
+     <span style="font-size: 48px; font-weight: 700; color: #fff; line-height: 1; letter-spacing: -1px;">15.000</span>
+    </div>
+    <div style="display: flex; gap: 24px; flex-wrap: wrap; border-top: 1px solid rgba(255,255,255,0.15); padding-top: 18px;">
+     <div>
+      <div style="font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: rgba(255,255,255,0.55); margin-bottom: 4px;">Vencimiento</div>
+      <div style="font-size: 15px; font-weight: 600; color: #fff;">##demo_fecha_generacion##</div>
+     </div>
+     <div>
+      <div style="font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: rgba(255,255,255,0.55); margin-bottom: 4px;">Cuota</div>
+      <div style="font-size: 15px; font-weight: 600; color: #fff;">1 de 12</div>
+     </div>
+    </div>
+   </div>
+   <div style="background: #fff8e6; border-left: 4px solid #f5a623; border-radius: 10px; padding: 16px 20px; margin-bottom: 28px;">
+    <p style="font-size: 14px; color: #7a5200; line-height: 1.55;"><strong style="color: #5a3a00;">Pagá antes del ##demo_fecha_generacion##</strong> para evitar intereses por mora y mantener tu historial crediticio impecable.</p>
+   </div>
+   <p style="font-size: 12px; color: #aaa; text-align: center; margin-top: 8px;">Este es un mensaje de demostración generado por Valgian CRM — Mensajería (ADR 0018).</p>
+  </div>
+ </div>
+</body>
+</html>`,
+    idUsuario: admin.id,
+  });
+
+  const estimuloNotificarDemo = await ensureEstimulo(estrategiaTramites.id, "notificar_demo", "Notificar (demo mensajería)");
+  await ensureTransicion(estrategiaTramites.id, estadoResueltoTramites.id, estimuloNotificarDemo.id, estadoResueltoTramites.id);
+  const transicionNotificarDemo = await getTransicion(estrategiaTramites.id, estadoResueltoTramites.id, estimuloNotificarDemo.id);
+
+  // Postgres no permite subqueries como argumento de un CALL ("cannot use
+  // subquery in CALL argument") — primer obstáculo, resuelto con variables.
+  // El segundo, más de fondo: sp_aplicar_estimulo corre ACCIONES.COMANDO vía
+  // EXECUTE dinámico (SPI) — y una llamada a un procedure con COMMIT interno
+  // (como sp_mensajeria_encolar) NUNCA es válida dentro de un EXECUTE
+  // dinámico, sea función o procedure ("invalid transaction termination",
+  // probado en vivo con ambas variantes). Por eso este procedure NO llama a
+  // sp_mensajeria_encolar — replica sus mismos INSERT (sin los COMMIT, que acá
+  // no hacen falta: todo corre y confirma junto con la transacción del CALL a
+  // sp_aplicar_estimulo). Exclusivo del seed de demo, mismo criterio que
+  // fn_filtro_tramite_cli_titular_1 — no forma parte de la infraestructura
+  // permanente en packages/db/sql/. Acotado a TEST_CLI_TIT_1 a propósito:
+  // aunque "notificar_demo" es una transición nueva y exclusiva (no la
+  // "resolver" que comparten todos los tipos de trámite), si algún día se
+  // aplica este estímulo sobre otro tipo de trámite, el procedure no
+  // encuentra cliente/email y no hace nada (no-op silencioso).
+  await db.execute(sql`
+    CREATE OR REPLACE PROCEDURE sp_notificar_cliente_demo(p_id_tramite uuid)
+    LANGUAGE plpgsql
+    AS $$
+    DECLARE
+      v_id_cliente uuid;
+      v_destino text;
+      v_id_plantilla uuid;
+      v_id_accion_externa uuid;
+      v_id_entidad uuid;
+      v_id_entidad_mensajeria uuid;
+      v_id_mensajeria_cola uuid;
+      v_asunto text;
+      v_inmediato boolean;
+    BEGIN
+      SELECT t."ID_REGISTRO" INTO v_id_cliente
+      FROM "TRAMITES" t
+      JOIN "TIPOS_TRAMITE" tt ON tt."ID" = t."ID_TIPO_TRAMITE"
+      WHERE t."ID" = p_id_tramite AND tt."CODIGO" = 'TEST_CLI_TIT_1';
+      IF v_id_cliente IS NULL THEN RETURN; END IF;
+
+      SELECT "EMAIL" INTO v_destino FROM "EMAILS" WHERE "ID_CLIENTE" = v_id_cliente AND "PRINCIPAL" = true LIMIT 1;
+      IF v_destino IS NULL THEN RETURN; END IF;
+
+      SELECT "ID", "ASUNTO" INTO v_id_plantilla, v_asunto FROM "MENSAJERIA_PLANTILLAS" WHERE "CODIGO" = 'demo_recordatorio_pago_1';
+      SELECT "ID", "INMEDIATO" INTO v_id_accion_externa, v_inmediato FROM "ACCIONES_EXTERNAS" WHERE "CODIGO" = 'mensajeria_smtp';
+      SELECT "ID" INTO v_id_entidad FROM "ENTIDADES" WHERE "CODIGO" = 'clientes';
+
+      v_id_mensajeria_cola := gen_random_uuid();
+
+      INSERT INTO "MENSAJERIA_COLA"
+        ("ID", "ID_ACCION_EXTERNA", "ID_MENSAJERIA_PLANTILLA", "ID_ENTIDAD", "ID_REGISTRO", "ASUNTO", "DESTINO", "DATOS_RAIZ", "FECHA_ENCOLADO")
+      VALUES
+        (v_id_mensajeria_cola, v_id_accion_externa, v_id_plantilla, v_id_entidad, v_id_cliente, v_asunto, v_destino,
+         jsonb_build_object('id_cliente', v_id_cliente::text, 'fecha', (now() + interval '5 days')::text), now());
+
+      IF v_inmediato THEN
+        SELECT "ID" INTO v_id_entidad_mensajeria FROM "ENTIDADES" WHERE "CODIGO" = 'mensajeria_cola';
+        INSERT INTO "ACCIONES_EXTERNAS_COLA" ("ID_ACCION_EXTERNA", "ID_ENTIDAD", "ID_REGISTRO")
+        VALUES (v_id_accion_externa, v_id_entidad_mensajeria, v_id_mensajeria_cola);
+      END IF;
+    END;
+    $$;
+  `);
+
+  const accionNotificarCliente = await ensureAccion({
+    idEstrategia: estrategiaTramites.id,
+    codigo: "notificar_cliente_demo",
+    nombre: "Notificar cliente por email (demo)",
+    comando: `CALL sp_notificar_cliente_demo($1)`,
+  });
+  await ensureTransicionAccion(transicionNotificarDemo.id, accionNotificarCliente.id, 1);
+
+  await ensureEstimuloAplicadoUnaVez(entidadTramites.id, tramite4.id, estimuloNotificarDemo.id, admin.id, "Notificación demo de mensajería.");
 
   // Perfil de prueba "Admin2": todos los permisos salvo Borrar en Archivos
   // Adjuntos — sirve para verificar en vivo que el gate granular de un botón
@@ -738,7 +980,7 @@ async function main() {
   }
 
   console.log(
-    "Seed de prueba aplicado (idempotente): 10 legajos, 20 clientes, 3 tipos de trámite, 4 trámites de ejemplo, 4 placeholders + 1 plantilla + 1 acción de generación de documentos, perfil Admin2 con todos los permisos salvo Borrar adjuntos.",
+    "Seed de prueba aplicado (idempotente): 10 legajos, 20 clientes, 3 tipos de trámite, 4 trámites de ejemplo, 4 placeholders + 1 plantilla + 1 acción de generación de documentos, 5 emails de clientes + 1 placeholder + 1 plantilla + 1 estímulo/acción de mensajería (demo), perfil Admin2 con todos los permisos salvo Borrar adjuntos.",
   );
 }
 

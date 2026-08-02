@@ -21,6 +21,7 @@ export * from "./reportes-admin";
 export * from "./catalogos";
 export * from "./legajos";
 export * from "./clientes";
+export * from "./emails";
 export * from "./layouts-legajo";
 export * from "./layouts-legajo-admin";
 export * from "./entidades";

@@ -132,27 +132,27 @@ Personas asociadas a un legajo. Un legajo tiene N clientes, con exactamente uno 
 | AUDIT_FECHA      | timestamp                                      |
 | AUDIT_USUARIO    | FK → USUARIOS                                  |
 
-### TIPOS_EMAIL
-
-| Campo  | Tipo     |
-| ------ | -------- |
-| ID     | UUID, PK |
-| CODIGO | string   |
-| NOMBRE | string   |
-
 ### EMAILS
 
-| Campo         | Tipo             |
-| ------------- | ---------------- |
-| ID            | UUID, PK         |
-| ID_CLIENTE    | FK → CLIENTES    |
-| ID_TIPO_EMAIL | FK → TIPOS_EMAIL |
-| EMAIL         | string           |
-| PRINCIPAL     | boolean          |
-| ALTA_FECHA    | timestamp        |
-| ALTA_USUARIO  | FK → USUARIOS    |
-| AUDIT_FECHA   | timestamp        |
-| AUDIT_USUARIO | FK → USUARIOS    |
+Implementada (`packages/core/src/emails.ts`) más simple que el diseño planeado originalmente acá — sin catálogo `TIPOS_EMAIL`, con `COMODIN` en su lugar (mismo criterio flexible que `LEGAJOS.COMODIN`/`CUENTAS.COMODIN`).
+
+| Campo         | Tipo          |
+| ------------- | ------------- |
+| ID            | UUID, PK      |
+| EMAIL         | string        |
+| PRINCIPAL     | boolean       |
+| ID_CLIENTE    | FK → CLIENTES |
+| COMODIN       | jsonb         |
+| ALTA_FECHA    | timestamp     |
+| ALTA_USUARIO  | FK → USUARIOS |
+| AUDIT_FECHA   | timestamp     |
+| AUDIT_USUARIO | FK → USUARIOS |
+
+**Regla — unicidad de principal**: solo puede existir un `EMAILS` con `PRINCIPAL = true` por `ID_CLIENTE` — mismo trigger de auto-swap que `CLIENTES.ES_TITULAR` (`packages/db/sql/0010_trigger_emails_principal.sql`).
+
+ABM embebido en el modal de Legajo, dentro de la herramienta de Clientes (botón "Emails" en el panel de detalle) — no es una pantalla propia. `ALTA_FECHA`/`ALTA_USUARIO`/`AUDIT_FECHA`/`AUDIT_USUARIO` se completan solo desde el server action, nunca son parte del formulario editable. Ver `domain/acciones-externas.md` para cómo lo consume Mensajería (`MENSAJERIA_COLA.DESTINO`).
+
+`TELEFONOS`/`TIPOS_TELEFONO` arriba siguen siendo diseño no implementado — a diferencia de `EMAILS`, todavía no hubo un sprint que los baje a código.
 
 ## Productos y cuentas
 

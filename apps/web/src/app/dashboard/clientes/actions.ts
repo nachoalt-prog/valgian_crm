@@ -9,9 +9,14 @@ import {
   listTiposDocumento,
   listGeneros,
   listProvincias,
+  listEmailsPorCliente,
+  createEmail,
+  updateEmail,
+  deleteEmail,
   getPermisoParaOperacion,
   OPERACION_ACCESO,
   type ClienteInput,
+  type EmailInput,
 } from "@valgian/core";
 import { getCurrentSession } from "@/lib/current-user";
 
@@ -63,4 +68,32 @@ export async function deleteClienteAction(id: string) {
   if (check.error) return { error: check.error };
 
   return deleteCliente(id);
+}
+
+export async function listEmailsPorClienteAction(idCliente: string) {
+  const check = await requireAcceso();
+  if (check.error) return [];
+
+  return listEmailsPorCliente(idCliente);
+}
+
+export async function createEmailAction(data: EmailInput) {
+  const check = await requireAcceso();
+  if (check.error || !check.usuarioId) return { error: check.error ?? "No autenticado." };
+
+  return createEmail(data, check.usuarioId);
+}
+
+export async function updateEmailAction(id: string, data: EmailInput) {
+  const check = await requireAcceso();
+  if (check.error || !check.usuarioId) return { error: check.error ?? "No autenticado." };
+
+  return updateEmail(id, data, check.usuarioId);
+}
+
+export async function deleteEmailAction(id: string) {
+  const check = await requireAcceso();
+  if (check.error) return { error: check.error };
+
+  return deleteEmail(id);
 }

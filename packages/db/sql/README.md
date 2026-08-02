@@ -20,3 +20,5 @@ psql "$DATABASE_URL" -f sql/0001_trigger_clientes_titular.sql
 - `0006_trigger_historial_vincular_adjuntos.sql`: auto-vincula a un movimiento de `HISTORIAL` los adjuntos recién subidos al mismo legajo/trámite (ver `domain/motor-de-estados.md`, sección "Adjuntos ↔ Historial").
 - `0007_trigger_notify_acciones_externas_cola.sql`: `NOTIFY` para el worker de Acciones Externas (ver `domain/acciones-externas.md`).
 - `0008_sp_mensajeria_encolar.sql`: `PROCEDURE` que encola un mensaje (mail/SMS/WhatsApp/...) + sus adjuntos, y opcionalmente dispara la cola genérica de Acciones Externas (ver `domain/acciones-externas.md`, sección Mensajería).
+- `0009_sp_mensajeria_encolar_destino.sql`: agrega el parámetro `p_destino` a `sp_mensajeria_encolar` (`DROP` + recreate, `CREATE OR REPLACE` no alcanza cuando cambia la firma).
+- `0010_trigger_emails_principal.sql`: trigger que garantiza que `EMAILS.PRINCIPAL = true` sea único por `ID_CLIENTE` (mismo criterio que `0001_trigger_clientes_titular.sql`).

@@ -321,6 +321,25 @@ export const clientes = pgTable("CLIENTES", {
   auditUsuario: uuid("AUDIT_USUARIO").references(() => usuarios.id),
 });
 
+/**
+ * Emails de un cliente — 0..N por CLIENTES, a lo sumo uno marcado PRINCIPAL
+ * (mismo criterio de "único activo, auto-swap" que CLIENTES.ES_TITULAR sobre
+ * ID_LEGAJO — ver 0001_trigger_clientes_titular.sql / trigger análogo acá).
+ * ABM propio, embebido en el modal de Legajo dentro de Clientes (core, no
+ * depende de ningún módulo de mensajería).
+ */
+export const emails = pgTable("EMAILS", {
+  id: uuid("ID").primaryKey().defaultRandom(),
+  email: text("EMAIL").notNull(),
+  principal: boolean("PRINCIPAL"),
+  idCliente: uuid("ID_CLIENTE").references(() => clientes.id),
+  comodin: jsonb("COMODIN"),
+  altaFecha: timestamp("ALTA_FECHA", { withTimezone: true }),
+  altaUsuario: uuid("ALTA_USUARIO").references(() => usuarios.id),
+  auditFecha: timestamp("AUDIT_FECHA", { withTimezone: true }),
+  auditUsuario: uuid("AUDIT_USUARIO").references(() => usuarios.id),
+});
+
 export const cuentas = pgTable("CUENTAS", {
   id: uuid("ID").primaryKey().defaultRandom(),
   idLegajo: uuid("ID_LEGAJO").references(() => legajos.id),
@@ -803,6 +822,9 @@ export const mensajeriaCola = pgTable("MENSAJERIA_COLA", {
   idRegistro: uuid("ID_REGISTRO"),
   // Copia de MENSAJERIA_PLANTILLAS.ASUNTO al encolar (todavía sin resolver).
   asunto: text("ASUNTO"),
+  // A dónde mandarlo (mail, teléfono, lo que pida el proveedor) — lo interpreta
+  // cada COMPONENTE, la cola no le da ningún formato particular.
+  destino: text("DESTINO"),
   // Datos raíz para la resolución de placeholders (mismo rol que
   // GENERACIONES_DOCUMENTO.DATOS) — los guarda SP_MENSAJERIA_ENCOLAR.
   datosRaiz: jsonb("DATOS_RAIZ"),

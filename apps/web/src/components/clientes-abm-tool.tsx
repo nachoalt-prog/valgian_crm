@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PlusCircle, Trash2, Users, User } from "lucide-react";
+import { PlusCircle, Trash2, Users, User, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CampoTexto, CampoSelect, CampoBooleano } from "@/components/campo-editable";
 import { ClienteDialog } from "@/components/cliente-dialog";
+import { EmailsClienteDialog } from "@/components/emails-cliente-dialog";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
   listClientesPorLegajoAction,
@@ -43,6 +44,7 @@ export function ClientesAbmTool({ idLegajo, canGestionar, revision, onCambio }: 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<ClienteConNombres | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [emailsDialogOpen, setEmailsDialogOpen] = useState(false);
 
   async function recargar() {
     setClientes(await listClientesPorLegajoAction(idLegajo));
@@ -183,6 +185,12 @@ export function ClientesAbmTool({ idLegajo, canGestionar, revision, onCambio }: 
           </div>
         ) : (
           <div key={seleccionado.id}>
+            <div className="mb-3 flex justify-end">
+              <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" onClick={() => setEmailsDialogOpen(true)}>
+                <Mail className="size-3.5" />
+                Emails
+              </Button>
+            </div>
             <CampoTexto
               label="Apellido"
               valor={seleccionado.apellido ?? ""}
@@ -266,6 +274,16 @@ export function ClientesAbmTool({ idLegajo, canGestionar, revision, onCambio }: 
         isError={!!deleteError}
         onConfirm={handleBorrar}
       />
+
+      {seleccionado && (
+        <EmailsClienteDialog
+          open={emailsDialogOpen}
+          onOpenChange={setEmailsDialogOpen}
+          idCliente={seleccionado.id}
+          nombreCliente={`${seleccionado.apellido ?? ""}, ${seleccionado.nombre}`}
+          canGestionar={canGestionar}
+        />
+      )}
     </div>
   );
 }

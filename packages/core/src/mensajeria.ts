@@ -24,9 +24,11 @@ export interface EncolarMensajeInput {
   idRegistro?: string | null;
   idsAdjuntos?: string[];
   datos: unknown;
+  /** A dónde mandarlo (mail, teléfono, ...) — cada COMPONENTE lo interpreta a su manera. */
+  destino?: string | null;
 }
 
-/** Ejecuta SP_MENSAJERIA_ENCOLAR — ver packages/db/sql/0008_sp_mensajeria_encolar.sql. */
+/** Ejecuta SP_MENSAJERIA_ENCOLAR — ver packages/db/sql/0009_sp_mensajeria_encolar_destino.sql. */
 export async function encolarMensaje(input: EncolarMensajeInput): Promise<{ id: string }> {
   const id = crypto.randomUUID();
   const idsAdjuntos = input.idsAdjuntos ?? [];
@@ -43,7 +45,7 @@ export async function encolarMensaje(input: EncolarMensajeInput): Promise<{ id: 
       : sql`ARRAY[]::uuid[]`;
 
   await db.execute(
-    sql`CALL sp_mensajeria_encolar(${id}, ${input.idPlantilla}, ${input.idAccionExterna}, ${input.idEntidad ?? null}, ${input.idRegistro ?? null}, ${arrayAdjuntos}, ${JSON.stringify(input.datos)}::jsonb)`,
+    sql`CALL sp_mensajeria_encolar(${id}, ${input.idPlantilla}, ${input.idAccionExterna}, ${input.idEntidad ?? null}, ${input.idRegistro ?? null}, ${arrayAdjuntos}, ${JSON.stringify(input.datos)}::jsonb, ${input.destino ?? null})`,
   );
   return { id };
 }
@@ -55,6 +57,7 @@ interface FilaMensajeCola {
   idEntidad: string | null;
   idRegistro: string | null;
   asunto: string | null;
+  destino: string | null;
   datosRaiz: unknown;
   fechaEncolado: Date | null;
   reintento: number;
@@ -76,6 +79,7 @@ async function listMensajesElegibles(filtro: { id: string } | { idAccionExterna:
       idEntidad: mensajeriaCola.idEntidad,
       idRegistro: mensajeriaCola.idRegistro,
       asunto: mensajeriaCola.asunto,
+      destino: mensajeriaCola.destino,
       datosRaiz: mensajeriaCola.datosRaiz,
       fechaEncolado: mensajeriaCola.fechaEncolado,
       reintento: mensajeriaCola.reintento,
@@ -133,7 +137,9 @@ export interface MensajeParaEnviar {
   id: string;
   asunto: string | null;
   cuerpoHtml: string;
-  /** Datos raíz crudos — cada proveedor decide qué campo leer para el destinatario (ej. `datosRaiz.destinatario`). */
+  /** A dónde mandarlo — MENSAJERIA_COLA.DESTINO, ya resuelto por SP_MENSAJERIA_ENCOLAR. */
+  destino: string | null;
+  /** Datos raíz crudos, por si el proveedor necesita algo más que el destino. */
   datosRaiz: unknown;
   adjuntos: AdjuntoMensaje[];
 }
@@ -250,6 +256,7 @@ async function procesarUnMensaje(fila: FilaMensajeCola, parametrosAccion: unknow
     id: fila.id,
     asunto: asuntoResuelto.html ?? fila.asunto,
     cuerpoHtml: cuerpoResuelto.html,
+    destino: fila.destino,
     datosRaiz: fila.datosRaiz,
     adjuntos,
   };
