@@ -2,7 +2,7 @@
 
 ## Estado
 
-Aceptada — diseño cerrado, implementación pendiente (ver `domain/procesos.md`).
+Aceptada — implementada (ver `domain/procesos.md`).
 
 ## Contexto
 
@@ -50,4 +50,9 @@ El reintento con backoff (reintentar en `X` minutos, por fuera de la corrida ofi
 - La ejecución real de cada paso (y su commit) vive en PL/pgSQL, dentro de una `PROCEDURE` (no una `FUNCTION` — necesita controlar sus propias transacciones para hacer commit paso a paso).
 - Hace falta un barrido de filas `procesando` huérfanas (Postgres se cae a mitad de una ejecución) — cuenta como intento fallido contra `REINTENTOS_MAX`, no es un reintento gratis.
 - `cron.use_background_workers = on` y el dimensionamiento de `cron.max_running_jobs`/`max_worker_processes` pasan a ser parte del checklist de setup de cada instalación nueva.
-- Ningún cambio de código todavía — esta ADR y `domain/procesos.md` documentan el diseño acordado.
+
+## Revisión — implementación real
+
+Al implementar, `pg_cron` resultó NO estar disponible en la imagen `postgres:17-alpine` usada por este proyecto en local (`docker-compose.yml`) — la premisa de portabilidad de la ADR (managed Postgres: RDS/Aurora/Cloud SQL/Supabase) no cubre un Postgres autohosteado en Docker sin la extensión instalada. Se resolvió agregando `docker/postgres/Dockerfile`, que compila `pg_cron` desde el código fuente contra la misma imagen (evita mismatch de ABI contra el paquete apk de Alpine, que además solo existe en su repo `edge`) — con `shared_preload_libraries`/`cron.database_name`/`cron.use_background_workers` forzados vía `command:` en `docker-compose.yml` (necesarios en un volumen ya inicializado, donde el `.conf.sample` de la imagen no aplica). Ver `domain/procesos.md` para el detalle completo, incluida una restricción real de PL/pgSQL encontrada en el camino (`COMMIT` dentro de un bloque `BEGIN/EXCEPTION/END` — no permitido, hay que sacarlo afuera).
+
+Implementado completo: las 4 tablas, `fn_cron_matches` (matching de cron sin nombres de mes/día ni la regla POSIX día-mes-OR-día-semana — no hacían falta para los horarios reales de este proyecto), el evaluador + 3 ejecutores + barrido de huérfanas registrados en `pg_cron`, y el ABM `/dashboard/procesos`. Verificado en vivo invocando las SPs directamente (sin esperar el tick de `pg_cron`): proceso de 2 pasos exitoso, proceso con paso que falla + reintento correcto, matching de cron contra 8 expresiones distintas, y barrido de huérfanas marcando error + generando reintento.

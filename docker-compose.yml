@@ -1,11 +1,19 @@
 services:
   postgres:
-    image: postgres:17-alpine
+    build:
+      context: ./docker/postgres
+      args:
+        POSTGRES_VERSION: "17"
     restart: unless-stopped
     environment:
       POSTGRES_USER: valgian
       POSTGRES_PASSWORD: valgian
       POSTGRES_DB: valgian_crm
+    # shared_preload_libraries es un parámetro de arranque — el .conf.sample
+    # de la imagen (docker/postgres/Dockerfile) solo aplica en un initdb
+    # fresco, no en un volumen ya inicializado. Se fuerza acá para que
+    # aplique sin importar el estado del volumen (ver ADR 0015).
+    command: postgres -c shared_preload_libraries=pg_cron -c cron.database_name=valgian_crm -c cron.use_background_workers=on
     ports:
       - "5432:5432"
     volumes:

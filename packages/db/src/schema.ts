@@ -844,3 +844,102 @@ export const mensajeriaColaAdjuntos = pgTable("MENSAJERIA_COLA_ADJUNTOS", {
   idMensajeriaCola: uuid("ID_MENSAJERIA_COLA").references(() => mensajeriaCola.id),
   idArchivoAdjunto: uuid("ID_ARCHIVO_ADJUNTO").references(() => archivosAdjuntos.id),
 });
+
+/**
+ * Procesos: scheduler de tareas periódicas sobre pg_cron (no Node) — ver ADR
+ * 0015, domain/procesos.md. Cada PROCESO corre según CRON, dividido en PASOS
+ * ordenados (SQL de confianza, dev-only, mismo modelo que ACCIONES.COMANDO,
+ * ADR 0009), con auditoría completa y reintento automático retomando desde el
+ * paso que falló.
+ */
+
+export const procesos = pgTable(
+  "PROCESOS",
+  {
+    id: uuid("ID").primaryKey().defaultRandom(),
+    codigo: text("CODIGO").notNull(),
+    nombre: text("NOMBRE").notNull(),
+    descripcion: text("DESCRIPCION"),
+    // Expresión cron completa (ej. '0 1 * * *') — evaluada contra cron.timezone
+    // de esta instalación (config de infraestructura, no columna, ver ADR 0015).
+    cron: text("CRON").notNull(),
+    activo: boolean("ACTIVO").default(true),
+    // Cada cuánto reintentar tras un fallo — null = no reintenta.
+    reintentoMinutos: integer("REINTENTO_MINUTOS"),
+    // Tope de reintentos antes de darse por vencido — agotarlo NO desactiva el
+    // PROCESO, la próxima corrida oficial por CRON arranca de cero igual.
+    reintentosMax: integer("REINTENTOS_MAX"),
+  },
+  (table) => [uniqueIndex("PROCESOS_CODIGO_UNIQUE").on(table.codigo)],
+);
+
+export const procesosPasos = pgTable("PROCESOS_PASOS", {
+  id: uuid("ID").primaryKey().defaultRandom(),
+  idProceso: uuid("ID_PROCESO").references(() => procesos.id),
+  orden: integer("ORDEN").notNull(),
+  // Identifica el paso en logs/errores — no es un CODIGO único global.
+  nombre: text("NOMBRE").notNull(),
+  // SQL de confianza (ADR 0009), mismo modelo que ACCIONES.COMANDO — dev-only,
+  // el ABM de PROCESOS no toca esta tabla.
+  comando: text("COMANDO").notNull(),
+  // Máximo esperado para ESTE paso puntual (no un valor global del PROCESO) —
+  // usado por el barrido de huérfanas.
+  timeoutMinutos: integer("TIMEOUT_MINUTOS"),
+});
+
+/**
+ * Auditoría Y cola de disparo a la vez — una fila es tanto "esto hay que
+ * correr" como "esto se corrió, así salió". Cubre corridas oficiales,
+ * reintentos y disparos manuales por igual (distinguidos por ORIGEN).
+ */
+export const procesosEjecuciones = pgTable(
+  "PROCESOS_EJECUCIONES",
+  {
+    id: uuid("ID").primaryKey().defaultRandom(),
+    idProceso: uuid("ID_PROCESO").references(() => procesos.id),
+    fechaProgramada: timestamp("FECHA_PROGRAMADA", { withTimezone: true }).notNull(),
+    numeroIntento: integer("NUMERO_INTENTO").default(1),
+    // Si es reintento, la ejecución que falló.
+    idEjecucionOrigen: uuid("ID_EJECUCION_ORIGEN").references((): AnyPgColumn => procesosEjecuciones.id),
+    // 'pendiente' / 'procesando' / 'completado' / 'error'
+    estado: text("ESTADO").notNull().default("pendiente"),
+    // Arranque de TODA la ejecución.
+    fechaInicio: timestamp("FECHA_INICIO", { withTimezone: true }),
+    // Arranque del PASO actualmente en curso — distinto de FECHA_INICIO; es lo
+    // que compara el barrido de huérfanas contra PROCESOS_PASOS.TIMEOUT_MINUTOS.
+    fechaInicioPaso: timestamp("FECHA_INICIO_PASO", { withTimezone: true }),
+    fechaFin: timestamp("FECHA_FIN", { withTimezone: true }),
+    error: text("ERROR"),
+    // Hasta dónde llegó bien.
+    idUltimoPasoOk: uuid("ID_ULTIMO_PASO_OK").references(() => procesosPasos.id),
+    // Cuál rompió (si ESTADO='error' y se llegó a capturar la excepción).
+    idPasoError: uuid("ID_PASO_ERROR").references(() => procesosPasos.id),
+    // Desde qué paso arranca ESTA ejecución — null = desde el primero.
+    idPasoDesde: uuid("ID_PASO_DESDE").references(() => procesosPasos.id),
+    // 'cron' / 'manual' / 'reintento'
+    origen: text("ORIGEN").notNull(),
+    // Quién lo disparó, si ORIGEN='manual'.
+    idUsuarioDisparo: uuid("ID_USUARIO_DISPARO").references(() => usuarios.id),
+  },
+  (table) => [
+    // Dedup: aunque haya varios ejecutores en paralelo y el evaluador corra en
+    // distintos ticks, nunca se duplica un disparo para el mismo instante programado.
+    uniqueIndex("PROCESOS_EJECUCIONES_PROCESO_FECHA_UNIQUE").on(table.idProceso, table.fechaProgramada),
+  ],
+);
+
+/**
+ * Historial detallado, un registro por cada INTENTO de cada paso dentro de una
+ * ejecución — a diferencia de PROCESOS_EJECUCIONES (que solo guarda el ÚLTIMO
+ * puntero de progreso), esta tabla da la línea de tiempo completa.
+ */
+export const procesosEjecucionesPasos = pgTable("PROCESOS_EJECUCIONES_PASOS", {
+  id: uuid("ID").primaryKey().defaultRandom(),
+  idEjecucion: uuid("ID_EJECUCION").references(() => procesosEjecuciones.id),
+  idPaso: uuid("ID_PASO").references(() => procesosPasos.id),
+  fechaInicio: timestamp("FECHA_INICIO", { withTimezone: true }).notNull(),
+  fechaFin: timestamp("FECHA_FIN", { withTimezone: true }),
+  // 'procesando' / 'completado' / 'error'
+  estado: text("ESTADO").notNull(),
+  error: text("ERROR"),
+});

@@ -44,6 +44,7 @@ const RUTA_POR_CODIGO: Record<string, string> = {
   monedas: "/dashboard/monedas",
   mensajeria_plantillas: "/dashboard/mensajeria-plantillas",
   acciones_externas: "/dashboard/acciones-externas",
+  procesos: "/dashboard/procesos",
 };
 
 export function AppSidebar({

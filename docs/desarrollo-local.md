@@ -33,6 +33,8 @@ pnpm db:migrate
 pnpm db:seed
 ```
 
+`docker compose up -d` construye la imagen de Postgres la primera vez (no es la oficial de Docker Hub a secas — `docker/postgres/Dockerfile` le compila `pg_cron` encima, ver ADR 0015/`domain/procesos.md`) — tarda más que un simple `pull` esa primera corrida. Si ya tenías el contenedor levantado de ANTES de que existiera ese Dockerfile, `docker compose up -d` no lo reconstruye solo — correr `docker compose build postgres && docker compose up -d` una vez (no borra datos, mismo volumen).
+
 El seed crea un usuario administrador: **`admin` / `admin123`** (solo para desarrollo local, no tiene ninguna sensibilidad real).
 
 ### Los seeds

@@ -23,6 +23,8 @@ import {
   categoriasTiposTramite,
   tiposTramite,
   tiposCampos,
+  procesos,
+  procesosPasos,
 } from "@valgian/db";
 
 /**
@@ -211,6 +213,52 @@ async function ensureTipoCampo(codigo: string, nombre: string) {
   if (existente) return existente;
 
   const [creado] = await db.insert(tiposCampos).values({ codigo, nombre }).returning();
+  return creado;
+}
+
+async function ensureProceso(params: {
+  codigo: string;
+  nombre: string;
+  descripcion?: string;
+  cron: string;
+  reintentoMinutos?: number;
+  reintentosMax?: number;
+}) {
+  const [existente] = await db.select().from(procesos).where(eq(procesos.codigo, params.codigo));
+  if (existente) return existente;
+
+  const [creado] = await db
+    .insert(procesos)
+    .values({
+      codigo: params.codigo,
+      nombre: params.nombre,
+      descripcion: params.descripcion ?? null,
+      cron: params.cron,
+      activo: true,
+      reintentoMinutos: params.reintentoMinutos ?? null,
+      reintentosMax: params.reintentosMax ?? null,
+    })
+    .returning();
+  return creado;
+}
+
+async function ensureProcesoPaso(params: { idProceso: string; orden: number; nombre: string; comando: string; timeoutMinutos?: number }) {
+  const [existente] = await db
+    .select()
+    .from(procesosPasos)
+    .where(and(eq(procesosPasos.idProceso, params.idProceso), eq(procesosPasos.orden, params.orden)));
+  if (existente) return existente;
+
+  const [creado] = await db
+    .insert(procesosPasos)
+    .values({
+      idProceso: params.idProceso,
+      orden: params.orden,
+      nombre: params.nombre,
+      comando: params.comando,
+      timeoutMinutos: params.timeoutMinutos ?? null,
+    })
+    .returning();
   return creado;
 }
 
@@ -601,6 +649,27 @@ LEFT JOIN "ACCIONES_EXTERNAS" AE ON AE."ID" = AEC."ID_ACCION_EXTERNA"
   await ensureReporteFiltro(reporteAccionesExternas.id, filtroFechaAccionExterna.id, "fecha_encolado", 2);
 
   await ensureReportePerfil(reporteAccionesExternas.id, perfilAdmin.id);
+
+  // --- Proceso de ejemplo (genérico, útil para cualquier instalación): ---
+  // limpieza diaria de tokens de sesión vencidos. USUARIOS.TOKEN/TOKEN_EXPIRACION
+  // ya se ignoran una vez vencidos (getSessionUser filtra por TOKEN_EXPIRACION
+  // > now()), así que esto no es necesario para el login — es housekeeping,
+  // para no dejar tokens viejos dando vueltas en la tabla indefinidamente.
+  const procesoLimpiezaTokens = await ensureProceso({
+    codigo: "limpieza_tokens_vencidos",
+    nombre: "Limpieza de tokens de sesión vencidos",
+    descripcion: "Todos los días a las 3am, limpia TOKEN/TOKEN_EXPIRACION de USUARIOS cuyo token ya venció.",
+    cron: "0 3 * * *",
+    reintentoMinutos: 15,
+    reintentosMax: 3,
+  });
+  await ensureProcesoPaso({
+    idProceso: procesoLimpiezaTokens.id,
+    orden: 1,
+    nombre: "Limpiar tokens vencidos",
+    comando: `UPDATE "USUARIOS" SET "TOKEN" = NULL, "TOKEN_EXPIRACION" = NULL WHERE "TOKEN_EXPIRACION" IS NOT NULL AND "TOKEN_EXPIRACION" < now()`,
+    timeoutMinutos: 5,
+  });
 
   console.log("Seed de configuración modelo aplicado (idempotente).");
 }

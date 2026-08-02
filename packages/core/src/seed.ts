@@ -284,6 +284,7 @@ async function main() {
   const herramientaMonedas = await ensureHerramienta("monedas", "Monedas", "monedas.gestionar");
   const herramientaMensajeriaPlantillas = await ensureHerramienta("mensajeria_plantillas", "Plantillas de Mensajería", "mensajeria_plantillas.gestionar");
   const herramientaAccionesExternas = await ensureHerramienta("acciones_externas", "Acciones Externas", "acciones_externas.gestionar");
+  const herramientaProcesos = await ensureHerramienta("procesos", "Procesos", "procesos.gestionar");
   // Estas no se navegan desde el sidebar — se cargan embebidas dentro de un
   // LAYOUTS_LEGAJO dentro del modal de legajo abierto desde Bandejas.
   const herramientaLegajoDatos = await ensureHerramienta("LEGAJO_DAT_1", "Datos de Legajo", "legajo_dat_1.gestionar");
@@ -316,6 +317,7 @@ async function main() {
     herramientaMonedas,
     herramientaMensajeriaPlantillas,
     herramientaAccionesExternas,
+    herramientaProcesos,
     herramientaLegajoDatos,
     herramientaLegajoClientes,
     herramientaGestionEntidad,
@@ -400,6 +402,7 @@ async function main() {
   await ensureMenuOpcion(menuConfiguracion.id, herramientaMonedas.id, "monedas", "Monedas", "icon.monedas", 14);
   await ensureMenuOpcion(menuConfiguracion.id, herramientaMensajeriaPlantillas.id, "mensajeria_plantillas", "Plantillas de Mensajería", "icon.mensajeriaPlantillas", 15);
   await ensureMenuOpcion(menuConfiguracion.id, herramientaAccionesExternas.id, "acciones_externas", "Acciones Externas", "icon.accionesExternas", 16);
+  await ensureMenuOpcion(menuConfiguracion.id, herramientaProcesos.id, "procesos", "Procesos", "icon.procesos", 17);
   await ensureMenuOpcion(menuHerramientas.id, herramientaBandejas.id, "bandejas", "Bandejas", "icon.bandejas", 1);
   await ensureMenuOpcion(menuHerramientas.id, herramientaReportes.id, "reportes", "Reportes", "icon.reportes", 2);
 

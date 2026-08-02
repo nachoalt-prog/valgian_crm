@@ -1,6 +1,6 @@
 # Dominio — Procesos
 
-> **Estado: diseñado, pendiente de implementación.** Este documento describe el diseño acordado (ver ADR 0015), no código ya construido — a diferencia del resto de `domain/`, que describe el sistema tal como es hoy. Se actualiza este encabezado en cuanto se implemente.
+> **Estado: implementado.** Ver ADR 0015 para el razonamiento de diseño completo — este documento ya describe el sistema tal como es hoy, no un plan.
 
 Procesos automáticos programados (tipo Scheduler): cada `PROCESO` corre según un horario (`CRON`), se divide en `PASOS` ordenados, deja auditoría completa de cada corrida, y reintenta automáticamente ante fallo — retomando desde el paso que falló, no desde el principio. El disparo corre en `pg_cron`, no en la aplicación — ver ADR 0015 para el porqué.
 
@@ -127,17 +127,24 @@ Un `PASO` cuyo `COMANDO` necesita algo que Postgres no puede hacer solo (mandar 
 
 ## ABM
 
-- **`/dashboard/procesos`** (`HERRAMIENTAS.CODIGO = 'procesos'`): listado de `PROCESOS`, edición de `CODIGO`/`NOMBRE`/`DESCRIPCION`/`ACTIVO`/`CRON`/`REINTENTO_MINUTOS`/`REINTENTOS_MAX`, botón "Correr ahora" por proceso. **No edita `PROCESOS_PASOS`** — eso es dev-only.
+- **`/dashboard/procesos`** (`HERRAMIENTAS.CODIGO = 'procesos'`, `packages/core/src/procesos.ts`): listado de `PROCESOS`, alta/edición de `CODIGO`/`NOMBRE`/`DESCRIPCION`/`ACTIVO`/`CRON`/`REINTENTO_MINUTOS`/`REINTENTOS_MAX`, botón "Correr ahora" por proceso (`dispararProcesoManual` — `INSERT` directo en `PROCESOS_EJECUCIONES` con `ORIGEN='manual'`). **No edita `PROCESOS_PASOS`** — eso es dev-only, se carga por seed/migración (`ensureProceso`/`ensureProcesoPaso` en `packages/core/src/seed-config.ts`). Borrado bloqueado si el proceso tiene `PROCESOS_EJECUCIONES` (audit trail).
 
-## Pendiente de implementación
+## Dónde vive cada pieza
 
-- Migración Drizzle de las 4 tablas (`PROCESOS`, `PROCESOS_PASOS`, `PROCESOS_EJECUCIONES`, `PROCESOS_EJECUCIONES_PASOS`).
-- Función PL/pgSQL de matching de expresiones cron.
-- SP evaluadora + SP(s) ejecutora(s), registro de 1 job evaluador + N jobs ejecutores en `pg_cron`, con `cron.use_background_workers = on`.
-- Barrido de huérfanas (timeout por paso).
-- Herramienta `/dashboard/procesos`.
-- A futuro: `REPORTE` de auditoría sobre `PROCESOS_EJECUCIONES` (reusando el módulo de Reportes, ver `domain/reportes.md`).
+- Schema: `packages/db/src/schema.ts` (`procesos`, `procesosPasos`, `procesosEjecuciones`, `procesosEjecucionesPasos`).
+- SQL manual (ver `packages/db/sql/README.md`): `0011_fn_cron_matches.sql` (matching de cron), `0012_sp_evaluar_procesos.sql`, `0013_sp_ejecutar_un_proceso_pendiente.sql`, `0014_sp_barrer_procesos_huerfanos.sql`, `0015_pg_cron_jobs_procesos.sql` (registro de los jobs).
+- `pg_cron` no viene con la imagen oficial `postgres:17-alpine` — se compila desde el código fuente en `docker/postgres/Dockerfile` (ver nota abajo). Cualquier instalación nueva de este repo necesita esa imagen, no la oficial de Docker Hub a secas.
+- ABM: `packages/core/src/procesos.ts`, `apps/web/src/app/dashboard/procesos/`, `apps/web/src/components/procesos-tool.tsx` / `proceso-dialog.tsx`.
+- Proceso de ejemplo, genérico y útil para cualquier instalación (no es dato de demo ficticio): `limpieza_tokens_vencidos` (`0 3 * * *`, limpia `USUARIOS.TOKEN`/`TOKEN_EXPIRACION` vencidos — housekeeping, no hace falta para que el login funcione, `getSessionUser` ya filtra por vencimiento).
 
-`ACCIONES_EXTERNAS`/`ACCIONES_EXTERNAS_COLA` ya están implementadas (ver `domain/acciones-externas.md` / ADR 0016) — Procesos las va a usar tal cual apenas exista, sin tocarlas.
+### `pg_cron` en Docker — compilado desde el código fuente
+
+`postgres:17-alpine` no trae `pg_cron`, y el paquete `postgresql-pg_cron` de Alpine solo existe en el repositorio `edge` — instalarlo así arriesga un mismatch de ABI contra los binarios de Postgres que trae la imagen oficial (no es el mismo build). `docker/postgres/Dockerfile` compila `pg_cron` desde su repo (`citusdata/pg_cron`) contra el `pg_config` de esa MISMA imagen, evitando el problema. Un detalle no obvio: por default el build de `pg_cron` intenta generar bitcode JIT (requiere `clang`/`llvm` en la versión EXACTA con la que se compiló Postgres — algo irrelevant para una extensión que no ejecuta queries) — se desactiva a mano (`with_llvm = no` en `Makefile.global`) en vez de perseguir esa compatibilidad, frágil de sostener contra los paquetes que Alpine va rotando.
+
+`shared_preload_libraries`/`cron.database_name`/`cron.use_background_workers` se fuerzan vía `command:` en `docker-compose.yml` (no alcanza con el `.conf.sample` de la imagen: solo aplica en un `initdb` fresco, no en un volumen ya inicializado). Necesita reiniciar el contenedor de Postgres para tomar efecto — no borra datos, mismo volumen.
+
+### Gotcha real de PL/pgSQL: `COMMIT` dentro de `BEGIN ... EXCEPTION ... END`
+
+`sp_ejecutar_un_proceso_pendiente` necesita comitear cada paso por separado (ver "Ejecución paso a paso" arriba) Y capturar la excepción si el paso falla — la primera versión puso el `COMMIT` DENTRO del bloque `BEGIN ... EXCEPTION WHEN OTHERS ... END` que envuelve cada paso, y rompía con `cannot commit while a subtransaction is active` — **incluso en el caso sin ningún error**. Motivo: en PL/pgSQL, un bloque `BEGIN ... EXCEPTION ... END` crea una subtransacción implícita (un savepoint) durante toda su ejecución, y Postgres no permite comitear la transacción de nivel superior mientras esa subtransacción sigue activa. Se corrige sacando el `COMMIT` FUERA del bloque (después del `END;`, todavía dentro del loop) — el bloque `BEGIN/EXCEPTION/END` solo hace el trabajo + decide si hubo error, nunca controla la transacción él mismo.
 
 Ver ADR 0015 para el razonamiento completo de las decisiones de diseño.

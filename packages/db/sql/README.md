@@ -22,3 +22,8 @@ psql "$DATABASE_URL" -f sql/0001_trigger_clientes_titular.sql
 - `0008_sp_mensajeria_encolar.sql`: `PROCEDURE` que encola un mensaje (mail/SMS/WhatsApp/...) + sus adjuntos, y opcionalmente dispara la cola genérica de Acciones Externas (ver `domain/acciones-externas.md`, sección Mensajería).
 - `0009_sp_mensajeria_encolar_destino.sql`: agrega el parámetro `p_destino` a `sp_mensajeria_encolar` (`DROP` + recreate, `CREATE OR REPLACE` no alcanza cuando cambia la firma).
 - `0010_trigger_emails_principal.sql`: trigger que garantiza que `EMAILS.PRINCIPAL = true` sea único por `ID_CLIENTE` (mismo criterio que `0001_trigger_clientes_titular.sql`).
+- `0011_fn_cron_matches.sql`: funciones que evalúan si una expresión cron matchea un timestamp — motor de Procesos (ver `domain/procesos.md`).
+- `0012_sp_evaluar_procesos.sql`: `PROCEDURE` del job evaluador de `pg_cron` (encola `PROCESOS_EJECUCIONES` pendientes).
+- `0013_sp_ejecutar_un_proceso_pendiente.sql`: `PROCEDURE` de los N jobs ejecutores de `pg_cron` (reclama y corre una ejecución pendiente, paso a paso).
+- `0014_sp_barrer_procesos_huerfanos.sql`: `PROCEDURE` del barrido de ejecuciones `procesando` cuyo paso en curso superó su timeout (caída de Postgres a mitad de camino).
+- `0015_pg_cron_jobs_procesos.sql`: registro de los jobs de `pg_cron` (1 evaluador + 3 ejecutores + 1 barrido de huérfanas) — a diferencia de los anteriores, esto es config/infraestructura (`cron.schedule` con nombre, idempotente), no DDL.
