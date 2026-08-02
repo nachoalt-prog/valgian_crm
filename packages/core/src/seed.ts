@@ -409,9 +409,9 @@ async function main() {
   await ensureMenuOpcion(menuConfiguracion.id, herramientaMonedas.id, "monedas", "Monedas", "icon.monedas", 14);
   await ensureMenuOpcion(menuConfiguracion.id, herramientaMensajeriaPlantillas.id, "mensajeria_plantillas", "Plantillas de Mensajería", "icon.mensajeriaPlantillas", 15);
   await ensureMenuOpcion(menuConfiguracion.id, herramientaAccionesExternas.id, "acciones_externas", "Acciones Externas", "icon.accionesExternas", 16);
-  await ensureMenuOpcion(menuConfiguracion.id, herramientaProcesos.id, "procesos", "Procesos", "icon.procesos", 17);
   await ensureMenuOpcion(menuHerramientas.id, herramientaBandejas.id, "bandejas", "Bandejas", "icon.bandejas", 1);
   await ensureMenuOpcion(menuHerramientas.id, herramientaReportes.id, "reportes", "Reportes", "icon.reportes", 2);
+  await ensureMenuOpcion(menuHerramientas.id, herramientaProcesos.id, "procesos", "Procesos", "icon.procesos", 3);
 
   await ensureInterfazMenu(interfazDefault.id, menuPrincipal.id);
   await ensureInterfazMenu(interfazDefault.id, menuConfiguracion.id);
