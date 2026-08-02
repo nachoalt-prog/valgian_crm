@@ -138,17 +138,23 @@ export function ReporteResultados({
           </Button>
         </div>
 
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-muted-foreground">Página {pagina + 1}</span>
-          <div className="flex items-center gap-1">
-            <Button size="icon" variant="ghost" disabled={pagina === 0} onClick={onPrevPage} className="size-7">
-              <ChevronLeft className="size-3.5" />
-            </Button>
-            <Button size="icon" variant="ghost" disabled={!hayMas} onClick={onNextPage} className="size-7">
-              <ChevronRight className="size-3.5" />
-            </Button>
+        {(pagina > 0 || hayMas) && (
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-muted-foreground">Página {pagina + 1}</span>
+            <div className="flex items-center gap-1">
+              {pagina > 0 && (
+                <Button size="icon" variant="ghost" onClick={onPrevPage} className="size-7">
+                  <ChevronLeft className="size-3.5" />
+                </Button>
+              )}
+              {hayMas && (
+                <Button size="icon" variant="ghost" onClick={onNextPage} className="size-7">
+                  <ChevronRight className="size-3.5" />
+                </Button>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

@@ -15,8 +15,7 @@ interface BandejasPanelProps {
 export function BandejasPanel({ bandejas, selectedBandejaId, onSelectBandeja, collapsed, onToggleCollapsed }: BandejasPanelProps) {
   if (collapsed) {
     return (
-      <section className="flex h-full flex-col items-center gap-2 bg-card/50 py-4">
-        <Inbox className="size-4 text-primary" />
+      <section className="h-full bg-card/50">
         <Tooltip>
           <TooltipTrigger
             render={
@@ -24,9 +23,12 @@ export function BandejasPanel({ bandejas, selectedBandejaId, onSelectBandeja, co
                 type="button"
                 onClick={onToggleCollapsed}
                 aria-label="Expandir bandejas"
-                className="size-7 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                className="relative flex h-full w-full items-start justify-center py-4 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
               >
-                <ChevronRight className="size-4" />
+                <Inbox className="size-4 text-primary" />
+                <span className="absolute inset-0 flex items-center justify-center">
+                  <ChevronRight className="size-4" />
+                </span>
               </button>
             }
           />

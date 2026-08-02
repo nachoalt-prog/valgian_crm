@@ -22,8 +22,7 @@ export function ReportesPanel({ reportes, selectedReporteId, onSelectReporte, co
 
   if (collapsed) {
     return (
-      <section className="flex h-full flex-col items-center gap-2 bg-card/50 py-4">
-        <BarChart3 className="size-4 text-primary" />
+      <section className="h-full bg-card/50">
         <Tooltip>
           <TooltipTrigger
             render={
@@ -31,9 +30,12 @@ export function ReportesPanel({ reportes, selectedReporteId, onSelectReporte, co
                 type="button"
                 onClick={onToggleCollapsed}
                 aria-label="Expandir reportes"
-                className="size-7 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                className="relative flex h-full w-full items-start justify-center py-4 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
               >
-                <ChevronRight className="size-4" />
+                <BarChart3 className="size-4 text-primary" />
+                <span className="absolute inset-0 flex items-center justify-center">
+                  <ChevronRight className="size-4" />
+                </span>
               </button>
             }
           />
