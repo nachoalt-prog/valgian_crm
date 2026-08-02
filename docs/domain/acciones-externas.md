@@ -213,7 +213,17 @@ Cada proveedor solo escribe la parte que lo distingue de los demás — hoy, `en
 
 Seed propio del módulo (`packages/modules/mensajeria-smtp/src/seed.ts`, script `seed` del paquete): crea la fila `ACCIONES_EXTERNAS` (`CODIGO='mensajeria_smtp'`) con `PARAMETROS` tomados de `.env` si están (`SMTP_HOST`/`SMTP_PORT`/`SMTP_USER`/`SMTP_PASS`/`SMTP_REMITENTE`) — así el secreto real nunca queda hardcodeado en el seed, pero sigue habiendo un lugar consistente (`.env` local) para que un desarrollador cargue sus propias credenciales de prueba (ej. Brevo, ver brainstorm original de este sprint). Sin esas variables, la fila se crea con `PARAMETROS=null` y no manda nada hasta que alguien las cargue.
 
-Verificado en vivo con un SMTP de prueba real (Ethereal, vía `nodemailer.createTestAccount()`) — encolar → despacho casi instantáneo vía `NOTIFY` → envío real exitoso → `PLACEHOLDERS` con el mapa resuelto → `DATOS_RAIZ` intacto. También se verificó el reintento: un mensaje con un placeholder roto falló, quedó elegible, y en la siguiente pasada del barrido (tras arreglar el placeholder) se reintentó y mandó bien — `REINTENTO` incrementado en la misma fila de `ACCIONES_EXTERNAS_COLA`, sin fila nueva. Verificado también con Brevo real (destinatario real, `DESTINO` resuelto desde `EMAILS.PRINCIPAL` de un cliente vía una acción del motor de estados) — la cuenta nueva de Brevo rechazó el primer intento (`525 Unauthorized IP address`, una medida de seguridad de Brevo — hay que autorizar la IP desde su panel, no es un bug de este código).
+**Cargar credenciales de prueba SIN pasar por `.env`/seed** (ej. para probar con una cuenta SMTP real en un entorno de desarrollo puntual, sin dejar el secreto commiteado en ningún lado): un `UPDATE` directo, a mano, sobre la fila existente —
+
+```sql
+UPDATE "ACCIONES_EXTERNAS"
+SET "PARAMETROS" = '{"host":"...", "port":587, "secure":false, "usuario":"...", "contrasena":"...", "remitente":"..."}'::jsonb
+WHERE "CODIGO" = 'mensajeria_smtp';
+```
+
+(o el mismo `UPDATE` vía Drizzle desde un script `scratch-*.ts` descartable, nunca commiteado — ver convención de scripts scratch de este proyecto). El entorno de desarrollo actual tiene cargadas así credenciales de Brevo reales — no están en ningún seed ni archivo versionado, viven solo en la fila de la base.
+
+Verificado en vivo con un SMTP de prueba real (Ethereal, vía `nodemailer.createTestAccount()`) — encolar → despacho casi instantáneo vía `NOTIFY` → envío real exitoso → `PLACEHOLDERS` con el mapa resuelto → `DATOS_RAIZ` intacto. También se verificó el reintento: un mensaje con un placeholder roto falló, quedó elegible, y en la siguiente pasada del barrido (tras arreglar el placeholder) se reintentó y mandó bien — `REINTENTO` incrementado en la misma fila de `ACCIONES_EXTERNAS_COLA`, sin fila nueva. Probado con Brevo real (destinatario real, `DESTINO` resuelto desde `EMAILS.PRINCIPAL` de un cliente vía una acción del motor de estados) — dos rechazos consecutivos, ninguno relacionado con este código: primero `525 Unauthorized IP address` (hay que autorizar la IP desde el panel de Brevo), después de autorizarla, `502 Your SMTP account is not yet activated` (la cuenta Brevo en sí todavía no está activada — hay que contactar a Brevo o esperar la activación). Pendiente de reintentar una vez que la cuenta esté activa.
 
 ### EMAILS — casillas de un cliente (core, no depende de ningún módulo de mensajería)
 
@@ -233,9 +243,18 @@ Reusa el motor de Reportes igual que "Cotizaciones" — cero código nuevo salvo
 
 **Columna "adjuntos" (nueva en el motor de Reportes, ADR 0014 ya preveía que el vocabulario de tipos iba a crecer)**: el valor de la columna es el `ID` de la fila dueña de los adjuntos (acá, `MENSAJERIA_COLA.ID`, aliaseado dos veces en la query — una vez como `id` para la key de React, otra como `adjuntos_id` para esta columna puntual). `formatearValor` (`apps/web/src/lib/resultados-formato.tsx`) renderiza un botón ícono-only que dispara un callback `onVerAdjuntos`, manejado por `ReportesTool`, que abre `MensajeriaColaAdjuntosDialog` — **estrictamente de solo lectura** (lista nombre + link de descarga, nada de cargar/reemplazar/borrar), a diferencia de `ArchivoAdjuntoDialog`.
 
+### ABM "Acciones Externas" (`/dashboard/acciones-externas`)
+
+CRUD estándar sobre `ACCIONES_EXTERNAS` (`packages/core/src/acciones-externas-admin.ts`, calcado del ABM de Monedas) — `CODIGO`/`NOMBRE`/`COMPONENTE` (texto libre, tiene que coincidir con el nombre exacto con el que un módulo se registra vía `registrarHandlerAccionExterna`), `ACTIVO`/`INMEDIATO` (switches), `REINTENTOS_MAX`/`REINTENTOS_MARGEN` (numéricos), `PARAMETROS` (textarea JSON libre — acá es donde un admin carga credenciales de un proveedor real, ej. SMTP, sin pasar por `.env` ni por un script; **queda visible en texto plano para cualquiera con acceso a esta herramienta**, coherente con que el diseño original ya asumía que `PARAMETROS` vive en la base, no en un secreto manager). `TOKEN`/`TOKEN_EXPIRACION` no son editables desde acá — reservados para un `COMPONENTE` futuro basado en OAuth que los administre él mismo. Borrado bloqueado si hay filas de `ACCIONES_EXTERNAS_COLA` o `MENSAJERIA_COLA` que la referencian.
+
+### Reporte "Acciones Externas"
+
+Reusa el motor de Reportes, mismo patrón que "Cotizaciones"/"Mensajería". Columnas: Acción, Resultado (`badge`), Detalle, Reintento, Tiempo (ms), Fecha (`tipo: "fecha_hora"`, ver abajo). Filtros: Acción Externa (`select`) y Fecha de Encolado (`fecha_rango`).
+
+**Columna `tipo: "fecha_hora"` (nueva en el motor de Reportes)**: `formatearValor` la muestra con hora y minutos (`toLocaleString`), a diferencia de `tipo: "fecha"` (solo fecha, `toLocaleDateString`) — se agregó como tipo aparte en vez de cambiar el comportamiento de `"fecha"` para no afectar a los reportes que ya la usan (Auditoría de Generaciones, Bandejas de legajos/cuentas). "Cotizaciones" también pasó a usar `"fecha_hora"` — con varias cotizaciones consultadas el mismo día, la hora es el dato que distingue una de otra.
+
 ## Pendiente
 
-- ABM/pantalla admin para `ACCIONES_EXTERNAS`/`MENSAJERIA_COLA` (más allá del reporte de solo lectura) — queda dev-seeded por ahora (mismo criterio que `ACCIONES.COMANDO`, ADR 0009).
 - Bootstrap genérico de módulos (`registrarModulo`, `apps/<client>/src/modules.ts`) — ya hay DOS módulos reales (`cotizaciones-argentina`, `mensajeria-smtp`), ambos registrados a mano en `instrumentation-node.ts`. Sigue sin construirse el mecanismo genérico de ADR 0012 — no bloqueó a ninguno de los dos, pero con un tercero probablemente valga la pena.
 - `INMEDIATO`: creado, sin ningún caller que lo interprete todavía (se activa cuando exista Procesos y algún `PASO` encole mensajes en lote).
 - Canales de mensajería adicionales (SMS, WhatsApp) — mismo contrato compartido (`procesarComponenteMensajeria`), solo falta el `EnviarUnMensaje` de cada proveedor.

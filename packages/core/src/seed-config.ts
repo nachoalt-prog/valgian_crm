@@ -496,7 +496,7 @@ JOIN "MONEDAS" M ON M."ID" = C."ID_MONEDA"
     { campo: "moneda", label: "Moneda" },
     { campo: "venta", label: "Valor Venta" },
     { campo: "compra", label: "Valor Compra" },
-    { campo: "fecha", label: "Fecha", tipo: "fecha" },
+    { campo: "fecha", label: "Fecha", tipo: "fecha_hora" },
   ];
 
   const reporteCotizaciones = await ensureReporte(
@@ -555,6 +555,52 @@ LEFT JOIN "MENSAJERIA_PLANTILLAS" MP ON MP."ID" = MC."ID_MENSAJERIA_PLANTILLA"
   await ensureReporteFiltro(reporteMensajeria.id, filtroFechaEncolado.id, "fecha_encolado", 2);
 
   await ensureReportePerfil(reporteMensajeria.id, perfilAdmin.id);
+
+  // --- Reporte de Acciones Externas (ACCIONES_EXTERNAS_COLA) ---
+
+  const filtroAccionExterna = await ensureFiltro(
+    "select_acciones_externas",
+    "Acción Externa",
+    "select",
+    `SELECT "ID" AS value, "NOMBRE" AS label FROM "ACCIONES_EXTERNAS" ORDER BY "NOMBRE"`,
+  );
+  const filtroFechaAccionExterna = await ensureFiltro("fecha_accion_externa", "Fecha de Encolado", "fecha_rango", null);
+
+  const REPORTE_ACCIONES_EXTERNAS_QUERY = `
+SELECT
+  AEC."ID" AS id,
+  AE."NOMBRE" AS accion,
+  AE."ID" AS accion_id,
+  CASE WHEN AEC."RESULTADO" IS NULL THEN 'Pendiente' WHEN AEC."RESULTADO" = 0 THEN 'Éxito' ELSE 'Error' END AS resultado,
+  AEC."RESULTADO_DESC" AS resultado_desc,
+  AEC."REINTENTO" AS reintento,
+  AEC."TIEMPO_CONEXION" AS tiempo_conexion,
+  AEC."FECHA_ENCOLADO" AS fecha_encolado
+FROM "ACCIONES_EXTERNAS_COLA" AEC
+LEFT JOIN "ACCIONES_EXTERNAS" AE ON AE."ID" = AEC."ID_ACCION_EXTERNA"
+`.trim();
+
+  const REPORTE_ACCIONES_EXTERNAS_COLUMNAS = [
+    { campo: "accion", label: "Acción" },
+    { campo: "resultado", label: "Resultado", tipo: "badge" },
+    { campo: "resultado_desc", label: "Detalle" },
+    { campo: "reintento", label: "Reintento" },
+    { campo: "tiempo_conexion", label: "Tiempo (ms)" },
+    { campo: "fecha_encolado", label: "Fecha", tipo: "fecha_hora" },
+  ];
+
+  const reporteAccionesExternas = await ensureReporte(
+    "acciones_externas_cola",
+    "Acciones Externas",
+    "Todos los disparos encolados (ACCIONES_EXTERNAS_COLA) — cotizaciones, mensajería o lo que sea —, con su resultado y reintentos.",
+    REPORTE_ACCIONES_EXTERNAS_QUERY,
+    REPORTE_ACCIONES_EXTERNAS_COLUMNAS,
+  );
+
+  await ensureReporteFiltro(reporteAccionesExternas.id, filtroAccionExterna.id, "accion_id", 1);
+  await ensureReporteFiltro(reporteAccionesExternas.id, filtroFechaAccionExterna.id, "fecha_encolado", 2);
+
+  await ensureReportePerfil(reporteAccionesExternas.id, perfilAdmin.id);
 
   console.log("Seed de configuración modelo aplicado (idempotente).");
 }

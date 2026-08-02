@@ -122,6 +122,31 @@
   --sidebar-border: oklch(0 0 0 / 10%);
 }
 
+/* Scroll de la barra lateral: fino y con el color del sitio, invisible salvo
+   al pasar el mouse (Firefox vía scrollbar-color, Chrome/Safari/Edge vía los
+   pseudo-elementos ::-webkit-scrollbar). */
+.sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+.sidebar-scroll:hover {
+  scrollbar-color: var(--sidebar-primary) transparent;
+}
+.sidebar-scroll::-webkit-scrollbar {
+  width: 5px;
+}
+.sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 9999px;
+  transition: background-color 0.2s ease;
+}
+.sidebar-scroll:hover::-webkit-scrollbar-thumb {
+  background-color: var(--sidebar-primary);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

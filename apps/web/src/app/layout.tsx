@@ -6,6 +6,7 @@ import { getTemaPorDefecto, getTemaPorInterfaz } from "@valgian/core";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { getCurrentSession } from "@/lib/current-user";
 import { THEME_COOKIE } from "@/lib/theme";
+import { INTERFAZ_COLORES_COOKIE, parseInterfazColoresCookie } from "@/lib/interfaz-colores";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -28,12 +29,17 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Antes de loguearse (o si el perfil no tiene interfaz asignada) se usa la
-  // interfaz "default". Después de loguearse, la del perfil real — ver
-  // domain/infraestructura.md ("Interfaz").
+  // Antes de loguearse (o si el perfil no tiene interfaz asignada): primero
+  // se intenta con los colores de la última sesión logueada en este navegador
+  // (INTERFAZ_COLORES_COOKIE — ver lib/interfaz-colores.ts), y si tampoco hay
+  // eso, recién ahí la interfaz "default". Después de loguearse, siempre la
+  // interfaz real del perfil — ver domain/infraestructura.md ("Interfaz").
+  const cookieStore = await cookies();
   const session = await getCurrentSession();
   const temaSesion = session?.perfil?.idInterfaz ? await getTemaPorInterfaz(session.perfil.idInterfaz) : null;
-  const tema = temaSesion ?? (await getTemaPorDefecto());
+  const coloresCookie = !temaSesion ? parseInterfazColoresCookie(cookieStore.get(INTERFAZ_COLORES_COOKIE)?.value) : null;
+  const tieneColoresCookie = !!(coloresCookie?.colorPrimario || coloresCookie?.colorSecundario);
+  const tema = temaSesion ?? (tieneColoresCookie ? coloresCookie : null) ?? (await getTemaPorDefecto());
 
   const overrides = [
     tema?.colorPrimario &&
@@ -46,7 +52,7 @@ export default async function RootLayout({
   // Sin cookie: se renderiza "dark" como default y el script de abajo lo
   // corrige antes del primer paint si el SO prefiere claro (sin flash porque
   // corre con estrategia beforeInteractive, antes de que el navegador pinte).
-  const themeCookie = (await cookies()).get(THEME_COOKIE)?.value;
+  const themeCookie = cookieStore.get(THEME_COOKIE)?.value;
   const temaClase = themeCookie === "light" ? "light" : "dark";
 
   return (

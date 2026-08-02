@@ -23,6 +23,7 @@ export function LoginForm() {
             name="username"
             type="text"
             autoComplete="username"
+            autoFocus
             required
             className="pl-9"
           />

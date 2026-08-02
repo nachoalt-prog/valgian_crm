@@ -153,8 +153,9 @@ Foto de perfil: `USUARIOS.AVATAR_PATH` guarda la ruta relativa del archivo dentr
 
 `INTERFAZ.FUENTE` selecciona un layout predefinido en código (no hay motor de renderizado dinámico configurable sin tocar código). `COLOR_PRIMARIO`/`COLOR_SECUNDARIO` permiten tematizar sin cambiar de layout. Un `PERFIL` apunta a una `INTERFAZ`; varios perfiles distintos pueden compartir la misma interfaz con permisos distintos entre sí.
 
-Qué interfaz se usa en cada momento:
-- **Antes de loguearse** (pantalla de login): no hay sesión todavía, así que se usa la `INTERFAZ` con `CODIGO = 'default'` como base.
+Qué interfaz se usa en cada momento (`COLOR_PRIMARIO`/`COLOR_SECUNDARIO` — el resto de `INTERFAZ`, ej. `IMAGEN_FONDO`, sigue usando siempre la `default` antes de loguearse):
+- **Antes de loguearse, primera vez en este navegador** (sin cookie `interfaz_colores` todavía): se usa la `INTERFAZ` con `CODIGO = 'default'` como base.
+- **Antes de loguearse, ya logueado alguna vez en este navegador**: se usan los colores guardados en la cookie `interfaz_colores` (`apps/web/src/lib/interfaz-colores.ts`) — la última interfaz REAL que vio ese navegador, no la `default` genérica. La cookie se escribe en `apps/web/src/app/login/actions.ts` justo después de un login exitoso, con los colores de la `INTERFAZ` del perfil que acaba de entrar. `apps/web/src/app/layout.tsx` la lee cuando no hay sesión activa.
 - **Después de loguearse**: se usa la `INTERFAZ` del `PERFIL` del usuario logueado — cada perfil puede ver una marca/paleta distinta.
 
 `TITULO` reemplaza el nombre de marca fijo que se mostraba en el shell (sidebar). Si es nulo, el código cae a un valor por defecto.
@@ -174,3 +175,5 @@ Mecanismo (sin `next-themes`, sin dependencia nueva — mismo patrón que ya usa
 ## Menú lateral — grupos colapsables
 
 Cada grupo del menú (`MenuGrupo.nombre`, ej. "ABMs", "Configuración") tiene su propio botón con chevron que oculta/muestra sus opciones — independiente del colapso GLOBAL del sidebar (que angosta todo a solo íconos). Estado en memoria (`useState` en `app-sidebar.tsx`, no persistido) — todos los grupos abiertos por default.
+
+El scroll del `<nav>` del sidebar usa la clase `.sidebar-scroll` (`apps/web/src/app/globals.css`) — fino (5px) y transparente por default, toma el color `--sidebar-primary` del sitio solo mientras el mouse está encima. `scrollbar-color`/`scrollbar-width` para Firefox, pseudo-elementos `::-webkit-scrollbar*` para Chrome/Edge/Safari — sin JS, puro CSS.

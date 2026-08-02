@@ -43,6 +43,7 @@ const RUTA_POR_CODIGO: Record<string, string> = {
   reportes_admin: "/dashboard/reportes-admin",
   monedas: "/dashboard/monedas",
   mensajeria_plantillas: "/dashboard/mensajeria-plantillas",
+  acciones_externas: "/dashboard/acciones-externas",
 };
 
 export function AppSidebar({
@@ -116,7 +117,7 @@ export function AppSidebar({
         </button>
       </div>
 
-      <nav className="flex-1 overflow-y-auto py-3 px-2 flex flex-col gap-4">
+      <nav className="sidebar-scroll flex-1 overflow-y-auto py-3 px-2 flex flex-col gap-4">
         {menu.map((grupo) => {
           const grupoAbierto = !gruposCerrados.has(grupo.nombre);
           return (

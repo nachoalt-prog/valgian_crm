@@ -29,6 +29,7 @@ export function formatearValor(valor: unknown, tipo?: string, onVerAdjuntos?: (v
   }
   if (valor === null || valor === undefined) return <span className="text-muted-foreground">—</span>;
   if (tipo === "fecha") return new Date(String(valor)).toLocaleDateString("es-AR");
+  if (tipo === "fecha_hora") return new Date(String(valor)).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
   if (tipo === "badge") {
     return (
       <Badge variant="outline" className="text-[11px]">
