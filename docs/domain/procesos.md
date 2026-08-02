@@ -105,7 +105,7 @@ Filas `procesando` cuyo paso en curso superó su `TIMEOUT_MINUTOS` (comparado co
 
 ### Zona horaria
 
-`cron.timezone` es config de infraestructura **por instalación** (mismo criterio que ADR 0013), no una columna de `PROCESOS` — ver ADR 0015. Toda hora que maneje una instalación de este sistema es la hora local de ESA instalación.
+`cron.timezone` es config de infraestructura **por instalación** (mismo criterio que ADR 0013), no una columna de `PROCESOS` — ver ADR 0015. Toda hora que maneje una instalación de este sistema es la hora local de ESA instalación. En `docker-compose.yml` se fuerza `timezone`/`cron.timezone` a `America/Argentina/Buenos_Aires` vía `command:` — sin esto, Postgres arranca en UTC por default, y un `PROCESOS.CRON` tipo `0 3 * * *` (pensado como "3am hora Argentina") corre en realidad a las 3am UTC = medianoche Argentina. Bug real encontrado en vivo (no solo de display: `fn_cron_matches` usa `EXTRACT(HOUR FROM ...)`, que depende de la zona horaria de sesión) — instalaciones en otro país necesitan su propio `America/...` acá.
 
 ### Apagar el scheduler
 

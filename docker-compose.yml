@@ -13,7 +13,16 @@ services:
     # de la imagen (docker/postgres/Dockerfile) solo aplica en un initdb
     # fresco, no en un volumen ya inicializado. Se fuerza acá para que
     # aplique sin importar el estado del volumen (ver ADR 0015).
-    command: postgres -c shared_preload_libraries=pg_cron -c cron.database_name=valgian_crm -c cron.use_background_workers=on
+    #
+    # timezone/cron.timezone: sin esto, Postgres arranca en UTC por default
+    # (confirmado en vivo: "SHOW timezone" devolvía UTC, "SHOW cron.timezone"
+    # devolvía GMT) — cron.timezone es justamente "config de infraestructura
+    # por instalación" que ya preveía ADR 0015 ("toda hora que maneje una
+    # instalación es la hora local de ESA instalación"), documentado pero
+    # nunca aplicado acá hasta ahora. Sin esto, un PROCESOS.CRON tipo
+    # '0 3 * * *' (pensado como "3am hora Argentina") corría en realidad a
+    # las 3am UTC = medianoche Argentina — bug real, no solo de display.
+    command: postgres -c shared_preload_libraries=pg_cron -c cron.database_name=valgian_crm -c cron.use_background_workers=on -c timezone=America/Argentina/Buenos_Aires -c cron.timezone=America/Argentina/Buenos_Aires
     ports:
       - "5432:5432"
     volumes:
