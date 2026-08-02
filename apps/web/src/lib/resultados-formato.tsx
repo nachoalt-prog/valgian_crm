@@ -1,12 +1,14 @@
-import { Paperclip } from "lucide-react";
+import { Paperclip, ListOrdered } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 // Formato/orden compartido entre BandejaResultados y ReporteResultados — mismo
-// vocabulario de "tipo" de columna (badge/fecha/adjuntos/default), se amplía
-// cuando hace falta (ver ADR 0014) — "adjuntos" sumado para el reporte de
-// Mensajería (domain/acciones-externas.md): el valor de la columna es el ID
-// de la fila dueña de los adjuntos (ej. MENSAJERIA_COLA.ID), no un texto a mostrar.
+// vocabulario de "tipo" de columna (badge/fecha/fecha_hora/adjuntos/pasos/default),
+// se amplía cuando hace falta (ver ADR 0014) — "adjuntos" sumado para el reporte
+// de Mensajería (domain/acciones-externas.md), "pasos" para el reporte de
+// Procesos (domain/procesos.md): en ambos casos el valor de la columna es el ID
+// de la fila dueña del detalle (MENSAJERIA_COLA.ID / PROCESOS_EJECUCIONES.ID),
+// no un texto a mostrar.
 export type Direccion = "asc" | "desc";
 
 export function compararValores(a: unknown, b: unknown, direccion: Direccion): number {
@@ -18,12 +20,25 @@ export function compararValores(a: unknown, b: unknown, direccion: Direccion): n
   return 0;
 }
 
-export function formatearValor(valor: unknown, tipo?: string, onVerAdjuntos?: (valor: unknown) => void): React.ReactNode {
+export function formatearValor(
+  valor: unknown,
+  tipo?: string,
+  onVerAdjuntos?: (valor: unknown) => void,
+  onVerPasos?: (valor: unknown) => void,
+): React.ReactNode {
   if (tipo === "adjuntos") {
     if (valor === null || valor === undefined) return <span className="text-muted-foreground">—</span>;
     return (
       <Button variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-primary" onClick={() => onVerAdjuntos?.(valor)}>
         <Paperclip className="size-3.5" />
+      </Button>
+    );
+  }
+  if (tipo === "pasos") {
+    if (valor === null || valor === undefined) return <span className="text-muted-foreground">—</span>;
+    return (
+      <Button variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-primary" onClick={() => onVerPasos?.(valor)}>
+        <ListOrdered className="size-3.5" />
       </Button>
     );
   }

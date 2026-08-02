@@ -135,6 +135,12 @@ Un `PASO` cuyo `COMANDO` necesita algo que Postgres no puede hacer solo (mandar 
 
 - **`/dashboard/procesos`** (`HERRAMIENTAS.CODIGO = 'procesos'`, `packages/core/src/procesos.ts`): listado de `PROCESOS`, alta/edición de `CODIGO`/`NOMBRE`/`DESCRIPCION`/`ACTIVO`/`CRON`/`REINTENTO_MINUTOS`/`REINTENTOS_MAX`, botón "Correr ahora" por proceso (`dispararProcesoManual` — `INSERT` directo en `PROCESOS_EJECUCIONES` con `ORIGEN='manual'`). **No edita `PROCESOS_PASOS`** — eso es dev-only, se carga por seed/migración (`ensureProceso`/`ensureProcesoPaso` en `packages/core/src/seed-config.ts`). Borrado bloqueado si el proceso tiene `PROCESOS_EJECUCIONES` (audit trail). El diálogo de edición muestra los `PROCESOS_PASOS` del proceso en una lista **de solo lectura** (`listPasosPorProceso`) — nombre y timeout de cada paso, sin ningún control de edición — informativo nomás, para no tener que ir a la base a ver qué hace el proceso.
 
+## Reporte "Procesos"
+
+Reusa el motor de Reportes (ADR 0014) tal cual — categoría `auditoria`, seedeado en `packages/core/src/seed-config.ts` junto al resto de los reportes de esa categoría (`procesos_ejecuciones`). Columnas: Proceso, Estado (`badge`, valor crudo — sin traducir a español, mismo criterio que el resto de los reportes de auditoría, para que coincida con el vocabulario del filtro de Estado), Origen, Intento, Error, Programada/Inicio/Fin (`fecha_hora`) y una última columna "Pasos" (`tipo:"pasos"`) que abre un diálogo de solo lectura (`ProcesosEjecucionPasosDialog`) con el detalle de `PROCESOS_EJECUCIONES_PASOS` de esa ejecución puntual — mismo patrón de botón-que-abre-detalle que el `tipo:"adjuntos"` del reporte de Mensajería (`domain/acciones-externas.md`). Filtros: Proceso (`select`), Estado (`select`, opciones crudas de `PROCESOS_EJECUCIONES.ESTADO`) y Fecha de Ejecución (`fecha_rango` sobre `FECHA_PROGRAMADA`).
+
+`listPasosDeEjecucion` (`packages/core/src/procesos.ts`) es la función de solo lectura que trae ese detalle — no reusa `listPasosPorProceso` (que lista los `PROCESOS_PASOS` configurados de un `PROCESO`, no la ejecución de uno).
+
 ## Dónde vive cada pieza
 
 - Schema: `packages/db/src/schema.ts` (`procesos`, `procesosPasos`, `procesosEjecuciones`, `procesosEjecucionesPasos`).

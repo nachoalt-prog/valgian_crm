@@ -5,6 +5,7 @@ import { ReportesPanel } from "@/components/reportes-panel";
 import { BandejaFiltros } from "@/components/bandeja-filtros";
 import { ReporteResultados } from "@/components/reporte-resultados";
 import { MensajeriaColaAdjuntosDialog } from "@/components/mensajeria-cola-adjuntos-dialog";
+import { ProcesosEjecucionPasosDialog } from "@/components/procesos-ejecucion-pasos-dialog";
 import { getReporteConfigAction, buscarReporteAction } from "@/app/dashboard/reportes/actions";
 import type { ReporteResumen, ReporteConfig } from "@valgian/core";
 
@@ -15,6 +16,7 @@ interface ReportesToolProps {
 export function ReportesTool({ reportesIniciales }: ReportesToolProps) {
   const [selectedReporteId, setSelectedReporteId] = useState<string | null>(null);
   const [verAdjuntosId, setVerAdjuntosId] = useState<string | null>(null);
+  const [verPasosId, setVerPasosId] = useState<string | null>(null);
   const [config, setConfig] = useState<ReporteConfig | null>(null);
   const [filterValues, setFilterValues] = useState<Record<string, string>>({});
   const [results, setResults] = useState<Record<string, unknown>[]>([]);
@@ -135,6 +137,7 @@ export function ReportesTool({ reportesIniciales }: ReportesToolProps) {
               onNextPage={handleNextPage}
               onExport={handleExport}
               onVerAdjuntos={(valor) => setVerAdjuntosId(String(valor))}
+              onVerPasos={(valor) => setVerPasosId(String(valor))}
             />
           </>
         )}
@@ -142,6 +145,10 @@ export function ReportesTool({ reportesIniciales }: ReportesToolProps) {
 
       {verAdjuntosId && (
         <MensajeriaColaAdjuntosDialog open={!!verAdjuntosId} onOpenChange={(o) => !o && setVerAdjuntosId(null)} idMensajeriaCola={verAdjuntosId} />
+      )}
+
+      {verPasosId && (
+        <ProcesosEjecucionPasosDialog open={!!verPasosId} onOpenChange={(o) => !o && setVerPasosId(null)} idEjecucion={verPasosId} />
       )}
     </div>
   );

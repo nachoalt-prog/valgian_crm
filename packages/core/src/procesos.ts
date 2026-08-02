@@ -1,6 +1,6 @@
 import { eq, and, count, inArray } from "drizzle-orm";
 import { sql } from "drizzle-orm";
-import { db, procesos, procesosPasos, procesosEjecuciones } from "@valgian/db";
+import { db, procesos, procesosPasos, procesosEjecuciones, procesosEjecucionesPasos } from "@valgian/db";
 
 /** ESTADO='pendiente'/'procesando' — la misma ejecución todavía puede correr o está corriendo ahora. */
 const ESTADOS_ACTIVOS = ["pendiente", "procesando"] as const;
@@ -44,6 +44,32 @@ export async function listProcesosAdmin(): Promise<ProcesoConEstado[]> {
   const idsActivos = new Set(activas.map((a) => a.idProceso));
 
   return filas.map((p) => ({ ...p, ejecutandose: idsActivos.has(p.id) }));
+}
+
+export interface ProcesoEjecucionPasoDetalle {
+  id: string;
+  pasoNombre: string | null;
+  estado: string;
+  fechaInicio: Date;
+  fechaFin: Date | null;
+  error: string | null;
+}
+
+/** Historial detallado de UNA ejecución puntual (PROCESOS_EJECUCIONES_PASOS) — usado por el reporte "Procesos" (botón "ver pasos", ver resultados-formato.tsx, tipo:"pasos"). */
+export async function listPasosDeEjecucion(idEjecucion: string): Promise<ProcesoEjecucionPasoDetalle[]> {
+  return db
+    .select({
+      id: procesosEjecucionesPasos.id,
+      pasoNombre: procesosPasos.nombre,
+      estado: procesosEjecucionesPasos.estado,
+      fechaInicio: procesosEjecucionesPasos.fechaInicio,
+      fechaFin: procesosEjecucionesPasos.fechaFin,
+      error: procesosEjecucionesPasos.error,
+    })
+    .from(procesosEjecucionesPasos)
+    .leftJoin(procesosPasos, eq(procesosPasos.id, procesosEjecucionesPasos.idPaso))
+    .where(eq(procesosEjecucionesPasos.idEjecucion, idEjecucion))
+    .orderBy(procesosEjecucionesPasos.fechaInicio);
 }
 
 /** Solo lectura — el ABM de PROCESOS no edita PROCESOS_PASOS (dev-only, ver comentario de arriba). */

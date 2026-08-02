@@ -517,7 +517,7 @@ ORDER BY G."ALTA_FECHA" DESC
 
   const reporteAuditoriaGeneraciones = await ensureReporte(
     "auditoria_generaciones_documento",
-    "Auditoría de Generación de Documentos",
+    "Generación de Documentos",
     "Todas las solicitudes de generación de documentos (GENERACIONES_DOCUMENTO), su estado y el archivo resultante.",
     categoriaAuditoria.id,
     REPORTE_AUDITORIA_GENERACIONES_QUERY,
@@ -670,6 +670,67 @@ ORDER BY AEC."FECHA_ENCOLADO" DESC
   await ensureReporteFiltro(reporteAccionesExternas.id, filtroFechaAccionExterna.id, "fecha_encolado", 2);
 
   await ensureReportePerfil(reporteAccionesExternas.id, perfilAdmin.id);
+
+  // --- Reporte de Procesos (PROCESOS_EJECUCIONES) ---
+
+  const filtroProceso = await ensureFiltro(
+    "select_procesos",
+    "Proceso",
+    "select",
+    `SELECT "ID" AS value, "NOMBRE" AS label FROM "PROCESOS" ORDER BY "NOMBRE"`,
+  );
+  const filtroEstadoProceso = await ensureFiltro(
+    "select_estado_proceso_ejecucion",
+    "Estado (Proceso)",
+    "select",
+    `SELECT DISTINCT "ESTADO" AS value, "ESTADO" AS label FROM "PROCESOS_EJECUCIONES" WHERE "ESTADO" IS NOT NULL ORDER BY 1`,
+  );
+  const filtroFechaProceso = await ensureFiltro("fecha_proceso_ejecucion", "Fecha de Ejecución", "fecha_rango", null);
+
+  const REPORTE_PROCESOS_QUERY = `
+SELECT
+  PE."ID" AS id,
+  PE."ID" AS pasos_id,
+  P."NOMBRE" AS proceso,
+  P."ID" AS proceso_id,
+  PE."ESTADO" AS estado,
+  PE."ORIGEN" AS origen,
+  PE."NUMERO_INTENTO" AS numero_intento,
+  PE."ERROR" AS error,
+  PE."FECHA_PROGRAMADA" AS fecha_programada,
+  PE."FECHA_INICIO" AS fecha_inicio,
+  PE."FECHA_FIN" AS fecha_fin
+FROM "PROCESOS_EJECUCIONES" PE
+JOIN "PROCESOS" P ON P."ID" = PE."ID_PROCESO"
+ORDER BY PE."FECHA_PROGRAMADA" DESC
+`.trim();
+
+  const REPORTE_PROCESOS_COLUMNAS = [
+    { campo: "proceso", label: "Proceso" },
+    { campo: "estado", label: "Estado", tipo: "badge" },
+    { campo: "origen", label: "Origen" },
+    { campo: "numero_intento", label: "Intento" },
+    { campo: "error", label: "Error" },
+    { campo: "fecha_programada", label: "Programada", tipo: "fecha_hora" },
+    { campo: "fecha_inicio", label: "Inicio", tipo: "fecha_hora" },
+    { campo: "fecha_fin", label: "Fin", tipo: "fecha_hora" },
+    { campo: "pasos_id", label: "Pasos", tipo: "pasos" },
+  ];
+
+  const reporteProcesos = await ensureReporte(
+    "procesos_ejecuciones",
+    "Procesos",
+    "Todas las ejecuciones registradas (PROCESOS_EJECUCIONES) — corridas por cron, manuales y reintentos —, con el detalle de cada paso.",
+    categoriaAuditoria.id,
+    REPORTE_PROCESOS_QUERY,
+    REPORTE_PROCESOS_COLUMNAS,
+  );
+
+  await ensureReporteFiltro(reporteProcesos.id, filtroProceso.id, "proceso_id", 1);
+  await ensureReporteFiltro(reporteProcesos.id, filtroEstadoProceso.id, "estado", 2);
+  await ensureReporteFiltro(reporteProcesos.id, filtroFechaProceso.id, "fecha_programada", 3);
+
+  await ensureReportePerfil(reporteProcesos.id, perfilAdmin.id);
 
   // --- Proceso de ejemplo (genérico, útil para cualquier instalación): ---
   // limpieza diaria de tokens de sesión vencidos. USUARIOS.TOKEN/TOKEN_EXPIRACION
