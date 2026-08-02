@@ -12,6 +12,7 @@ import {
   bandejasFiltros,
   bandejasPerfiles,
   reportes,
+  reportesCategorias,
   reportesFiltros,
   reportesPerfiles,
   herramientas,
@@ -115,11 +116,19 @@ async function ensureBandejaPerfil(idBandeja: string, idPerfil: string) {
   return creada;
 }
 
-async function ensureReporte(codigo: string, nombre: string, descripcion: string, query: string, columnas: unknown) {
+async function ensureReporteCategoria(codigo: string, nombre: string) {
+  const [existente] = await db.select().from(reportesCategorias).where(eq(reportesCategorias.codigo, codigo));
+  if (existente) return existente;
+
+  const [creada] = await db.insert(reportesCategorias).values({ codigo, nombre }).returning();
+  return creada;
+}
+
+async function ensureReporte(codigo: string, nombre: string, descripcion: string, idCategoria: string, query: string, columnas: unknown) {
   const [existente] = await db.select().from(reportes).where(eq(reportes.codigo, codigo));
   if (existente) return existente;
 
-  const [creado] = await db.insert(reportes).values({ codigo, nombre, descripcion, query, columnas }).returning();
+  const [creado] = await db.insert(reportes).values({ codigo, nombre, descripcion, idCategoria, query, columnas }).returning();
   return creado;
 }
 
@@ -461,6 +470,10 @@ LEFT JOIN "CUENTAS" CU ON ENT."CODIGO" = 'cuentas' AND CU."ID" = T."ID_REGISTRO"
 
   // --- Reportes ---
 
+  const categoriaAuditoria = await ensureReporteCategoria("auditoria", "Auditoría");
+  const categoriaUtilidades = await ensureReporteCategoria("utilidades", "Utilidades");
+  await ensureReporteCategoria("general", "General");
+
   const filtroEstadoGeneracion = await ensureFiltro(
     "select_estado_generacion",
     "Estado (Generación de Documento)",
@@ -489,14 +502,15 @@ FROM "GENERACIONES_DOCUMENTO" G
 LEFT JOIN "PLANTILLAS_ADJUNTOS" P ON P."ID" = G."ID_PLANTILLA"
 LEFT JOIN "ENTIDADES" ENT ON ENT."ID" = G."ID_ENTIDAD"
 LEFT JOIN "ARCHIVOS_ADJUNTOS" AR ON AR."ID" = G."ID_ARCHIVO_RESULTADO"
+ORDER BY G."ALTA_FECHA" DESC
 `.trim();
 
   const REPORTE_AUDITORIA_GENERACIONES_COLUMNAS = [
     { campo: "plantilla", label: "Plantilla" },
     { campo: "entidad", label: "Entidad" },
     { campo: "estado", label: "Estado", tipo: "badge" },
-    { campo: "alta_fecha", label: "Solicitado", tipo: "fecha" },
-    { campo: "audit_fecha", label: "Actualizado", tipo: "fecha" },
+    { campo: "alta_fecha", label: "Solicitado", tipo: "fecha_hora" },
+    { campo: "audit_fecha", label: "Actualizado", tipo: "fecha_hora" },
     { campo: "archivo_resultado", label: "Archivo generado" },
     { campo: "error", label: "Error" },
   ];
@@ -505,6 +519,7 @@ LEFT JOIN "ARCHIVOS_ADJUNTOS" AR ON AR."ID" = G."ID_ARCHIVO_RESULTADO"
     "auditoria_generaciones_documento",
     "Auditoría de Generación de Documentos",
     "Todas las solicitudes de generación de documentos (GENERACIONES_DOCUMENTO), su estado y el archivo resultante.",
+    categoriaAuditoria.id,
     REPORTE_AUDITORIA_GENERACIONES_QUERY,
     REPORTE_AUDITORIA_GENERACIONES_COLUMNAS,
   );
@@ -538,6 +553,7 @@ SELECT
   C."FECHA_CONSULTA" AS fecha
 FROM "COTIZACIONES" C
 JOIN "MONEDAS" M ON M."ID" = C."ID_MONEDA"
+ORDER BY C."FECHA_CONSULTA" DESC
 `.trim();
 
   const REPORTE_COTIZACIONES_COLUMNAS = [
@@ -551,6 +567,7 @@ JOIN "MONEDAS" M ON M."ID" = C."ID_MONEDA"
     "cotizaciones",
     "Cotizaciones",
     "Histórico de cotizaciones consultadas (COTIZACIONES), por moneda.",
+    categoriaUtilidades.id,
     REPORTE_COTIZACIONES_QUERY,
     REPORTE_COTIZACIONES_COLUMNAS,
   );
@@ -581,13 +598,14 @@ SELECT
   MC."FECHA_ENCOLADO" AS fecha_encolado
 FROM "MENSAJERIA_COLA" MC
 LEFT JOIN "MENSAJERIA_PLANTILLAS" MP ON MP."ID" = MC."ID_MENSAJERIA_PLANTILLA"
+ORDER BY MC."FECHA_ENCOLADO" DESC
 `.trim();
 
   const REPORTE_MENSAJERIA_COLUMNAS = [
     { campo: "plantilla", label: "Plantilla" },
     { campo: "resultado", label: "Resultado", tipo: "badge" },
     { campo: "resultado_desc", label: "Detalle" },
-    { campo: "fecha_encolado", label: "Fecha", tipo: "fecha" },
+    { campo: "fecha_encolado", label: "Fecha", tipo: "fecha_hora" },
     { campo: "adjuntos_id", label: "Adjuntos", tipo: "adjuntos" },
   ];
 
@@ -595,6 +613,7 @@ LEFT JOIN "MENSAJERIA_PLANTILLAS" MP ON MP."ID" = MC."ID_MENSAJERIA_PLANTILLA"
     "mensajeria_cola",
     "Mensajería",
     "Todos los mensajes encolados (MENSAJERIA_COLA) — mail, SMS, WhatsApp o lo que sea —, su resultado y los adjuntos de cada uno.",
+    categoriaAuditoria.id,
     REPORTE_MENSAJERIA_QUERY,
     REPORTE_MENSAJERIA_COLUMNAS,
   );
@@ -626,6 +645,7 @@ SELECT
   AEC."FECHA_ENCOLADO" AS fecha_encolado
 FROM "ACCIONES_EXTERNAS_COLA" AEC
 LEFT JOIN "ACCIONES_EXTERNAS" AE ON AE."ID" = AEC."ID_ACCION_EXTERNA"
+ORDER BY AEC."FECHA_ENCOLADO" DESC
 `.trim();
 
   const REPORTE_ACCIONES_EXTERNAS_COLUMNAS = [
@@ -641,6 +661,7 @@ LEFT JOIN "ACCIONES_EXTERNAS" AE ON AE."ID" = AEC."ID_ACCION_EXTERNA"
     "acciones_externas_cola",
     "Acciones Externas",
     "Todos los disparos encolados (ACCIONES_EXTERNAS_COLA) — cotizaciones, mensajería o lo que sea —, con su resultado y reintentos.",
+    categoriaAuditoria.id,
     REPORTE_ACCIONES_EXTERNAS_QUERY,
     REPORTE_ACCIONES_EXTERNAS_COLUMNAS,
   );

@@ -1,5 +1,5 @@
 import { eq, sql } from "drizzle-orm";
-import { db, reportes, reportesFiltros, reportesPerfiles, filtros } from "@valgian/db";
+import { db, reportes, reportesCategorias, reportesFiltros, reportesPerfiles, filtros } from "@valgian/db";
 import { ejecutarQueryConFiltros, type FiltroAplicable } from "./query-filtros";
 
 /**
@@ -16,15 +16,23 @@ export interface ReporteResumen {
   codigo: string;
   nombre: string;
   descripcion: string | null;
+  categoriaNombre: string | null;
 }
 
 export async function listReportesParaPerfil(perfilId: string): Promise<ReporteResumen[]> {
   return db
-    .select({ id: reportes.id, codigo: reportes.codigo, nombre: reportes.nombre, descripcion: reportes.descripcion })
+    .select({
+      id: reportes.id,
+      codigo: reportes.codigo,
+      nombre: reportes.nombre,
+      descripcion: reportes.descripcion,
+      categoriaNombre: reportesCategorias.nombre,
+    })
     .from(reportesPerfiles)
     .innerJoin(reportes, eq(reportes.id, reportesPerfiles.idReporte))
+    .leftJoin(reportesCategorias, eq(reportesCategorias.id, reportes.idCategoria))
     .where(eq(reportesPerfiles.idPerfil, perfilId))
-    .orderBy(reportes.nombre);
+    .orderBy(reportesCategorias.nombre, reportes.nombre);
 }
 
 export interface ColumnaReporte {

@@ -8,6 +8,13 @@
 -- interno (ej. SP_MENSAJERIA_ENCOLAR): EXECUTE dinámico corre por SPI, que
 -- nunca admite control transaccional en la cadena (mismo hallazgo que
 -- ACCIONES.COMANDO, ver domain/acciones-externas.md).
+--
+-- Cancelación cooperativa: ANTES de cada paso (nunca en medio de un EXECUTE
+-- ya en curso — no hay forma de interrumpir eso sin matar el backend de
+-- Postgres) se relee el ESTADO de la fila. Si alguien la puso en 'cancelada'
+-- desde afuera (ver cancelarEjecucionProceso, packages/core/src/procesos.ts),
+-- el loop corta ahí — el paso que ya terminó queda registrado, ninguno más
+-- arranca, y no se genera reintento.
 CREATE OR REPLACE PROCEDURE sp_ejecutar_un_proceso_pendiente()
 LANGUAGE plpgsql
 AS $$
@@ -16,6 +23,8 @@ DECLARE
   v_paso RECORD;
   v_desde_orden integer;
   v_hubo_error boolean := false;
+  v_cancelada boolean := false;
+  v_estado_actual text;
   v_reintento_minutos integer;
   v_reintentos_max integer;
   v_error_mensaje text;
@@ -55,6 +64,12 @@ BEGIN
     WHERE "ID_PROCESO" = v_ejecucion."ID_PROCESO" AND "ORDEN" >= v_desde_orden
     ORDER BY "ORDEN"
   LOOP
+    SELECT "ESTADO" INTO v_estado_actual FROM "PROCESOS_EJECUCIONES" WHERE "ID" = v_ejecucion."ID";
+    IF v_estado_actual = 'cancelada' THEN
+      v_cancelada := true;
+      EXIT;
+    END IF;
+
     UPDATE "PROCESOS_EJECUCIONES" SET "FECHA_INICIO_PASO" = now() WHERE "ID" = v_ejecucion."ID";
     COMMIT;
 
@@ -89,7 +104,10 @@ BEGIN
     END IF;
   END LOOP;
 
-  IF NOT v_hubo_error THEN
+  IF v_cancelada THEN
+    -- Ya quedó en 'cancelada' desde afuera — no pisar ese estado, no reintentar.
+    NULL;
+  ELSIF NOT v_hubo_error THEN
     UPDATE "PROCESOS_EJECUCIONES" SET "ESTADO" = 'completado', "FECHA_FIN" = now() WHERE "ID" = v_ejecucion."ID";
     COMMIT;
   ELSIF v_reintentos_max IS NOT NULL AND v_reintento_minutos IS NOT NULL AND v_ejecucion."NUMERO_INTENTO" < v_reintentos_max THEN

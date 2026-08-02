@@ -6,6 +6,7 @@ import {
   updateProceso,
   deleteProceso,
   dispararProcesoManual,
+  cancelarEjecucionProceso,
   listPasosPorProceso,
   getPermisoParaOperacion,
   OPERACION_ACCESO,
@@ -65,6 +66,15 @@ export async function dispararProcesoManualAction(id: string) {
   if (check.error || !check.usuarioId) return { error: check.error ?? "No autenticado." };
 
   const result = await dispararProcesoManual(id, check.usuarioId);
+  if (result.data) revalidatePath("/dashboard/procesos");
+  return result;
+}
+
+export async function cancelarEjecucionProcesoAction(id: string) {
+  const check = await requireGestion();
+  if (check.error) return { error: check.error };
+
+  const result = await cancelarEjecucionProceso(id);
   if (result.data) revalidatePath("/dashboard/procesos");
   return result;
 }

@@ -1,6 +1,9 @@
-import { eq, count } from "drizzle-orm";
+import { eq, and, count, inArray } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { db, procesos, procesosPasos, procesosEjecuciones } from "@valgian/db";
+
+/** ESTADO='pendiente'/'procesando' — la misma ejecución todavía puede correr o está corriendo ahora. */
+const ESTADOS_ACTIVOS = ["pendiente", "procesando"] as const;
 
 /**
  * ABM de PROCESOS — ver domain/procesos.md, ADR 0015. El ABM administra
@@ -18,8 +21,29 @@ function esViolacionUnica(err: unknown): boolean {
   return typeof err === "object" && err !== null && "code" in err && (err as { code: string }).code === "23505";
 }
 
-export async function listProcesosAdmin() {
-  return db.select().from(procesos).orderBy(procesos.nombre);
+export interface ProcesoConEstado {
+  id: string;
+  codigo: string;
+  nombre: string;
+  descripcion: string | null;
+  cron: string;
+  activo: boolean | null;
+  reintentoMinutos: number | null;
+  reintentosMax: number | null;
+  /** true si hay una PROCESOS_EJECUCIONES 'pendiente' o 'procesando' para este proceso — ver ProcesosTool (spinner). */
+  ejecutandose: boolean;
+}
+
+export async function listProcesosAdmin(): Promise<ProcesoConEstado[]> {
+  const filas = await db.select().from(procesos).orderBy(procesos.nombre);
+
+  const activas = await db
+    .selectDistinct({ idProceso: procesosEjecuciones.idProceso })
+    .from(procesosEjecuciones)
+    .where(inArray(procesosEjecuciones.estado, ESTADOS_ACTIVOS));
+  const idsActivos = new Set(activas.map((a) => a.idProceso));
+
+  return filas.map((p) => ({ ...p, ejecutandose: idsActivos.has(p.id) }));
 }
 
 /** Solo lectura — el ABM de PROCESOS no edita PROCESOS_PASOS (dev-only, ver comentario de arriba). */
@@ -68,6 +92,25 @@ export async function deleteProceso(id: string): Promise<Resultado<true>> {
   }
 
   await db.delete(procesos).where(eq(procesos.id, id));
+  return { data: true };
+}
+
+/**
+ * Cancelación cooperativa (ver packages/db/sql/0013_sp_ejecutar_un_proceso_pendiente.sql):
+ * si la ejecución está 'pendiente', el ejecutor directamente nunca la reclama.
+ * Si ya está 'procesando', el ejecutor relee el ESTADO ANTES de cada paso — el
+ * paso que ya esté corriendo en este mismo instante termina igual (no hay
+ * forma de interrumpir un EXECUTE en curso sin matar el backend de Postgres),
+ * pero ninguno más arranca después.
+ */
+export async function cancelarEjecucionProceso(idProceso: string): Promise<Resultado<true>> {
+  const filas = await db
+    .update(procesosEjecuciones)
+    .set({ estado: "cancelada", fechaFin: new Date() })
+    .where(and(eq(procesosEjecuciones.idProceso, idProceso), inArray(procesosEjecuciones.estado, ESTADOS_ACTIVOS)))
+    .returning();
+
+  if (filas.length === 0) return { error: "No hay ninguna ejecución pendiente o en curso para cancelar." };
   return { data: true };
 }
 

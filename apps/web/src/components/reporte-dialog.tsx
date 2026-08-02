@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { ReporteInput } from "@valgian/core";
 
 interface ReporteRow {
@@ -12,22 +13,31 @@ interface ReporteRow {
   codigo: string;
   nombre: string;
   descripcion: string | null;
+  idCategoria: string | null;
   query: string | null;
   columnas: unknown;
+}
+
+interface CategoriaOption {
+  id: string;
+  codigo: string;
+  nombre: string;
 }
 
 interface ReporteDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   reporte: ReporteRow | null;
+  categorias: CategoriaOption[];
   onSave: (data: ReporteInput, id?: string) => Promise<{ error?: string } | void>;
 }
 
 // key={reporte?.id ?? "new"} en el padre fuerza un remount al cambiar de registro.
-export function ReporteDialog({ open, onOpenChange, reporte, onSave }: ReporteDialogProps) {
+export function ReporteDialog({ open, onOpenChange, reporte, categorias, onSave }: ReporteDialogProps) {
   const [codigo, setCodigo] = useState(reporte?.codigo ?? "");
   const [nombre, setNombre] = useState(reporte?.nombre ?? "");
   const [descripcion, setDescripcion] = useState(reporte?.descripcion ?? "");
+  const [idCategoria, setIdCategoria] = useState<string | null>(reporte?.idCategoria ?? null);
   const [query, setQuery] = useState(reporte?.query ?? "");
   const [columnasTexto, setColumnasTexto] = useState(reporte?.columnas ? JSON.stringify(reporte.columnas, null, 2) : "[]");
   const [error, setError] = useState<string | null>(null);
@@ -36,6 +46,11 @@ export function ReporteDialog({ open, onOpenChange, reporte, onSave }: ReporteDi
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+
+    if (!idCategoria) {
+      setError("Elegí una categoría.");
+      return;
+    }
 
     let columnas: unknown;
     try {
@@ -46,7 +61,7 @@ export function ReporteDialog({ open, onOpenChange, reporte, onSave }: ReporteDi
     }
 
     setPending(true);
-    const result = await onSave({ codigo, nombre, descripcion: descripcion || null, query, columnas }, reporte?.id);
+    const result = await onSave({ codigo, nombre, descripcion: descripcion || null, idCategoria, query, columnas }, reporte?.id);
     setPending(false);
     if (result?.error) {
       setError(result.error);
@@ -83,6 +98,26 @@ export function ReporteDialog({ open, onOpenChange, reporte, onSave }: ReporteDi
               Descripción
             </Label>
             <Input id="descripcion" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs uppercase tracking-wider text-muted-foreground">Categoría</Label>
+            <Select
+              items={Object.fromEntries(categorias.map((c) => [c.id, c.nombre]))}
+              value={idCategoria ?? undefined}
+              onValueChange={(v) => setIdCategoria(v)}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Seleccioná una categoría…" />
+              </SelectTrigger>
+              <SelectContent>
+                {categorias.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.nombre}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-1.5">

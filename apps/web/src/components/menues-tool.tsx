@@ -39,7 +39,7 @@ export function MenuesTool({ menuesIniciales, opcionesIniciales, herramientas, c
     setTimeout(() => setAviso(null), 3500);
   }
 
-  async function handleSaveMenu(data: { codigo: string; nombre: string }, id?: string) {
+  async function handleSaveMenu(data: { codigo: string; nombre: string; orden: number | null; abierto: boolean }, id?: string) {
     const result = id ? await updateMenuAction(id, data) : await createMenuAction(data);
     if (!result.error) router.refresh();
     return result;

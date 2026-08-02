@@ -129,11 +129,18 @@ async function ensurePermisoOperacion(idPerfil: string, idOperacion: string) {
   return creado;
 }
 
-async function ensureMenu(codigo: string, nombre: string) {
+// ORDEN/ABIERTO se resincronizan en cada corrida (a diferencia de
+// codigo/nombre) — son los "valores de fábrica" de los menúes estándar; el
+// ABM de Menúes (herramienta "menues") sigue siendo el lugar para que una
+// instalación puntual los cambie a mano después.
+async function ensureMenu(codigo: string, nombre: string, orden: number, abierto: boolean) {
   const [existente] = await db.select().from(menues).where(eq(menues.codigo, codigo));
-  if (existente) return existente;
+  if (existente) {
+    const [actualizado] = await db.update(menues).set({ orden, abierto }).where(eq(menues.id, existente.id)).returning();
+    return actualizado;
+  }
 
-  const [creado] = await db.insert(menues).values({ codigo, nombre }).returning();
+  const [creado] = await db.insert(menues).values({ codigo, nombre, orden, abierto }).returning();
   return creado;
 }
 
@@ -381,9 +388,9 @@ async function main() {
     })
     .where(eq(herramientas.id, herramientaArchivosAdjuntos.id));
 
-  const menuPrincipal = await ensureMenu("principal", "Principal");
-  const menuConfiguracion = await ensureMenu("configuracion", "Configuración");
-  const menuHerramientas = await ensureMenu("herramientas", "Herramientas");
+  const menuPrincipal = await ensureMenu("principal", "Principal", 1, true);
+  const menuHerramientas = await ensureMenu("herramientas", "Herramientas", 2, true);
+  const menuConfiguracion = await ensureMenu("configuracion", "Configuración", 3, true);
 
   await ensureMenuOpcion(menuPrincipal.id, herramientaDashboard.id, "dashboard", "Dashboard", "icon.dashboard", 1);
   await ensureMenuOpcion(menuConfiguracion.id, herramientaUsuarios.id, "usuarios_perfiles", "Usuarios y Perfiles", "icon.usuarios", 1);

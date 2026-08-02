@@ -197,6 +197,20 @@
       "when": 1785677528002,
       "tag": "0027_flippant_sentinels",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1785683240983,
+      "tag": "0028_previous_earthquake",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1785683809943,
+      "tag": "0029_flawless_romulus",
+      "breakpoints": true
     }
   ]
 }

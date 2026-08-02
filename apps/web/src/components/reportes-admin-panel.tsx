@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { PlusCircle, Pencil, Trash2, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { ReporteDialog } from "@/components/reporte-dialog";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import type { ReporteInput } from "@valgian/core";
@@ -12,12 +13,20 @@ interface ReporteRow {
   codigo: string;
   nombre: string;
   descripcion: string | null;
+  idCategoria: string | null;
   query: string | null;
   columnas: unknown;
 }
 
+interface CategoriaOption {
+  id: string;
+  codigo: string;
+  nombre: string;
+}
+
 interface ReportesAdminPanelProps {
   reportes: ReporteRow[];
+  categorias: CategoriaOption[];
   selectedId: string | null;
   onSelect: (id: string) => void;
   canGestionar: boolean;
@@ -26,7 +35,7 @@ interface ReportesAdminPanelProps {
   onDelete: (id: string) => Promise<{ error?: string } | void>;
 }
 
-export function ReportesAdminPanel({ reportes, selectedId, onSelect, canGestionar, onSinPermiso, onSave, onDelete }: ReportesAdminPanelProps) {
+export function ReportesAdminPanel({ reportes, categorias, selectedId, onSelect, canGestionar, onSinPermiso, onSave, onDelete }: ReportesAdminPanelProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<ReporteRow | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<ReporteRow | null>(null);
@@ -79,6 +88,7 @@ export function ReportesAdminPanel({ reportes, selectedId, onSelect, canGestiona
         )}
         {reportes.map((r) => {
           const isSelected = selectedId === r.id;
+          const categoria = categorias.find((c) => c.id === r.idCategoria);
           return (
             <li
               key={r.id}
@@ -90,6 +100,11 @@ export function ReportesAdminPanel({ reportes, selectedId, onSelect, canGestiona
               <div className="min-w-0">
                 <div className="mb-0.5 flex items-center gap-2">
                   <span className="font-mono text-xs font-bold text-primary">[{r.codigo}]</span>
+                  {categoria && (
+                    <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">
+                      {categoria.nombre}
+                    </Badge>
+                  )}
                 </div>
                 <span className="truncate text-sm font-medium text-foreground">{r.nombre}</span>
               </div>
@@ -122,7 +137,7 @@ export function ReportesAdminPanel({ reportes, selectedId, onSelect, canGestiona
         })}
       </ul>
 
-      <ReporteDialog key={editing?.id ?? "new"} open={dialogOpen} onOpenChange={setDialogOpen} reporte={editing} onSave={onSave} />
+      <ReporteDialog key={editing?.id ?? "new"} open={dialogOpen} onOpenChange={setDialogOpen} reporte={editing} categorias={categorias} onSave={onSave} />
 
       <ConfirmDialog
         open={!!deleteConfirm}

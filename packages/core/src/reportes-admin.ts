@@ -1,5 +1,5 @@
 import { and, eq, count } from "drizzle-orm";
-import { db, reportes, reportesFiltros, reportesPerfiles, filtros, perfiles } from "@valgian/db";
+import { db, reportes, reportesCategorias, reportesFiltros, reportesPerfiles, filtros, perfiles } from "@valgian/db";
 
 /** ABM de REPORTES — a diferencia de packages/core/src/reportes.ts (ejecución de búsquedas/export). */
 
@@ -7,10 +7,15 @@ export async function listReportesAdmin() {
   return db.select().from(reportes).orderBy(reportes.nombre);
 }
 
+export async function listReportesCategorias() {
+  return db.select().from(reportesCategorias).orderBy(reportesCategorias.nombre);
+}
+
 export interface ReporteInput {
   codigo: string;
   nombre: string;
   descripcion: string | null;
+  idCategoria: string;
   query: string;
   columnas: unknown;
 }

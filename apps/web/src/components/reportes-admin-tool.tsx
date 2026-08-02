@@ -14,8 +14,15 @@ interface ReporteRow {
   codigo: string;
   nombre: string;
   descripcion: string | null;
+  idCategoria: string | null;
   query: string | null;
   columnas: unknown;
+}
+
+interface CategoriaOption {
+  id: string;
+  codigo: string;
+  nombre: string;
 }
 
 interface FiltroOption {
@@ -26,11 +33,12 @@ interface FiltroOption {
 
 interface ReportesAdminToolProps {
   reportesIniciales: ReporteRow[];
+  categorias: CategoriaOption[];
   filtrosDisponibles: FiltroOption[];
   canGestionar: boolean;
 }
 
-export function ReportesAdminTool({ reportesIniciales, filtrosDisponibles, canGestionar }: ReportesAdminToolProps) {
+export function ReportesAdminTool({ reportesIniciales, categorias, filtrosDisponibles, canGestionar }: ReportesAdminToolProps) {
   const router = useRouter();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
@@ -68,6 +76,7 @@ export function ReportesAdminTool({ reportesIniciales, filtrosDisponibles, canGe
       <aside className="w-72 shrink-0 overflow-hidden rounded-xl border border-border">
         <ReportesAdminPanel
           reportes={reportesIniciales}
+          categorias={categorias}
           selectedId={selectedId}
           onSelect={(id) => setSelectedId((prev) => (prev === id ? null : id))}
           canGestionar={canGestionar}

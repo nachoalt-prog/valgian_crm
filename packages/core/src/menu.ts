@@ -12,6 +12,8 @@ interface MenuOpcion {
 
 interface MenuGrupo {
   nombre: string;
+  orden: number | null;
+  abierto: boolean | null;
   opciones: MenuOpcion[];
 }
 
@@ -28,6 +30,8 @@ export async function getMenuForPerfil(perfilId: string, interfazId: string | nu
     .select({
       menuId: menues.id,
       menuNombre: menues.nombre,
+      menuOrden: menues.orden,
+      menuAbierto: menues.abierto,
       opcionId: menuesOpciones.id,
       opcionCodigo: menuesOpciones.codigo,
       opcionNombre: menuesOpciones.nombre,
@@ -44,7 +48,7 @@ export async function getMenuForPerfil(perfilId: string, interfazId: string | nu
   const grupos = new Map<string, MenuGrupo>();
   for (const fila of filas) {
     if (!grupos.has(fila.menuId)) {
-      grupos.set(fila.menuId, { nombre: fila.menuNombre, opciones: [] });
+      grupos.set(fila.menuId, { nombre: fila.menuNombre, orden: fila.menuOrden, abierto: fila.menuAbierto, opciones: [] });
     }
     grupos.get(fila.menuId)!.opciones.push({
       id: fila.opcionId,
@@ -55,9 +59,11 @@ export async function getMenuForPerfil(perfilId: string, interfazId: string | nu
     });
   }
 
-  for (const grupo of grupos.values()) {
+  const listaGrupos = Array.from(grupos.values());
+  for (const grupo of listaGrupos) {
     grupo.opciones.sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
   }
+  listaGrupos.sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
 
-  return Array.from(grupos.values());
+  return listaGrupos;
 }

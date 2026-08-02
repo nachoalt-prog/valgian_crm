@@ -107,6 +107,12 @@ export const menues = pgTable("MENUES", {
   id: uuid("ID").primaryKey().defaultRandom(),
   codigo: text("CODIGO").notNull(),
   nombre: text("NOMBRE").notNull(),
+  // Orden entre los grupos de menú del sidebar — más bajo aparece primero.
+  orden: integer("ORDEN"),
+  // Estado inicial del grupo (desplegado/colapsado) la primera vez que se
+  // carga el sidebar tras loguearse — de ahí en más el usuario lo puede
+  // togglear libremente (estado en memoria, no persiste, ver app-sidebar.tsx).
+  abierto: boolean("ABIERTO"),
   comodin: jsonb("COMODIN"),
 });
 
@@ -411,6 +417,16 @@ export const bandejasPerfiles = pgTable(
  * exporta, no dispara nada sobre un legajo/trámite. Tabla separada de
  * BANDEJAS a propósito (conceptos de producto distintos).
  */
+export const reportesCategorias = pgTable(
+  "REPORTES_CATEGORIAS",
+  {
+    id: uuid("ID").primaryKey().defaultRandom(),
+    codigo: text("CODIGO").notNull(),
+    nombre: text("NOMBRE").notNull(),
+  },
+  (table) => [uniqueIndex("REPORTES_CATEGORIAS_CODIGO_UNIQUE").on(table.codigo)],
+);
+
 export const reportes = pgTable(
   "REPORTES",
   {
@@ -418,6 +434,9 @@ export const reportes = pgTable(
     codigo: text("CODIGO").notNull(),
     nombre: text("NOMBRE").notNull(),
     descripcion: text("DESCRIPCION"),
+    idCategoria: uuid("ID_CATEGORIA")
+      .notNull()
+      .references(() => reportesCategorias.id),
     // SELECT con alias — la base sobre la que se filtra y de la que salen las columnas.
     query: text("QUERY"),
     // Qué alias de QUERY se muestran como columnas del listado, en qué orden y con qué label.

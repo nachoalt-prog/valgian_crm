@@ -1,4 +1,4 @@
-import { getPermisoParaOperacion, OPERACION_ACCESO, listReportesAdmin, listFiltros } from "@valgian/core";
+import { getPermisoParaOperacion, OPERACION_ACCESO, listReportesAdmin, listReportesCategorias, listFiltros } from "@valgian/core";
 import { getCurrentSession } from "@/lib/current-user";
 import { SinAcceso } from "@/components/sin-acceso";
 import { ReportesAdminTool } from "@/components/reportes-admin-tool";
@@ -13,7 +13,7 @@ export default async function ReportesAdminPage() {
     return <SinAcceso herramienta="Reportes (ABM)" />;
   }
 
-  const [reportes, filtrosDisponibles] = await Promise.all([listReportesAdmin(), listFiltros()]);
+  const [reportes, categorias, filtrosDisponibles] = await Promise.all([listReportesAdmin(), listReportesCategorias(), listFiltros()]);
 
-  return <ReportesAdminTool reportesIniciales={reportes} filtrosDisponibles={filtrosDisponibles} canGestionar={tieneAcceso} />;
+  return <ReportesAdminTool reportesIniciales={reportes} categorias={categorias} filtrosDisponibles={filtrosDisponibles} canGestionar={tieneAcceso} />;
 }

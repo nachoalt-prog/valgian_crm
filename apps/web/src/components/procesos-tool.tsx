@@ -1,15 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { PlusCircle, Pencil, Trash2, Timer, Play } from "lucide-react";
+import { PlusCircle, Pencil, Trash2, Timer, Play, Loader2, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ProcesoDialog } from "@/components/proceso-dialog";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { cn } from "@/lib/utils";
 import type { ProcesoInput } from "@valgian/core";
-import { createProcesoAction, updateProcesoAction, deleteProcesoAction, dispararProcesoManualAction } from "@/app/dashboard/procesos/actions";
+import {
+  createProcesoAction,
+  updateProcesoAction,
+  deleteProcesoAction,
+  dispararProcesoManualAction,
+  cancelarEjecucionProcesoAction,
+} from "@/app/dashboard/procesos/actions";
 
 interface ProcesoRow {
   id: string;
@@ -20,6 +28,7 @@ interface ProcesoRow {
   activo: boolean | null;
   reintentoMinutos: number | null;
   reintentosMax: number | null;
+  ejecutandose: boolean;
 }
 
 interface ProcesosToolProps {
@@ -35,6 +44,18 @@ export function ProcesosTool({ procesosIniciales, canGestionar }: ProcesosToolPr
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [disparando, setDisparando] = useState<string | null>(null);
+  const [cancelando, setCancelando] = useState<string | null>(null);
+  const [hoverStop, setHoverStop] = useState<string | null>(null);
+
+  // Mientras algún proceso esté pendiente/procesando, refresca cada 3s para
+  // que el spinner desaparezca solo apenas termine (sin esto, quedaría
+  // "colgado" hasta la próxima acción manual del usuario).
+  const hayActivos = procesosIniciales.some((p) => p.ejecutandose);
+  useEffect(() => {
+    if (!hayActivos) return;
+    const id = setInterval(() => router.refresh(), 3000);
+    return () => clearInterval(id);
+  }, [hayActivos, router]);
 
   function mostrarAviso(mensaje: string) {
     setAviso(mensaje);
@@ -82,6 +103,15 @@ export function ProcesosTool({ procesosIniciales, canGestionar }: ProcesosToolPr
     const result = await dispararProcesoManualAction(p.id);
     setDisparando(null);
     mostrarAviso(result?.error ? `Error: ${result.error}` : `"${p.nombre}" encolado — lo va a tomar el próximo ejecutor disponible.`);
+    if (!result?.error) router.refresh();
+  }
+
+  async function cancelarProceso(p: ProcesoRow) {
+    if (!canGestionar) return mostrarAviso("No tenés permiso de gestión sobre esta herramienta.");
+    setCancelando(p.id);
+    const result = await cancelarEjecucionProcesoAction(p.id);
+    setCancelando(null);
+    mostrarAviso(result?.error ? `Error: ${result.error}` : `"${p.nombre}" cancelado.`);
     if (!result?.error) router.refresh();
   }
 
@@ -137,16 +167,39 @@ export function ProcesosTool({ procesosIniciales, canGestionar }: ProcesosToolPr
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-7 text-muted-foreground hover:text-primary"
-                          disabled={disparando === p.id}
-                          onClick={() => correrAhora(p)}
-                          title="Correr ahora"
-                        >
-                          <Play className="size-3.5" />
-                        </Button>
+                        {p.ejecutandose ? (
+                          <Tooltip>
+                            <TooltipTrigger
+                              render={
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className={cn("size-7", hoverStop === p.id ? "text-destructive hover:text-destructive" : "text-primary")}
+                                  disabled={cancelando === p.id}
+                                  onMouseEnter={() => setHoverStop(p.id)}
+                                  onMouseLeave={() => setHoverStop(null)}
+                                  onClick={() => cancelarProceso(p)}
+                                >
+                                  {hoverStop === p.id ? <Square className="size-3.5 fill-current" /> : <Loader2 className="size-3.5 animate-spin" />}
+                                </Button>
+                              }
+                            />
+                            <TooltipContent side="top" className="text-xs">
+                              Cancelar ejecución
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-7 text-muted-foreground hover:text-primary"
+                            disabled={disparando === p.id}
+                            onClick={() => correrAhora(p)}
+                            title="Correr ahora"
+                          >
+                            <Play className="size-3.5" />
+                          </Button>
+                        )}
                         <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                           <Button variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-primary" onClick={() => abrirEdicion(p)}>
                             <Pencil className="size-3.5" />

@@ -174,6 +174,8 @@ Mecanismo (sin `next-themes`, sin dependencia nueva — mismo patrón que ya usa
 
 ## Menú lateral — grupos colapsables
 
-Cada grupo del menú (`MenuGrupo.nombre`, ej. "ABMs", "Configuración") tiene su propio botón con chevron que oculta/muestra sus opciones — independiente del colapso GLOBAL del sidebar (que angosta todo a solo íconos). Estado en memoria (`useState` en `app-sidebar.tsx`, no persistido) — todos los grupos abiertos por default.
+Cada grupo del menú (`MenuGrupo.nombre`, ej. "ABMs", "Configuración") tiene su propio botón con chevron que oculta/muestra sus opciones — independiente del colapso GLOBAL del sidebar (que angosta todo a solo íconos). Estado en memoria (`useState` en `app-sidebar.tsx`, no persistido — se resetea a los valores de abajo en cada carga de página).
+
+`MENUES.ORDEN` (integer) define el orden entre grupos (`getMenuForPerfil` los devuelve ya ordenados) — estándar: Principal=1, Herramientas=2, Configuración=3. `MENUES.ABIERTO` (boolean) define el estado inicial (desplegado/colapsado) la primera vez que se carga el sidebar tras loguearse — de ahí en más el usuario lo togglea libremente sin volver a leer la base. Ambos administrables desde el ABM de Menúes (`/dashboard/menues`) — para los 3 menúes estándar, también se resincronizan en cada corrida de `pnpm db:seed` (`ensureMenu`, a diferencia de `codigo`/`nombre`, que nunca se pisan).
 
 El scroll del `<nav>` del sidebar usa la clase `.sidebar-scroll` (`apps/web/src/app/globals.css`) — fino (5px) y transparente por default, toma el color `--sidebar-primary` del sitio solo mientras el mouse está encima. `scrollbar-color`/`scrollbar-width` para Firefox, pseudo-elementos `::-webkit-scrollbar*` para Chrome/Edge/Safari — sin JS, puro CSS.

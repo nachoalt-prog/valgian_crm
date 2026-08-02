@@ -6,18 +6,31 @@ Reusa el mecanismo de query-filtros y la tabla `FILTROS` de Bandejas — ver ADR
 
 ## Tablas
 
+### REPORTES_CATEGORIAS
+
+| Campo  | Tipo             |
+| ------ | ---------------- |
+| ID     | UUID, PK         |
+| CODIGO | string, unique   |
+| NOMBRE | string           |
+
+Categorías estándar (seedeadas en `seed-config.ts`): `auditoria` ("Auditoría"), `utilidades` ("Utilidades"), `general` ("General") — administrables como cualquier catálogo simple, sin ABM propio todavía (se agregan por seed si hace falta una nueva).
+
 ### REPORTES
 
-| Campo       | Tipo                                                              |
-| ----------- | -------------------------------------------------------------------- |
-| ID          | UUID, PK                                                              |
-| CODIGO      | string, unique                                                        |
-| NOMBRE      | string                                                                |
-| DESCRIPCION | string, nullable                                                      |
-| QUERY       | text — SQL base del reporte, con alias explícitos (mismo formato que `BANDEJAS.QUERY`) |
-| COLUMNAS    | jsonb — columnas visibles del listado: `[{campo, label, tipo, orden}]` |
+| Campo        | Tipo                                                              |
+| ------------ | -------------------------------------------------------------------- |
+| ID           | UUID, PK                                                              |
+| CODIGO       | string, unique                                                        |
+| NOMBRE       | string                                                                |
+| DESCRIPCION  | string, nullable                                                      |
+| ID_CATEGORIA | FK → REPORTES_CATEGORIAS, **not null**                                |
+| QUERY        | text — SQL base del reporte, con alias explícitos (mismo formato que `BANDEJAS.QUERY`) |
+| COLUMNAS     | jsonb — columnas visibles del listado: `[{campo, label, tipo, orden}]` |
 
-`QUERY` se carga por código/migración (autoría de developer, mismo nivel de confianza que `ACCIONES.COMANDO`/`BANDEJAS.QUERY` — ver ADR 0009 y ADR 0014). No hay pantalla de SQL libre para admin.
+`QUERY` se carga por código/migración (autoría de developer, mismo nivel de confianza que `ACCIONES.COMANDO`/`BANDEJAS.QUERY` — ver ADR 0009 y ADR 0014), pero a diferencia de `BANDEJAS.QUERY`, sí es editable desde el ABM de Reportes (`/dashboard/reportes-admin`) — no hay pantalla de SQL libre para el USUARIO final, pero un admin con acceso a esa herramienta puede tocar `QUERY`/`COLUMNAS`/`ID_CATEGORIA` directamente.
+
+**Orden por defecto**: todo `REPORTES.QUERY` termina con `ORDER BY <columna de fecha principal> DESC` — el motor de paginación (`query-filtros.ts`) no agrega ningún `ORDER BY` propio, así que sin uno en la query de base el orden entre páginas queda indefinido. El click-to-sort del listado (`ReporteResultados`) solo reordena la página actual, no sirve como sustituto de esto.
 
 ### REPORTES_FILTROS
 
@@ -68,7 +81,7 @@ Mismo criterio que Bandejas (ADR 0009, ADR 0014): `REPORTES.QUERY` es contenido 
 
 ## Herramientas de administración
 
-- **`/dashboard/reportes`** (`HERRAMIENTAS.CODIGO = 'reportes'`): la herramienta de búsqueda — elegir reporte, aplicar filtros, ver listado paginado, exportar. `ReportesTool` reusa `BandejaFiltros` tal cual (el formulario de filtros es idéntico en forma a Bandejas — mismo `FiltroBandeja`/`FiltroReporte` estructural) y agrega `ReporteResultados` (paginación + export, sin columna "Acciones" porque no hay apertura).
+- **`/dashboard/reportes`** (`HERRAMIENTAS.CODIGO = 'reportes'`): la herramienta de búsqueda — elegir reporte, aplicar filtros, ver listado paginado, exportar. `ReportesTool` reusa `BandejaFiltros` tal cual (el formulario de filtros es idéntico en forma a Bandejas — mismo `FiltroBandeja`/`FiltroReporte` estructural) y agrega `ReporteResultados` (paginación + export, sin columna "Acciones" porque no hay apertura). El listado de la izquierda (`ReportesPanel`) agrupa los reportes por `REPORTES_CATEGORIAS.NOMBRE` (los sin categoría, imposible hoy por el `NOT NULL`, caerían en "Sin categoría") — `listReportesParaPerfil` ya devuelve las filas ordenadas por categoría primero.
 - **`/dashboard/reportes-admin`** (`HERRAMIENTAS.CODIGO = 'reportes_admin'`, distinto de `'reportes'`, mismo criterio que `bandejas_admin`/`bandejas`): ABM de los vínculos — qué `FILTROS` tiene cada reporte (`REPORTES_FILTROS`, con `CAMPO`/`ORDEN`) y qué `PERFILES` lo ven (`REPORTES_PERFILES`, checklist). `REPORTES.QUERY`/`COLUMNAS` no se editan desde acá — se cargan por migración/seed.
 
 ## Implementación

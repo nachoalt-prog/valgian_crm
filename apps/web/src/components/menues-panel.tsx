@@ -14,7 +14,7 @@ interface MenuesPanelProps {
   onSelectMenu: (id: string) => void;
   canGestionar: boolean;
   onSinPermiso: () => void;
-  onSave: (data: { codigo: string; nombre: string }, id?: string) => Promise<{ error?: string } | void>;
+  onSave: (data: { codigo: string; nombre: string; orden: number | null; abierto: boolean }, id?: string) => Promise<{ error?: string } | void>;
   onDelete: (id: string) => Promise<{ error?: string } | void>;
 }
 

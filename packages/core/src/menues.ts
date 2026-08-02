@@ -5,6 +5,8 @@ export interface MenuConContador {
   id: string;
   codigo: string;
   nombre: string;
+  orden: number | null;
+  abierto: boolean | null;
   opcionesCount: number;
 }
 
@@ -14,11 +16,13 @@ export async function listMenues(): Promise<MenuConContador[]> {
       id: menues.id,
       codigo: menues.codigo,
       nombre: menues.nombre,
+      orden: menues.orden,
+      abierto: menues.abierto,
       opcionesCount: count(menuesOpciones.id),
     })
     .from(menues)
     .leftJoin(menuesOpciones, eq(menuesOpciones.idMenu, menues.id))
-    .groupBy(menues.id, menues.codigo, menues.nombre);
+    .groupBy(menues.id, menues.codigo, menues.nombre, menues.orden, menues.abierto);
 
   return rows.map((r) => ({ ...r, opcionesCount: Number(r.opcionesCount) }));
 }
@@ -26,6 +30,8 @@ export async function listMenues(): Promise<MenuConContador[]> {
 export interface MenuInput {
   codigo: string;
   nombre: string;
+  orden: number | null;
+  abierto: boolean;
 }
 
 interface Resultado<T> {

@@ -47,7 +47,7 @@ Auditoría **y** cola de disparo — una fila es tanto "esto hay que correr" com
 | FECHA_PROGRAMADA       | timestamp — cuándo tiene que correr esta instancia puntual    |
 | NUMERO_INTENTO         | integer, default 1                                            |
 | ID_EJECUCION_ORIGEN    | FK nullable, self-reference → PROCESOS_EJECUCIONES — si es reintento, la ejecución que falló |
-| ESTADO                 | `pendiente / procesando / completado / error`                 |
+| ESTADO                 | `pendiente / procesando / completado / error / cancelada`     |
 | FECHA_INICIO           | timestamp, nullable — arranque de TODA la ejecución            |
 | FECHA_INICIO_PASO      | timestamp, nullable — arranque del paso actualmente en curso (distinto de `FECHA_INICIO`; es lo que compara el barrido de huérfanas contra `TIMEOUT_MINUTOS` del paso en curso) |
 | FECHA_FIN              | timestamp, nullable                                            |
@@ -118,6 +118,12 @@ Por diseño, **no hay catch-up automático**: el evaluador solo mira "¿matchea 
 ### Disparo manual
 
 Desde el ABM de `PROCESOS`, un botón "Correr ahora" — no necesita mecanismo aparte: es un `INSERT` directo en `PROCESOS_EJECUCIONES` (`ORIGEN='manual'`, `ID_USUARIO_DISPARO`, `FECHA_PROGRAMADA=ahora`, sin `ID_PASO_DESDE`), sin pasar por el evaluador. Se suma a la misma cola que ya reclaman los ejecutores — mismo guard de no-solapamiento, mismas reglas de reintento si falla.
+
+### Cancelación (cooperativa, no un `kill` real)
+
+`cancelarEjecucionProceso` (`packages/core/src/procesos.ts`) marca `ESTADO='cancelada'` sobre cualquier `PROCESOS_EJECUCIONES` `pendiente`/`procesando` de ese `PROCESO`. No hay forma de interrumpir un `EXECUTE` ya en curso sin matar el backend de Postgres que lo corre — en cambio, `sp_ejecutar_un_proceso_pendiente` relee el `ESTADO` de la fila **antes de cada paso** (nunca en medio de uno) y corta el loop si ya no es `procesando`. Efecto práctico: el paso que ya estaba corriendo en el instante de la cancelación termina igual, pero ningún paso siguiente arranca, y no se genera fila de reintento. Si la ejecución todavía estaba `pendiente` (nunca la reclamó ningún ejecutor), la cancelación es inmediata y total — el claim del ejecutor filtra por `ESTADO = 'pendiente'`, así que una fila `cancelada` nunca se reclama.
+
+ABM (`ProcesosTool`, `apps/web/src/components/procesos-tool.tsx`): mientras el `PROCESO` tiene una ejecución `pendiente`/`procesando` (`ProcesoConEstado.ejecutandose`, calculado en `listProcesosAdmin`), el botón "Correr ahora" se reemplaza por un spinner; al pasar el mouse por encima se convierte en un cuadrado rojo (tooltip "Cancelar ejecución") que dispara la cancelación al hacer click. Mientras haya algún proceso `ejecutandose`, la pantalla se refresca sola cada 3 segundos (`router.refresh()`) para que el spinner desaparezca solo apenas termine, sin depender de que el usuario haga algo.
 
 ## Cómo se conecta con acciones externas
 

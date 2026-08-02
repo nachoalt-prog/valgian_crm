@@ -20,6 +20,7 @@ interface MenuOpcion {
 
 interface MenuGrupo {
   nombre: string;
+  abierto: boolean | null;
   opciones: MenuOpcion[];
 }
 
@@ -58,8 +59,12 @@ export function AppSidebar({
 }) {
   const [collapsed, setCollapsed] = useState(false);
   // Colapso individual por grupo — el botón del grupo siempre se ve, solo se
-  // ocultan sus opciones. Todos abiertos por default; solo guarda los cerrados.
-  const [gruposCerrados, setGruposCerrados] = useState<Set<string>>(new Set());
+  // ocultan sus opciones. Estado inicial: MENUES.ABIERTO (al loguearse/cargar
+  // por primera vez) — de ahí en más el usuario lo togglea libremente, en
+  // memoria, sin volver a leer la base (mismo criterio ya documentado).
+  const [gruposCerrados, setGruposCerrados] = useState<Set<string>>(
+    () => new Set(menu.filter((g) => g.abierto === false).map((g) => g.nombre)),
+  );
   const [tema, setTema] = useState<Theme>(temaInicial);
   const pathname = usePathname();
 
