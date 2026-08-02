@@ -735,6 +735,9 @@ export const accionesExternas = pgTable(
     // el COMPONENTE barra todo junto. Se crea, NO se usa todavía — ningún
     // código se ramifica según este valor por ahora.
     inmediato: boolean("INMEDIATO").default(true),
+    // Si es true, esta acción aparece en el combo de proveedores de mensajería
+    // (ej. el modal de "Probar" de Plantillas de Mensajería) — filtra junto con ACTIVO.
+    mensajeria: boolean("MENSAJERIA").default(false),
     reintentosMax: integer("REINTENTOS_MAX"),
     // Minutos de margen desde ACCIONES_EXTERNAS_COLA.FECHA_ENCOLADO — pasado
     // ese margen, no se reintenta más aunque REINTENTO no haya llegado a REINTENTOS_MAX.
@@ -844,10 +847,15 @@ export const mensajeriaCola = pgTable("MENSAJERIA_COLA", {
   // A dónde mandarlo (mail, teléfono, lo que pida el proveedor) — lo interpreta
   // cada COMPONENTE, la cola no le da ningún formato particular.
   destino: text("DESTINO"),
-  // Datos raíz para la resolución de placeholders (mismo rol que
-  // GENERACIONES_DOCUMENTO.DATOS) — los guarda SP_MENSAJERIA_ENCOLAR.
-  datosRaiz: jsonb("DATOS_RAIZ"),
-  // Mapa código->valor YA resueltos — lo escribe el componente al mandar, para auditoría (nunca el crudo de DATOS_RAIZ).
+  // Datos raíz para resolver placeholders desde cero (mismo rol que
+  // GENERACIONES_DOCUMENTO.DATOS) — los guarda sp_mensajeria_encolar/
+  // sp_encolar_mensaje_sin_commit cuando el llamador NO pasa PLACEHOLDERS ya resuelto.
+  placeholdersDatosRaiz: jsonb("PLACEHOLDERS_DATOS_RAIZ"),
+  // Doble uso: (a) si viene NULL al encolar, el componente resuelve desde
+  // PLACEHOLDERS_DATOS_RAIZ y recién ACÁ escribe el mapa código->valor al
+  // mandar, para auditoría; (b) si viene YA poblado al encolar (ej. el modal
+  // de "Probar" de Plantillas de Mensajería), se usa directo como input para
+  // sustituir en asunto/cuerpo, sin resolver ni consultar PLACEHOLDERS_DATOS_RAIZ.
   placeholders: jsonb("PLACEHOLDERS"),
   // null = no intentado, 0 = éxito, cualquier otro valor = error — mismo criterio que ACCIONES_EXTERNAS_COLA.
   resultado: integer("RESULTADO"),

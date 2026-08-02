@@ -938,7 +938,7 @@ async function main() {
       v_id_mensajeria_cola := gen_random_uuid();
 
       INSERT INTO "MENSAJERIA_COLA"
-        ("ID", "ID_ACCION_EXTERNA", "ID_MENSAJERIA_PLANTILLA", "ID_ENTIDAD", "ID_REGISTRO", "ASUNTO", "DESTINO", "DATOS_RAIZ", "FECHA_ENCOLADO")
+        ("ID", "ID_ACCION_EXTERNA", "ID_MENSAJERIA_PLANTILLA", "ID_ENTIDAD", "ID_REGISTRO", "ASUNTO", "DESTINO", "PLACEHOLDERS_DATOS_RAIZ", "FECHA_ENCOLADO")
       VALUES
         (v_id_mensajeria_cola, v_id_accion_externa, v_id_plantilla, v_id_entidad, v_id_cliente, v_asunto, v_destino,
          jsonb_build_object('id_cliente', v_id_cliente::text, 'fecha', (now() + interval '5 days')::text), now());

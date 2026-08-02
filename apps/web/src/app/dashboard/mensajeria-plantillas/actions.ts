@@ -6,7 +6,11 @@ import {
   crearMensajeriaPlantilla,
   actualizarMensajeriaPlantilla,
   borrarMensajeriaPlantilla,
+  extraerPlaceholdersDePlantilla,
   listEstimulosConEstrategia,
+  listAccionesExternasMensajeria,
+  encolarMensaje,
+  getEstadoMensaje,
   getPermisoParaOperacion,
   OPERACION_ACCESO,
   type ActualizarMensajeriaPlantillaInput,
@@ -93,4 +97,51 @@ export async function borrarMensajeriaPlantillaAction(id: string) {
   const result = await borrarMensajeriaPlantilla(id);
   if (result.data) revalidatePath("/dashboard/mensajeria-plantillas");
   return result;
+}
+
+/** Usado por el modal de "Probar" — arma un campo por cada placeholder que usa la plantilla. */
+export async function listPlaceholdersDePlantillaAction(idPlantilla: string) {
+  const check = await requireGestion();
+  if (check.error) return { error: check.error };
+  return extraerPlaceholdersDePlantilla(idPlantilla);
+}
+
+/** Combo de acciones externas del modal de "Probar" — solo las habilitadas para mensajería. */
+export async function listAccionesExternasMensajeriaAction() {
+  const check = await requireGestion();
+  if (check.error) return { error: check.error };
+  return { data: await listAccionesExternasMensajeria() };
+}
+
+export interface EnviarMensajePruebaInput {
+  idPlantilla: string;
+  idAccionExterna: string;
+  destino: string;
+  placeholders: Record<string, string>;
+}
+
+/** Encola un mensaje de prueba desde el modal — sin entidad/registro real, placeholders ya resueltos por el usuario, siempre inmediato. */
+export async function enviarMensajePruebaAction(input: EnviarMensajePruebaInput) {
+  const check = await requireGestion();
+  if (check.error) return { error: check.error };
+  if (!input.destino) return { error: "Falta el email destino." };
+
+  const { id } = await encolarMensaje({
+    idPlantilla: input.idPlantilla,
+    idAccionExterna: input.idAccionExterna,
+    idEntidad: null,
+    idRegistro: null,
+    datos: null,
+    destino: input.destino,
+    placeholders: input.placeholders,
+    forzarInmediato: true,
+  });
+  return { data: { id } };
+}
+
+/** Polling del modal de "Probar" hasta que el mensaje termine de mandarse o de reintentar. */
+export async function getEstadoMensajePruebaAction(id: string) {
+  const check = await requireGestion();
+  if (check.error) return { error: check.error };
+  return { data: await getEstadoMensaje(id) };
 }

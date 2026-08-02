@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { PlusCircle, Pencil, Trash2, Mail, Paperclip } from "lucide-react";
+import { PlusCircle, Pencil, Trash2, Mail, Paperclip, FlaskConical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { MensajeriaPlantillaDialog } from "@/components/mensajeria-plantilla-dialog";
+import { MensajeriaPlantillaProbarDialog } from "@/components/mensajeria-plantilla-probar-dialog";
 import { ArchivoAdjuntoDialog } from "@/components/archivo-adjunto-dialog";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { HERRAMIENTA_MENSAJERIA_PLANTILLAS_CODIGO } from "@/lib/archivos-adjuntos-const";
@@ -24,6 +25,7 @@ export function MensajeriaPlantillasTool({ plantillasIniciales, estimulosDisponi
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<MensajeriaPlantillaDetalle | null>(null);
   const [archivoTarget, setArchivoTarget] = useState<MensajeriaPlantillaDetalle | null>(null);
+  const [probarTarget, setProbarTarget] = useState<MensajeriaPlantillaDetalle | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<MensajeriaPlantillaDetalle | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
@@ -43,6 +45,11 @@ export function MensajeriaPlantillasTool({ plantillasIniciales, estimulosDisponi
     if (!canGestionar) return avisarSinPermiso();
     setEditing(p);
     setDialogOpen(true);
+  }
+
+  function abrirPrueba(p: MensajeriaPlantillaDetalle) {
+    if (!canGestionar) return avisarSinPermiso();
+    setProbarTarget(p);
   }
 
   function pedirBorrado(p: MensajeriaPlantillaDetalle) {
@@ -133,6 +140,17 @@ export function MensajeriaPlantillasTool({ plantillasIniciales, estimulosDisponi
                         <Button
                           variant="ghost"
                           size="icon"
+                          className="size-7 text-muted-foreground hover:text-primary"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            abrirPrueba(p);
+                          }}
+                        >
+                          <FlaskConical className="size-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           className="size-7 text-muted-foreground hover:text-destructive"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -175,6 +193,15 @@ export function MensajeriaPlantillasTool({ plantillasIniciales, estimulosDisponi
           canGuardar={canGestionar}
           onGuardado={() => router.refresh()}
           tiposPermitidos={["html"]}
+        />
+      )}
+
+      {probarTarget && (
+        <MensajeriaPlantillaProbarDialog
+          key={probarTarget.id}
+          open={!!probarTarget}
+          onOpenChange={(o) => !o && setProbarTarget(null)}
+          plantilla={probarTarget}
         />
       )}
 

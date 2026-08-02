@@ -28,3 +28,5 @@ psql "$DATABASE_URL" -f sql/0001_trigger_clientes_titular.sql
 - `0014_sp_barrer_procesos_huerfanos.sql`: `PROCEDURE` del barrido de ejecuciones `procesando` cuyo paso en curso superó su timeout (caída de Postgres a mitad de camino).
 - `0015_pg_cron_jobs_procesos.sql`: registro de los jobs de `pg_cron` (1 evaluador + 3 ejecutores + 1 barrido de huérfanas) — a diferencia de los anteriores, esto es config/infraestructura (`cron.schedule` con nombre, idempotente), no DDL.
 - `0016_sp_encolar_mensaje_sin_commit.sql`: `PROCEDURE` que encola un mensaje igual que `sp_mensajeria_encolar`, sin los `COMMIT` internos — para usar desde `ACCIONES.COMANDO`/`PROCESOS_PASOS.COMANDO` (que corren vía `EXECUTE` dinámico, nunca admiten control transaccional en la cadena).
+- `0017_sp_mensajeria_encolar_placeholders_forzar_inmediato.sql`: agrega `p_placeholders`/`p_forzar_inmediato` a `sp_mensajeria_encolar` (`DROP` + recreate) — ver `domain/acciones-externas.md`, sección "Probar una plantilla".
+- `0018_sp_encolar_mensaje_sin_commit_placeholders_forzar_inmediato.sql`: mismos parámetros nuevos, en paridad, sobre `sp_encolar_mensaje_sin_commit`.

@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db, mensajeriaPlantillas } from "@valgian/db";
-import { guardarArchivo, borrarArchivo } from "./archivos-adjuntos";
+import { guardarArchivo, borrarArchivo, leerArchivoCrudo } from "./archivos-adjuntos";
+import { extraerCodigosPlaceholders } from "./placeholders";
 
 interface Resultado<T> {
   data?: T;
@@ -114,6 +115,18 @@ export async function actualizarMensajeriaPlantilla(id: string, input: Actualiza
     .where(eq(mensajeriaPlantillas.id, id));
 
   return { data: true };
+}
+
+/** Códigos ##CODIGO## que usa la plantilla (asunto + HTML del archivo modelo), sin resolverlos — para el modal de "Probar". */
+export async function extraerPlaceholdersDePlantilla(id: string): Promise<Resultado<string[]>> {
+  const plantilla = await getMensajeriaPlantillaPorId(id);
+  if (!plantilla) return { error: "No existe la plantilla." };
+  if (!plantilla.idArchivoAdjunto) return { data: extraerCodigosPlaceholders(plantilla.asunto) };
+
+  const archivo = await leerArchivoCrudo(plantilla.idArchivoAdjunto);
+  if (archivo.error || !archivo.data) return { error: archivo.error ?? "No se pudo leer el HTML de la plantilla." };
+
+  return { data: extraerCodigosPlaceholders(plantilla.asunto, archivo.data.buffer.toString("utf-8")) };
 }
 
 /** Borra la plantilla y su archivo asociado (si tiene uno cargado). */

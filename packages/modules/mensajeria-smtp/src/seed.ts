@@ -14,7 +14,7 @@ async function ensureAccionExterna(
   codigo: string,
   nombre: string,
   componente: string,
-  opciones: { parametros: unknown; reintentosMax?: number; reintentosMargen?: number },
+  opciones: { parametros: unknown; reintentosMax?: number; reintentosMargen?: number; mensajeria?: boolean },
 ) {
   const [existente] = await db.select().from(accionesExternas).where(eq(accionesExternas.codigo, codigo));
   if (existente) return existente;
@@ -28,6 +28,7 @@ async function ensureAccionExterna(
       parametros: opciones.parametros,
       reintentosMax: opciones.reintentosMax,
       reintentosMargen: opciones.reintentosMargen,
+      mensajeria: opciones.mensajeria,
     })
     .returning();
   return creada;
@@ -47,6 +48,7 @@ async function main() {
     parametros: parametrosSmtpDesdeEnv(),
     reintentosMax: 3,
     reintentosMargen: 15,
+    mensajeria: true,
   });
 
   console.log("Seed de Mensajería SMTP aplicado (idempotente).");

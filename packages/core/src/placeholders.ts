@@ -67,6 +67,39 @@ export interface ResolverPlaceholdersResult {
 
 const PLACEHOLDER_REGEX = /##([A-Za-z0-9_]+)##/g;
 
+/**
+ * Códigos ##CODIGO## presentes en uno o más textos (HTML o texto plano), SIN
+ * resolverlos contra PLACEHOLDERS — dedupe, orden de aparición. La usa
+ * resolverPlaceholders por dentro, y también se expone para "solo listar sin
+ * resolver" (ej. el modal de "Probar" de Plantillas de Mensajería, sobre
+ * ASUNTO + HTML del archivo modelo, sin pegarle a la base).
+ */
+export function extraerCodigosPlaceholders(...textos: (string | null | undefined)[]): string[] {
+  const codigos = new Set<string>();
+  for (const texto of textos) {
+    if (!texto) continue;
+    for (const m of texto.matchAll(PLACEHOLDER_REGEX)) codigos.add(m[1]);
+  }
+  return [...codigos];
+}
+
+/**
+ * Sustituye ##CODIGO## en `texto` a partir de un mapa YA resuelto — sin
+ * pegarle a PLACEHOLDERS/queries. La usa procesarUnMensaje cuando
+ * MENSAJERIA_COLA.PLACEHOLDERS ya viene poblada al encolar (ver
+ * domain/acciones-externas.md). A diferencia de resolverPlaceholders, acá no
+ * hay PLACEHOLDERS.ESCAPAR que consultar — el llamador es responsable de
+ * pasar valores ya listos para insertar. Un código sin entrada en el mapa
+ * queda literal (mismo criterio que resolverPlaceholders).
+ */
+export function sustituirPlaceholdersDesdeMapa(texto: string, valores: Record<string, string>): string {
+  let resultado = texto;
+  for (const codigo of extraerCodigosPlaceholders(texto)) {
+    if (codigo in valores) resultado = resultado.replaceAll(`##${codigo}##`, valores[codigo]);
+  }
+  return resultado;
+}
+
 function escapeHtml(valor: string): string {
   return valor
     .replaceAll("&", "&amp;")
@@ -86,7 +119,7 @@ async function ejecutarQueryPlaceholder(query: string, datos: unknown): Promise<
 }
 
 export async function resolverPlaceholders(htmlTemplate: string, datos: unknown): Promise<ResolverPlaceholdersResult> {
-  const codigos = [...new Set([...htmlTemplate.matchAll(PLACEHOLDER_REGEX)].map((m) => m[1]))];
+  const codigos = extraerCodigosPlaceholders(htmlTemplate);
   if (codigos.length === 0) return { html: htmlTemplate };
 
   const filas = await db.select().from(placeholders).where(inArray(placeholders.codigo, codigos));

@@ -1,6 +1,6 @@
 import { and, eq, isNull, ne, or, sql } from "drizzle-orm";
 import { db, mensajeriaCola, mensajeriaColaAdjuntos, mensajeriaPlantillas, accionesExternas, archivosAdjuntos, tiposArchivosAdjuntos } from "@valgian/db";
-import { resolverPlaceholders, type ResolverPlaceholdersResult } from "./placeholders";
+import { resolverPlaceholders, sustituirPlaceholdersDesdeMapa, type ResolverPlaceholdersResult } from "./placeholders";
 import { leerArchivoCrudo } from "./archivos-adjuntos";
 import { aplicarEstimulo } from "./motor-estados";
 import { getEntidadPorCodigo } from "./entidades";
@@ -26,9 +26,14 @@ export interface EncolarMensajeInput {
   datos: unknown;
   /** A dónde mandarlo (mail, teléfono, ...) — cada COMPONENTE lo interpreta a su manera. */
   destino?: string | null;
+  /** Si viene completo, procesarUnMensaje lo usa como input para resolver asunto/cuerpo
+   * (sustituirPlaceholdersDesdeMapa) en vez de resolver contra PLACEHOLDERS_DATOS_RAIZ. */
+  placeholders?: Record<string, string> | null;
+  /** Si es true, siempre inserta la fila de disparo en ACCIONES_EXTERNAS_COLA, sin importar ACCIONES_EXTERNAS.INMEDIATO. */
+  forzarInmediato?: boolean;
 }
 
-/** Ejecuta SP_MENSAJERIA_ENCOLAR — ver packages/db/sql/0009_sp_mensajeria_encolar_destino.sql. */
+/** Ejecuta SP_MENSAJERIA_ENCOLAR — ver packages/db/sql/0017_sp_mensajeria_encolar_placeholders_forzar_inmediato.sql. */
 export async function encolarMensaje(input: EncolarMensajeInput): Promise<{ id: string }> {
   const id = crypto.randomUUID();
   const idsAdjuntos = input.idsAdjuntos ?? [];
@@ -44,8 +49,10 @@ export async function encolarMensaje(input: EncolarMensajeInput): Promise<{ id: 
         )}]`
       : sql`ARRAY[]::uuid[]`;
 
+  const placeholders = input.placeholders ? JSON.stringify(input.placeholders) : null;
+
   await db.execute(
-    sql`CALL sp_mensajeria_encolar(${id}, ${input.idPlantilla}, ${input.idAccionExterna}, ${input.idEntidad ?? null}, ${input.idRegistro ?? null}, ${arrayAdjuntos}, ${JSON.stringify(input.datos)}::jsonb, ${input.destino ?? null})`,
+    sql`CALL sp_mensajeria_encolar(${id}, ${input.idPlantilla}, ${input.idAccionExterna}, ${input.idEntidad ?? null}, ${input.idRegistro ?? null}, ${arrayAdjuntos}, ${JSON.stringify(input.datos)}::jsonb, ${input.destino ?? null}, ${placeholders}::jsonb, ${input.forzarInmediato ?? false})`,
   );
   return { id };
 }
@@ -58,7 +65,9 @@ interface FilaMensajeCola {
   idRegistro: string | null;
   asunto: string | null;
   destino: string | null;
-  datosRaiz: unknown;
+  placeholdersDatosRaiz: unknown;
+  /** Si ya viene poblado, procesarUnMensaje lo usa como input en vez de resolver desde placeholdersDatosRaiz. */
+  placeholders: Record<string, string> | null;
   fechaEncolado: Date | null;
   reintento: number;
 }
@@ -80,14 +89,15 @@ async function listMensajesElegibles(filtro: { id: string } | { idAccionExterna:
       idRegistro: mensajeriaCola.idRegistro,
       asunto: mensajeriaCola.asunto,
       destino: mensajeriaCola.destino,
-      datosRaiz: mensajeriaCola.datosRaiz,
+      placeholdersDatosRaiz: mensajeriaCola.placeholdersDatosRaiz,
+      placeholders: mensajeriaCola.placeholders,
       fechaEncolado: mensajeriaCola.fechaEncolado,
       reintento: mensajeriaCola.reintento,
     })
     .from(mensajeriaCola)
     .where(and(condicionElegible(), condicionExtra));
 
-  return filas.map((f) => ({ ...f, reintento: f.reintento ?? 0 }));
+  return filas.map((f) => ({ ...f, reintento: f.reintento ?? 0, placeholders: f.placeholders as Record<string, string> | null }));
 }
 
 export interface MensajeriaColaAdjuntoDetalle {
@@ -235,21 +245,28 @@ async function procesarUnMensaje(fila: FilaMensajeCola, parametrosAccion: unknow
     return false;
   }
 
-  const cuerpoResuelto = await resolverPlaceholders(htmlCrudo.data.buffer.toString("utf-8"), fila.datosRaiz);
+  const htmlCrudoTexto = htmlCrudo.data.buffer.toString("utf-8");
+  const placeholdersPrecargados = fila.placeholders;
+
+  const cuerpoResuelto: ResolverPlaceholdersResult = placeholdersPrecargados
+    ? { html: sustituirPlaceholdersDesdeMapa(htmlCrudoTexto, placeholdersPrecargados) }
+    : await resolverPlaceholders(htmlCrudoTexto, fila.placeholdersDatosRaiz);
   if (cuerpoResuelto.error || cuerpoResuelto.html === undefined) {
     await finalizarIntentoMensaje(fila, { resultado: 1, resultadoDesc: cuerpoResuelto.error ?? "Error resolviendo el cuerpo del mensaje.", placeholders: null });
     return false;
   }
 
   const asuntoResuelto: ResolverPlaceholdersResult = fila.asunto
-    ? await resolverPlaceholders(fila.asunto, fila.datosRaiz)
+    ? placeholdersPrecargados
+      ? { html: sustituirPlaceholdersDesdeMapa(fila.asunto, placeholdersPrecargados) }
+      : await resolverPlaceholders(fila.asunto, fila.placeholdersDatosRaiz)
     : { html: undefined, valores: {} };
   if (asuntoResuelto.error) {
     await finalizarIntentoMensaje(fila, { resultado: 1, resultadoDesc: asuntoResuelto.error, placeholders: null });
     return false;
   }
 
-  const placeholdersResueltos = { ...cuerpoResuelto.valores, ...asuntoResuelto.valores };
+  const placeholdersResueltos = placeholdersPrecargados ?? { ...cuerpoResuelto.valores, ...asuntoResuelto.valores };
   const adjuntos = await cargarAdjuntosMensaje(fila.id);
 
   const mensaje: MensajeParaEnviar = {
@@ -257,7 +274,7 @@ async function procesarUnMensaje(fila: FilaMensajeCola, parametrosAccion: unknow
     asunto: asuntoResuelto.html ?? fila.asunto,
     cuerpoHtml: cuerpoResuelto.html,
     destino: fila.destino,
-    datosRaiz: fila.datosRaiz,
+    datosRaiz: fila.placeholdersDatosRaiz,
     adjuntos,
   };
 
@@ -304,4 +321,33 @@ export async function procesarComponenteMensajeria(fila: FilaAccionExternaCola, 
     resultado: huboError ? 1 : 0,
     resultadoDesc: `${mensajes.length} mensaje(s) procesado(s)${huboError ? ", con al menos un error" : ""}.`,
   });
+}
+
+export interface AccionExternaMensajeriaOption {
+  id: string;
+  nombre: string;
+}
+
+/** Acciones externas habilitadas para el combo de "Probar" de Plantillas de Mensajería — MENSAJERIA=true y ACTIVO=true. */
+export async function listAccionesExternasMensajeria(): Promise<AccionExternaMensajeriaOption[]> {
+  return db
+    .select({ id: accionesExternas.id, nombre: accionesExternas.nombre })
+    .from(accionesExternas)
+    .where(and(eq(accionesExternas.mensajeria, true), eq(accionesExternas.activo, true)))
+    .orderBy(accionesExternas.nombre);
+}
+
+export interface EstadoMensaje {
+  resultado: number | null;
+  resultadoDesc: string | null;
+  reintentosSuperados: boolean;
+}
+
+/** Para el polling del modal de "Probar" — RESULTADO=0 es éxito, REINTENTOS_SUPERADOS=true es falla definitiva. */
+export async function getEstadoMensaje(id: string): Promise<EstadoMensaje | null> {
+  const [fila] = await db
+    .select({ resultado: mensajeriaCola.resultado, resultadoDesc: mensajeriaCola.resultadoDesc, reintentosSuperados: mensajeriaCola.reintentosSuperados })
+    .from(mensajeriaCola)
+    .where(eq(mensajeriaCola.id, id));
+  return fila ? { ...fila, reintentosSuperados: fila.reintentosSuperados ?? false } : null;
 }
