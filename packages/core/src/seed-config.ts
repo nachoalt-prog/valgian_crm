@@ -508,7 +508,12 @@ ORDER BY G."ALTA_FECHA" DESC
   const REPORTE_AUDITORIA_GENERACIONES_COLUMNAS = [
     { campo: "plantilla", label: "Plantilla" },
     { campo: "entidad", label: "Entidad" },
-    { campo: "estado", label: "Estado", tipo: "badge" },
+    {
+      campo: "estado",
+      label: "Estado",
+      tipo: "badge",
+      colores: { pendiente: "warning", procesando: "info", completado: "success", error: "error" },
+    },
     { campo: "alta_fecha", label: "Solicitado", tipo: "fecha_hora" },
     { campo: "audit_fecha", label: "Actualizado", tipo: "fecha_hora" },
     { campo: "archivo_resultado", label: "Archivo generado" },
@@ -603,7 +608,12 @@ ORDER BY MC."FECHA_ENCOLADO" DESC
 
   const REPORTE_MENSAJERIA_COLUMNAS = [
     { campo: "plantilla", label: "Plantilla" },
-    { campo: "resultado", label: "Resultado", tipo: "badge" },
+    {
+      campo: "resultado",
+      label: "Resultado",
+      tipo: "badge",
+      colores: { Pendiente: "warning", Éxito: "success", Error: "error" },
+    },
     { campo: "resultado_desc", label: "Detalle" },
     { campo: "fecha_encolado", label: "Fecha", tipo: "fecha_hora" },
     { campo: "adjuntos_id", label: "Adjuntos", tipo: "adjuntos" },
@@ -650,7 +660,12 @@ ORDER BY AEC."FECHA_ENCOLADO" DESC
 
   const REPORTE_ACCIONES_EXTERNAS_COLUMNAS = [
     { campo: "accion", label: "Acción" },
-    { campo: "resultado", label: "Resultado", tipo: "badge" },
+    {
+      campo: "resultado",
+      label: "Resultado",
+      tipo: "badge",
+      colores: { Pendiente: "warning", Éxito: "success", Error: "error" },
+    },
     { campo: "resultado_desc", label: "Detalle" },
     { campo: "reintento", label: "Reintento" },
     { campo: "tiempo_conexion", label: "Tiempo (ms)" },
@@ -707,7 +722,12 @@ ORDER BY PE."FECHA_PROGRAMADA" DESC
 
   const REPORTE_PROCESOS_COLUMNAS = [
     { campo: "proceso", label: "Proceso" },
-    { campo: "estado", label: "Estado", tipo: "badge" },
+    {
+      campo: "estado",
+      label: "Estado",
+      tipo: "badge",
+      colores: { pendiente: "warning", procesando: "info", completado: "success", error: "error", cancelada: "neutral" },
+    },
     { campo: "origen", label: "Origen" },
     { campo: "numero_intento", label: "Intento" },
     { campo: "error", label: "Error" },

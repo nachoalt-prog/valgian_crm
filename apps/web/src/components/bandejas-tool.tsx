@@ -8,6 +8,7 @@ import { LegajoLayoutModal } from "@/components/legajo-layout-modal";
 import { TramiteModal } from "@/components/tramite-modal";
 import { getBandejaConfigAction, buscarBandejaAction } from "@/app/dashboard/bandejas/actions";
 import { getPermisoTramitesAction } from "@/app/dashboard/tramites/actions";
+import { cn } from "@/lib/utils";
 import type { BandejaResumen, BandejaConfig } from "@valgian/core";
 
 interface TramiteAbierto {
@@ -22,6 +23,7 @@ interface BandejasToolProps {
 
 export function BandejasTool({ bandejasIniciales }: BandejasToolProps) {
   const [selectedBandejaId, setSelectedBandejaId] = useState<string | null>(null);
+  const [panelCollapsed, setPanelCollapsed] = useState(false);
   const [config, setConfig] = useState<BandejaConfig | null>(null);
   const [filterValues, setFilterValues] = useState<Record<string, string>>({});
   const [results, setResults] = useState<Record<string, unknown>[]>([]);
@@ -35,6 +37,7 @@ export function BandejasTool({ bandejasIniciales }: BandejasToolProps) {
 
   const handleSelectBandeja = useCallback(async (id: string) => {
     setSelectedBandejaId(id);
+    setPanelCollapsed(true);
     setFilterValues({});
     setResults([]);
     setSearched(false);
@@ -111,8 +114,19 @@ export function BandejasTool({ bandejasIniciales }: BandejasToolProps) {
         </div>
       )}
 
-      <aside className="w-72 shrink-0 overflow-hidden rounded-xl border border-border">
-        <BandejasPanel bandejas={bandejasIniciales} selectedBandejaId={selectedBandejaId} onSelectBandeja={handleSelectBandeja} />
+      <aside
+        className={cn(
+          "shrink-0 overflow-hidden rounded-xl border border-border transition-all duration-200 ease-in-out",
+          panelCollapsed ? "w-14" : "w-72",
+        )}
+      >
+        <BandejasPanel
+          bandejas={bandejasIniciales}
+          selectedBandejaId={selectedBandejaId}
+          onSelectBandeja={handleSelectBandeja}
+          collapsed={panelCollapsed}
+          onToggleCollapsed={() => setPanelCollapsed((v) => !v)}
+        />
       </aside>
 
       <div className="flex flex-1 flex-col overflow-hidden rounded-xl border border-border">

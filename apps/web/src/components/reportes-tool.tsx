@@ -7,6 +7,7 @@ import { ReporteResultados } from "@/components/reporte-resultados";
 import { MensajeriaColaAdjuntosDialog } from "@/components/mensajeria-cola-adjuntos-dialog";
 import { ProcesosEjecucionPasosDialog } from "@/components/procesos-ejecucion-pasos-dialog";
 import { getReporteConfigAction, buscarReporteAction } from "@/app/dashboard/reportes/actions";
+import { cn } from "@/lib/utils";
 import type { ReporteResumen, ReporteConfig } from "@valgian/core";
 
 interface ReportesToolProps {
@@ -15,6 +16,7 @@ interface ReportesToolProps {
 
 export function ReportesTool({ reportesIniciales }: ReportesToolProps) {
   const [selectedReporteId, setSelectedReporteId] = useState<string | null>(null);
+  const [panelCollapsed, setPanelCollapsed] = useState(false);
   const [verAdjuntosId, setVerAdjuntosId] = useState<string | null>(null);
   const [verPasosId, setVerPasosId] = useState<string | null>(null);
   const [config, setConfig] = useState<ReporteConfig | null>(null);
@@ -28,6 +30,7 @@ export function ReportesTool({ reportesIniciales }: ReportesToolProps) {
 
   const handleSelectReporte = useCallback(async (id: string) => {
     setSelectedReporteId(id);
+    setPanelCollapsed(true);
     setFilterValues({});
     setResults([]);
     setSearched(false);
@@ -105,8 +108,19 @@ export function ReportesTool({ reportesIniciales }: ReportesToolProps) {
 
   return (
     <div className="flex h-full gap-4">
-      <aside className="w-72 shrink-0 overflow-hidden rounded-xl border border-border">
-        <ReportesPanel reportes={reportesIniciales} selectedReporteId={selectedReporteId} onSelectReporte={handleSelectReporte} />
+      <aside
+        className={cn(
+          "shrink-0 overflow-hidden rounded-xl border border-border transition-all duration-200 ease-in-out",
+          panelCollapsed ? "w-14" : "w-72",
+        )}
+      >
+        <ReportesPanel
+          reportes={reportesIniciales}
+          selectedReporteId={selectedReporteId}
+          onSelectReporte={handleSelectReporte}
+          collapsed={panelCollapsed}
+          onToggleCollapsed={() => setPanelCollapsed((v) => !v)}
+        />
       </aside>
 
       <div className="flex flex-1 flex-col overflow-hidden rounded-xl border border-border">

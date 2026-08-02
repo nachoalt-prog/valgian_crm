@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronLeft, ChevronRight, ChevronDown, LogOut, Sun, Moon } from "lucide-react";
@@ -67,6 +67,20 @@ export function AppSidebar({
   );
   const [tema, setTema] = useState<Theme>(temaInicial);
   const pathname = usePathname();
+  const asideRef = useRef<HTMLElement>(null);
+
+  // Click afuera de la sidebar la colapsa — solo escucha mientras está
+  // expandida (no tiene sentido, ni cuesta nada, mientras ya está colapsada).
+  useEffect(() => {
+    if (collapsed) return;
+    function handlePointerDown(e: PointerEvent) {
+      if (asideRef.current && !asideRef.current.contains(e.target as Node)) {
+        setCollapsed(true);
+      }
+    }
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [collapsed]);
 
   // Sin cookie todavía, el layout.tsx pudo haber corregido la clase real del
   // <html> según prefers-color-scheme DESPUÉS del render de este componente
@@ -95,6 +109,7 @@ export function AppSidebar({
 
   return (
     <aside
+      ref={asideRef}
       className={cn(
         "flex flex-col h-full bg-sidebar border-r border-sidebar-border transition-all duration-200 ease-in-out shrink-0",
         collapsed ? "w-14" : "w-56",

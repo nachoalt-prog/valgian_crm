@@ -137,7 +137,8 @@ export function ReporteDialog({ open, onOpenChange, reporte, categorias, onSave 
 
           <div className="space-y-1.5">
             <Label htmlFor="columnas" className="text-xs uppercase tracking-wider text-muted-foreground">
-              Columnas visibles (JSON — alias de la query, label, tipo opcional)
+              Columnas visibles (JSON — alias de la query, label, tipo opcional. En tipo:"badge", "colores" opcional
+              mapea cada valor a un tono: success/warning/error/info/neutral)
             </Label>
             <textarea
               id="columnas"
@@ -145,7 +146,7 @@ export function ReporteDialog({ open, onOpenChange, reporte, categorias, onSave 
               onChange={(e) => setColumnasTexto(e.target.value)}
               rows={6}
               required
-              placeholder='[{"campo": "estado", "label": "Estado", "tipo": "badge"}, {"campo": "alta_fecha", "label": "Fecha", "tipo": "fecha"}]'
+              placeholder='[{"campo": "estado", "label": "Estado", "tipo": "badge", "colores": {"pendiente": "warning", "completado": "success", "error": "error"}}, {"campo": "alta_fecha", "label": "Fecha", "tipo": "fecha"}]'
               className="w-full rounded-lg border border-input bg-transparent px-3 py-2 font-mono text-xs text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
             />
           </div>

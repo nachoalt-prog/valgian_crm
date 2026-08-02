@@ -118,7 +118,7 @@ export function ReporteResultados({
             {filasOrdenadas.map((row, idx) => (
               <TableRow key={String(row.id ?? idx)}>
                 {columnas.map((c) => (
-                  <TableCell key={c.campo}>{formatearValor(row[c.campo], c.tipo, onVerAdjuntos, onVerPasos)}</TableCell>
+                  <TableCell key={c.campo}>{formatearValor(row[c.campo], c.tipo, onVerAdjuntos, onVerPasos, c.colores)}</TableCell>
                 ))}
               </TableRow>
             ))}

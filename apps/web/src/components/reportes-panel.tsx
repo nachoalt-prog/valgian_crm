@@ -1,15 +1,18 @@
 "use client";
 
-import { BarChart3 } from "lucide-react";
+import { BarChart3, ChevronLeft, ChevronRight } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ReporteResumen } from "@valgian/core";
 
 interface ReportesPanelProps {
   reportes: ReporteResumen[];
   selectedReporteId: string | null;
   onSelectReporte: (id: string) => void;
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
 }
 
-export function ReportesPanel({ reportes, selectedReporteId, onSelectReporte }: ReportesPanelProps) {
+export function ReportesPanel({ reportes, selectedReporteId, onSelectReporte, collapsed, onToggleCollapsed }: ReportesPanelProps) {
   const grupos = new Map<string, ReporteResumen[]>();
   for (const r of reportes) {
     const clave = r.categoriaNombre ?? "Sin categoría";
@@ -17,11 +20,46 @@ export function ReportesPanel({ reportes, selectedReporteId, onSelectReporte }: 
     grupos.get(clave)!.push(r);
   }
 
+  if (collapsed) {
+    return (
+      <section className="flex h-full flex-col items-center gap-2 bg-card/50 py-4">
+        <BarChart3 className="size-4 text-primary" />
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <button
+                type="button"
+                onClick={onToggleCollapsed}
+                aria-label="Expandir reportes"
+                className="size-7 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              >
+                <ChevronRight className="size-4" />
+              </button>
+            }
+          />
+          <TooltipContent side="right" className="text-xs">
+            Expandir reportes
+          </TooltipContent>
+        </Tooltip>
+      </section>
+    );
+  }
+
   return (
     <section className="flex h-full flex-col bg-card/50">
-      <div className="flex items-center gap-2 border-b border-border px-5 py-4">
-        <BarChart3 className="size-4 text-primary" />
-        <h2 className="text-sm font-semibold uppercase tracking-widest text-primary">Reportes</h2>
+      <div className="flex items-center justify-between gap-2 border-b border-border px-5 py-4">
+        <div className="flex items-center gap-2">
+          <BarChart3 className="size-4 text-primary" />
+          <h2 className="text-sm font-semibold uppercase tracking-widest text-primary">Reportes</h2>
+        </div>
+        <button
+          type="button"
+          onClick={onToggleCollapsed}
+          aria-label="Colapsar reportes"
+          className="size-7 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+        >
+          <ChevronLeft className="size-4" />
+        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto">

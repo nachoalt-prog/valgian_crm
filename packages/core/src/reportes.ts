@@ -39,6 +39,10 @@ export interface ColumnaReporte {
   campo: string;
   label: string;
   tipo?: string;
+  // Solo aplica con tipo:"badge" — mapea el valor crudo de la columna a un tono
+  // semántico ("success"/"warning"/"error"/"info"/"neutral", ver resultados-formato.tsx).
+  // Opcional: sin esto, el badge se ve igual que siempre (outline sin color).
+  colores?: Record<string, string>;
 }
 
 export interface OpcionFiltroReporte {

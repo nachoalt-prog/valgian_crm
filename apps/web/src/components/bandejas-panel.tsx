@@ -1,20 +1,58 @@
 "use client";
 
-import { Inbox } from "lucide-react";
+import { ChevronLeft, ChevronRight, Inbox } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { BandejaResumen } from "@valgian/core";
 
 interface BandejasPanelProps {
   bandejas: BandejaResumen[];
   selectedBandejaId: string | null;
   onSelectBandeja: (id: string) => void;
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
 }
 
-export function BandejasPanel({ bandejas, selectedBandejaId, onSelectBandeja }: BandejasPanelProps) {
+export function BandejasPanel({ bandejas, selectedBandejaId, onSelectBandeja, collapsed, onToggleCollapsed }: BandejasPanelProps) {
+  if (collapsed) {
+    return (
+      <section className="flex h-full flex-col items-center gap-2 bg-card/50 py-4">
+        <Inbox className="size-4 text-primary" />
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <button
+                type="button"
+                onClick={onToggleCollapsed}
+                aria-label="Expandir bandejas"
+                className="size-7 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              >
+                <ChevronRight className="size-4" />
+              </button>
+            }
+          />
+          <TooltipContent side="right" className="text-xs">
+            Expandir bandejas
+          </TooltipContent>
+        </Tooltip>
+      </section>
+    );
+  }
+
   return (
     <section className="flex h-full flex-col bg-card/50">
-      <div className="flex items-center gap-2 border-b border-border px-5 py-4">
-        <Inbox className="size-4 text-primary" />
-        <h2 className="text-sm font-semibold uppercase tracking-widest text-primary">Bandejas</h2>
+      <div className="flex items-center justify-between gap-2 border-b border-border px-5 py-4">
+        <div className="flex items-center gap-2">
+          <Inbox className="size-4 text-primary" />
+          <h2 className="text-sm font-semibold uppercase tracking-widest text-primary">Bandejas</h2>
+        </div>
+        <button
+          type="button"
+          onClick={onToggleCollapsed}
+          aria-label="Colapsar bandejas"
+          className="size-7 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+        >
+          <ChevronLeft className="size-4" />
+        </button>
       </div>
 
       <ul className="flex-1 divide-y divide-border overflow-y-auto">
