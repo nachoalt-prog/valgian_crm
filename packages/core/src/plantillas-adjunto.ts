@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db, plantillasAdjunto } from "@valgian/db";
 import { guardarArchivo, borrarArchivo, leerArchivoCrudo } from "./archivos-adjuntos";
 
@@ -96,6 +96,21 @@ export async function borrarPlantillaAdjunto(id: string): Promise<Resultado<true
   if (plantilla.idArchivoAdjunto) await borrarArchivo(plantilla.idArchivoAdjunto);
 
   return { data: true };
+}
+
+/**
+ * Los ARCHIVOS_ADJUNTOS que referencian estas PLANTILLAS_ADJUNTOS, tal cual
+ * (sin resolver placeholders) — usado por el modal de "Probar" de Plantillas
+ * de Mensajería, para adjuntar documentos ya existentes sin subir archivos
+ * nuevos ni generar basura. Ignora ids que no existan o no tengan archivo cargado.
+ */
+export async function resolverArchivosDePlantillas(idsPlantillasAdjunto: string[]): Promise<string[]> {
+  if (idsPlantillasAdjunto.length === 0) return [];
+  const filas = await db
+    .select({ idArchivoAdjunto: plantillasAdjunto.idArchivoAdjunto })
+    .from(plantillasAdjunto)
+    .where(inArray(plantillasAdjunto.id, idsPlantillasAdjunto));
+  return filas.map((f) => f.idArchivoAdjunto).filter((id): id is string => !!id);
 }
 
 /** El HTML crudo de la plantilla, listo para pasarle a resolverPlaceholders. */

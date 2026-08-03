@@ -11,12 +11,18 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import {
   listPlaceholdersDePlantillaAction,
   listAccionesExternasMensajeriaAction,
+  listPlantillasAdjuntoParaProbarAction,
   enviarMensajePruebaAction,
   getEstadoMensajePruebaAction,
 } from "@/app/dashboard/mensajeria-plantillas/actions";
 import type { AccionExternaMensajeriaOption } from "@valgian/core";
 
 interface PlantillaRow {
+  id: string;
+  nombre: string;
+}
+
+interface PlantillaAdjuntoOption {
   id: string;
   nombre: string;
 }
@@ -35,6 +41,8 @@ export function MensajeriaPlantillaProbarDialog({ open, onOpenChange, plantilla 
   const [codigos, setCodigos] = useState<string[]>([]);
   const [valores, setValores] = useState<Record<string, string>>({});
   const [acciones, setAcciones] = useState<AccionExternaMensajeriaOption[]>([]);
+  const [plantillasAdjunto, setPlantillasAdjunto] = useState<PlantillaAdjuntoOption[]>([]);
+  const [idsPlantillasSeleccionadas, setIdsPlantillasSeleccionadas] = useState<string[]>([]);
   const [destino, setDestino] = useState("");
   const [idAccionExterna, setIdAccionExterna] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -49,24 +57,34 @@ export function MensajeriaPlantillaProbarDialog({ open, onOpenChange, plantilla 
     setCargando(true);
     setError(null);
 
-    Promise.all([listPlaceholdersDePlantillaAction(plantilla.id), listAccionesExternasMensajeriaAction()]).then(([placeholdersRes, accionesRes]) => {
-      if (cancelado) return;
-      if (placeholdersRes.error) {
-        setError(placeholdersRes.error);
+    setIdsPlantillasSeleccionadas([]);
+
+    Promise.all([listPlaceholdersDePlantillaAction(plantilla.id), listAccionesExternasMensajeriaAction(), listPlantillasAdjuntoParaProbarAction()]).then(
+      ([placeholdersRes, accionesRes, plantillasAdjuntoRes]) => {
+        if (cancelado) return;
+        if (placeholdersRes.error) {
+          setError(placeholdersRes.error);
+          setCargando(false);
+          return;
+        }
+        if (accionesRes.error) {
+          setError(accionesRes.error);
+          setCargando(false);
+          return;
+        }
+        if (plantillasAdjuntoRes.error) {
+          setError(plantillasAdjuntoRes.error);
+          setCargando(false);
+          return;
+        }
+        const codigosEncontrados = placeholdersRes.data ?? [];
+        setCodigos(codigosEncontrados);
+        setValores(Object.fromEntries(codigosEncontrados.map((c) => [c, ""])));
+        setAcciones(accionesRes.data ?? []);
+        setPlantillasAdjunto(plantillasAdjuntoRes.data ?? []);
         setCargando(false);
-        return;
-      }
-      if (accionesRes.error) {
-        setError(accionesRes.error);
-        setCargando(false);
-        return;
-      }
-      const codigosEncontrados = placeholdersRes.data ?? [];
-      setCodigos(codigosEncontrados);
-      setValores(Object.fromEntries(codigosEncontrados.map((c) => [c, ""])));
-      setAcciones(accionesRes.data ?? []);
-      setCargando(false);
-    });
+      },
+    );
 
     return () => {
       cancelado = true;
@@ -98,6 +116,10 @@ export function MensajeriaPlantillaProbarDialog({ open, onOpenChange, plantilla 
     };
   }, [idMensajeEnCurso]);
 
+  function toggleAdjunto(id: string) {
+    setIdsPlantillasSeleccionadas((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
   async function handleEnviar() {
     if (!plantilla || !idAccionExterna) return;
     setError(null);
@@ -109,6 +131,7 @@ export function MensajeriaPlantillaProbarDialog({ open, onOpenChange, plantilla 
       idAccionExterna,
       destino,
       placeholders: valores,
+      idsPlantillasAdjunto: idsPlantillasSeleccionadas,
     });
 
     if (result.error || !result.data) {
@@ -172,6 +195,31 @@ export function MensajeriaPlantillaProbarDialog({ open, onOpenChange, plantilla 
                 </SelectContent>
               </Select>
               {acciones.length === 0 && <p className="text-xs text-muted-foreground">No hay acciones externas habilitadas para mensajería.</p>}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground">Adjuntos</Label>
+              {plantillasAdjunto.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No hay Plantillas de Documento con archivo cargado.</p>
+              ) : (
+                <ul className="max-h-40 overflow-y-auto rounded-lg border border-border">
+                  {plantillasAdjunto.map((p) => (
+                    <li key={p.id} className="border-b border-border last:border-b-0">
+                      <label className="flex cursor-pointer items-center gap-3 px-3 py-2 hover:bg-muted/50">
+                        <input
+                          type="checkbox"
+                          checked={idsPlantillasSeleccionadas.includes(p.id)}
+                          onChange={() => toggleAdjunto(p.id)}
+                          disabled={enviando}
+                          className="size-4 accent-primary"
+                        />
+                        <span className="text-sm text-foreground">{p.nombre}</span>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="text-xs text-muted-foreground">Se adjuntan los documentos tal cual — sin resolver placeholders.</p>
             </div>
 
             {enviando && <p className="text-sm text-muted-foreground">Enviando el mensaje, por favor espere en esta pantalla.</p>}

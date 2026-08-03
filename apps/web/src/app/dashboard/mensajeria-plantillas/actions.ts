@@ -9,6 +9,8 @@ import {
   extraerPlaceholdersDePlantilla,
   listEstimulosConEstrategia,
   listAccionesExternasMensajeria,
+  listPlantillasAdjunto,
+  resolverArchivosDePlantillas,
   encolarMensaje,
   getEstadoMensaje,
   getPermisoParaOperacion,
@@ -113,11 +115,20 @@ export async function listAccionesExternasMensajeriaAction() {
   return { data: await listAccionesExternasMensajeria() };
 }
 
+/** Combo de adjuntos del modal de "Probar" — reusa documentos ya existentes (PLANTILLAS_ADJUNTOS), no sube archivos nuevos. */
+export async function listPlantillasAdjuntoParaProbarAction() {
+  const check = await requireGestion();
+  if (check.error) return { error: check.error };
+  const plantillas = await listPlantillasAdjunto();
+  return { data: plantillas.filter((p) => p.idArchivoAdjunto).map((p) => ({ id: p.id, nombre: p.nombre })) };
+}
+
 export interface EnviarMensajePruebaInput {
   idPlantilla: string;
   idAccionExterna: string;
   destino: string;
   placeholders: Record<string, string>;
+  idsPlantillasAdjunto?: string[];
 }
 
 /** Encola un mensaje de prueba desde el modal — sin entidad/registro real, placeholders ya resueltos por el usuario, siempre inmediato. */
@@ -125,6 +136,8 @@ export async function enviarMensajePruebaAction(input: EnviarMensajePruebaInput)
   const check = await requireGestion();
   if (check.error) return { error: check.error };
   if (!input.destino) return { error: "Falta el email destino." };
+
+  const idsAdjuntos = input.idsPlantillasAdjunto?.length ? await resolverArchivosDePlantillas(input.idsPlantillasAdjunto) : [];
 
   const { id } = await encolarMensaje({
     idPlantilla: input.idPlantilla,
@@ -134,6 +147,7 @@ export async function enviarMensajePruebaAction(input: EnviarMensajePruebaInput)
     datos: null,
     destino: input.destino,
     placeholders: input.placeholders,
+    idsAdjuntos,
     forzarInmediato: true,
   });
   return { data: { id } };
