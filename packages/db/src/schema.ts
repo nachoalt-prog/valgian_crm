@@ -501,11 +501,20 @@ export const layoutsLegajoSolapas = pgTable(
  * para su propio ciclo de vida. Ver domain/tramites.md.
  */
 
-export const categoriasTiposTramite = pgTable("CATEGORIAS_TIPOS_TRAMITE", {
-  id: uuid("ID").primaryKey().defaultRandom(),
-  codigo: text("CODIGO").notNull(),
-  nombre: text("NOMBRE").notNull(),
-});
+export const categoriasTiposTramite = pgTable(
+  "CATEGORIAS_TIPOS_TRAMITE",
+  {
+    id: uuid("ID").primaryKey().defaultRandom(),
+    codigo: text("CODIGO").notNull(),
+    nombre: text("NOMBRE").notNull(),
+    // 1-3 letras mayúsculas (validado en el ABM y en crearCategoriaTipoTramite/
+    // actualizarCategoriaTipoTramite, packages/core/src/tipos-tramite.ts) —
+    // antepone el número de trámite de esta categoría (ver TRAMITES.NUMERO).
+    // Único: dos categorías con el mismo prefijo producirían números finales colisionando.
+    prefijo: text("PREFIJO").notNull(),
+  },
+  (table) => [uniqueIndex("CATEGORIAS_TIPOS_TRAMITE_PREFIJO_UNIQUE").on(table.prefijo)],
+);
 
 export const tiposTramite = pgTable("TIPOS_TRAMITE", {
   id: uuid("ID").primaryKey().defaultRandom(),
@@ -555,19 +564,27 @@ export const tiposTramiteCampos = pgTable("TIPOS_TRAMITE_CAMPOS", {
   listaValores: text("LISTA_VALORES"),
 });
 
-export const tramites = pgTable("TRAMITES", {
-  id: uuid("ID").primaryKey().defaultRandom(),
-  idTipoTramite: uuid("ID_TIPO_TRAMITE").references(() => tiposTramite.id),
-  idEstado: uuid("ID_ESTADO").references(() => estados.id),
-  // Junto a TIPOS_TRAMITE.ID_ENTIDAD (vía idTipoTramite) ubica el registro real.
-  idRegistro: uuid("ID_REGISTRO"),
-  comodin: jsonb("COMODIN"),
-  altaFecha: timestamp("ALTA_FECHA", { withTimezone: true }),
-  altaUsuario: uuid("ALTA_USUARIO").references(() => usuarios.id),
-  auditFecha: timestamp("AUDIT_FECHA", { withTimezone: true }),
-  auditUsuario: uuid("AUDIT_USUARIO").references(() => usuarios.id),
-  idTramitePadre: uuid("ID_TRAMITE_PADRE").references((): AnyPgColumn => tramites.id),
-});
+export const tramites = pgTable(
+  "TRAMITES",
+  {
+    id: uuid("ID").primaryKey().defaultRandom(),
+    idTipoTramite: uuid("ID_TIPO_TRAMITE").references(() => tiposTramite.id),
+    idEstado: uuid("ID_ESTADO").references(() => estados.id),
+    // Junto a TIPOS_TRAMITE.ID_ENTIDAD (vía idTipoTramite) ubica el registro real.
+    idRegistro: uuid("ID_REGISTRO"),
+    comodin: jsonb("COMODIN"),
+    // PREFIJO (de CATEGORIAS_TIPOS_TRAMITE, vía TIPOS_TRAMITE) + secuencial —
+    // la genera fn_tramites_generar_numero (trigger BEFORE INSERT), nunca se
+    // arma a mano. Ver domain/tramites.md.
+    numero: text("NUMERO").notNull(),
+    altaFecha: timestamp("ALTA_FECHA", { withTimezone: true }),
+    altaUsuario: uuid("ALTA_USUARIO").references(() => usuarios.id),
+    auditFecha: timestamp("AUDIT_FECHA", { withTimezone: true }),
+    auditUsuario: uuid("AUDIT_USUARIO").references(() => usuarios.id),
+    idTramitePadre: uuid("ID_TRAMITE_PADRE").references((): AnyPgColumn => tramites.id),
+  },
+  (table) => [uniqueIndex("TRAMITES_NUMERO_UNIQUE").on(table.numero)],
+);
 
 export const tramitesCamposDatos = pgTable(
   "TRAMITES_CAMPOS_DATOS",

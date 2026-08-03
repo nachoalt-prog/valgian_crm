@@ -292,6 +292,11 @@ async function main() {
   const herramientaMensajeriaPlantillas = await ensureHerramienta("mensajeria_plantillas", "Plantillas de Mensajería", "mensajeria_plantillas.gestionar");
   const herramientaAccionesExternas = await ensureHerramienta("acciones_externas", "Acciones Externas", "acciones_externas.gestionar");
   const herramientaProcesos = await ensureHerramienta("procesos", "Procesos", "procesos.gestionar");
+  const herramientaCategoriasTiposTramite = await ensureHerramienta(
+    "categorias_tipos_tramite",
+    "Categorías de Tipos de Trámite",
+    "categorias_tipos_tramite.gestionar",
+  );
   // Estas no se navegan desde el sidebar — se cargan embebidas dentro de un
   // LAYOUTS_LEGAJO dentro del modal de legajo abierto desde Bandejas.
   const herramientaLegajoDatos = await ensureHerramienta("LEGAJO_DAT_1", "Datos de Legajo", "legajo_dat_1.gestionar");
@@ -325,6 +330,7 @@ async function main() {
     herramientaMensajeriaPlantillas,
     herramientaAccionesExternas,
     herramientaProcesos,
+    herramientaCategoriasTiposTramite,
     herramientaLegajoDatos,
     herramientaLegajoClientes,
     herramientaGestionEntidad,
@@ -371,6 +377,7 @@ async function main() {
     herramientaReportesAdmin,
     herramientaMonedas,
     herramientaMensajeriaPlantillas,
+    herramientaCategoriasTiposTramite,
     herramientaLegajoDatos,
     herramientaLegajoClientes,
     herramientaGestionEntidad,
@@ -412,6 +419,14 @@ async function main() {
   await ensureMenuOpcion(menuHerramientas.id, herramientaBandejas.id, "bandejas", "Bandejas", "icon.bandejas", 1);
   await ensureMenuOpcion(menuHerramientas.id, herramientaReportes.id, "reportes", "Reportes", "icon.reportes", 2);
   await ensureMenuOpcion(menuHerramientas.id, herramientaProcesos.id, "procesos", "Procesos", "icon.procesos", 3);
+  await ensureMenuOpcion(
+    menuConfiguracion.id,
+    herramientaCategoriasTiposTramite.id,
+    "categorias_tipos_tramite",
+    "Categorías de Trámite",
+    "icon.categoriasTiposTramite",
+    17,
+  );
 
   await ensureInterfazMenu(interfazDefault.id, menuPrincipal.id);
   await ensureInterfazMenu(interfazDefault.id, menuConfiguracion.id);

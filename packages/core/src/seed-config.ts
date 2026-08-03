@@ -429,6 +429,7 @@ async function main() {
   const BANDEJA_TRAMITES_QUERY = `
 SELECT
   T."ID" AS id,
+  T."NUMERO" AS numero,
   TT."NOMBRE" AS tipo_tramite,
   TT."ID" AS tipo_tramite_id,
   E."NOMBRE" AS estado,
@@ -449,6 +450,7 @@ LEFT JOIN "CUENTAS" CU ON ENT."CODIGO" = 'cuentas' AND CU."ID" = T."ID_REGISTRO"
 `.trim();
 
   const BANDEJA_TRAMITES_COLUMNAS = [
+    { campo: "numero", label: "N°" },
     { campo: "tipo_tramite", label: "Tipo de Trámite" },
     { campo: "registro", label: "Sobre" },
     { campo: "estado", label: "Estado", tipo: "badge" },

@@ -25,17 +25,22 @@ export async function loginAction(_prevState: { error?: string } | undefined, fo
     path: "/",
   });
 
-  // Colores de énfasis de la interfaz real del perfil — para que la próxima
-  // vez que se muestre el login (sin sesión todavía) use estos en vez de
-  // caer siempre a la interfaz "default" (ver lib/interfaz-colores.ts).
+  // Colores de énfasis + imagen de fondo (URL, no la imagen en sí) de la
+  // interfaz real del perfil — para que la próxima vez que se muestre el
+  // login (sin sesión todavía) use estos en vez de caer siempre a la
+  // interfaz "default" (ver lib/interfaz-colores.ts).
   const session = await getSessionUser(result.token);
   const tema = session?.perfil?.idInterfaz ? await getTemaPorInterfaz(session.perfil.idInterfaz) : null;
-  if (tema?.colorPrimario || tema?.colorSecundario) {
-    cookieStore.set(INTERFAZ_COLORES_COOKIE, JSON.stringify({ colorPrimario: tema.colorPrimario, colorSecundario: tema.colorSecundario }), {
-      sameSite: "lax",
-      maxAge: 31536000,
-      path: "/",
-    });
+  if (tema?.colorPrimario || tema?.colorSecundario || tema?.imagenFondo) {
+    cookieStore.set(
+      INTERFAZ_COLORES_COOKIE,
+      JSON.stringify({ colorPrimario: tema.colorPrimario, colorSecundario: tema.colorSecundario, imagenFondo: tema.imagenFondo ?? null }),
+      {
+        sameSite: "lax",
+        maxAge: 31536000,
+        path: "/",
+      },
+    );
   }
 
   redirect("/dashboard");

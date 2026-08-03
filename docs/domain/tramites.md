@@ -6,13 +6,16 @@ Formularios configurables por tipo, que se pueden iniciar y gestionar sobre cual
 
 ### CATEGORIAS_TIPOS_TRAMITE
 
-| Campo  | Tipo     |
-| ------ | -------- |
-| ID     | UUID, PK |
-| CODIGO | string   |
-| NOMBRE | string   |
+| Campo   | Tipo                                                                 |
+| ------- | --------------------------------------------------------------------- |
+| ID      | UUID, PK                                                               |
+| CODIGO  | string                                                                 |
+| NOMBRE  | string                                                                 |
+| PREFIJO | string, **not null**, único — 1 a 3 letras mayúsculas (ej. `LEG`, `CLI`, `MSJ`) |
 
-Agrupación puramente organizativa para el desplegable "Categoría" del ABM de Trámites — no tiene efecto funcional.
+Agrupación organizativa para el desplegable "Categoría" del ABM de Trámites — ya no es *puramente* organizativa desde que `PREFIJO` antepone el número de cada `TRAMITE` de esta categoría (ver `TRAMITES.NUMERO` más abajo). `PREFIJO` es único a propósito: dos categorías con el mismo prefijo producirían números finales colisionando.
+
+ABM propio (`/dashboard/categorias-tipos-tramite`, `HERRAMIENTAS.CODIGO = 'categorias_tipos_tramite'`, `packages/core/src/tipos-tramite.ts`: `crearCategoriaTipoTramite`/`actualizarCategoriaTipoTramite`/`borrarCategoriaTipoTramite`) — antes de esto la tabla era de solo lectura, poblada únicamente por seed. `PREFIJO` se valida (1-3 letras mayúsculas) tanto en el diálogo (auto-uppercase al tipear) como en las funciones de `packages/core` — no hay `CHECK` a nivel Postgres, mismo criterio de validación en capa de aplicación que el resto de catálogos simples de este proyecto. Borrado bloqueado si hay `TIPOS_TRAMITE` en esa categoría.
 
 ### TIPOS_TRAMITE
 
@@ -77,6 +80,7 @@ Catálogo de tipos de campo soportados por el dibujado automático del Modal de 
 | ID_ESTADO        | FK → ESTADOS, nullable                              |
 | ID_REGISTRO      | UUID, nullable — junto a `TIPOS_TRAMITE.ID_ENTIDAD` ubica el registro real |
 | COMODIN          | jsonb, nullable                                     |
+| NUMERO           | string, **not null**, único — `PREFIJO` + secuencial, lo genera un trigger (ver más abajo), nunca se arma a mano |
 | ALTA_FECHA       | timestamp                                           |
 | ALTA_USUARIO     | FK → USUARIOS                                       |
 | AUDIT_FECHA      | timestamp                                           |
@@ -143,13 +147,27 @@ Firma: `sp_gestionar_tramite(p_id_tramite uuid, p_id_tipo_tramite uuid, p_id_reg
 
 **Validado que el `COMMIT` del paso 5 sobrevive aunque el paso 6 falle** (ej. estímulo inválido para el estado actual): se probó con procedures descartables que un `PROCEDURE` puede hacer `CALL` anidado a otro `PROCEDURE` con `COMMIT` interno sin el error `invalid transaction termination` que sí aparece al agrupar sentencias sueltas en un mismo `-c` de psql (ver `domain/motor-de-estados.md`) — esa restricción es solo para *funciones*, no para *procedures* anidados vía `CALL`.
 
+## TRAMITES.NUMERO — número legible, generado automáticamente
+
+Trigger `BEFORE INSERT ON TRAMITES` (`fn_tramites_generar_numero`, `packages/db/sql/0019_trigger_tramites_numero.sql`) — se activa sin importar qué código dispara el `INSERT` (hoy, siempre `sp_gestionar_tramite`, paso 3 de la sección de arriba; no hace falta que ese SP sepa nada de `NUMERO`).
+
+**Formato**: `PREFIJO` (de `CATEGORIAS_TIPOS_TRAMITE`, resuelto vía `TRAMITES.ID_TIPO_TRAMITE → TIPOS_TRAMITE.ID_CATEGORIA`) + un secuencial con padding a 6 dígitos por defecto — salvo que el número necesite más (a partir de 1000000 usa 7 dígitos, sin recortar): `lpad(v_numero::text, GREATEST(6, length(v_numero::text)), '0')`. Ej. `LEG000001`, `CLI000042`, y eventualmente `LEG1000000`.
+
+**Concurrencia**: el secuencial por categoría se lleva en una tabla contador nueva, `TRAMITES_NUMERO_SECUENCIA (ID_CATEGORIA uuid PK → CATEGORIAS_TIPOS_TRAMITE, ULTIMO_NUMERO integer)`, incrementada con `INSERT ... ON CONFLICT ("ID_CATEGORIA") DO UPDATE SET "ULTIMO_NUMERO" = "ULTIMO_NUMERO" + 1 RETURNING "ULTIMO_NUMERO"` — una única sentencia atómica, mismo patrón `ON CONFLICT DO UPDATE` que ya usa `sp_gestionar_tramite` para `TRAMITES_CAMPOS_DATOS`. Dos altas concurrentes de la misma categoría nunca pueden leer el mismo `ULTIMO_NUMERO` (Postgres serializa a nivel de fila ahí) — no hace falta `FOR UPDATE` explícito ni una `SEQUENCE` de Postgres por prefijo. Verificado en vivo con 5 altas disparadas en paralelo (`Promise.all`) sobre la misma categoría: 5 números únicos y consecutivos, sin colisiones.
+
+Si `TIPOS_TRAMITE.ID_CATEGORIA` es null, o esa categoría no tiene `PREFIJO` (no debería pasar — `PREFIJO` es `NOT NULL` desde que existe la columna), el trigger `RAISE EXCEPTION` — un `TIPO_TRAMITE` sin categoría con prefijo no puede tener trámites nuevos.
+
+**Nota sobre `ON CONFLICT DO NOTHING` de `sp_gestionar_tramite`**: como el trigger es `BEFORE INSERT` (no `BEFORE INSERT ... WHEN`), Postgres lo dispara igual aunque la fila termine sin insertarse por el `DO NOTHING` (ej. al re-`gestionar` un trámite ya existente) — consume un número de la secuencia sin usarlo. Es un "hueco" cosmético en la numeración (como cualquier `SERIAL`/`IDENTITY` de Postgres frente a un rollback), no un bug — no se intentó evitar.
+
+**Backfill**: los `TRAMITES` que ya existían antes de este mecanismo se numeraron a mano con un script scratch de una sola corrida (no versionado, no forma parte de ningún seed), en orden de `ALTA_FECHA`, usando el mismo incremento atómico contra `TRAMITES_NUMERO_SECUENCIA` — así los números backfilleados y los generados por el trigger de acá en más nunca colisionan.
+
 ## UI
 
 ### Modal de Trámites (`apps/web/src/components/tramite-modal.tsx`)
 
 Componente compartido, usado tanto desde el ABM de Trámites como desde la bandeja "Trámites" (ver más abajo). Recibe `idTipoTramite`, `idRegistro`, `idUsuario` (resuelto siempre server-side desde la sesión, nunca del cliente) y **`idTramite` opcional**: si viene, carga y edita ese trámite; si no, es una alta nueva — esto último solo puede pasar desde el botón "Iniciar" del ABM. Mismo tamaño que el modal de legajo (`h-[85vh] max-w-5xl`) — hasta hace poco era más chico (`max-w-3xl`), pero le quedaba justo con las solapas Historial/Adjuntos sumadas.
 
-- **Cabecera fija tipo-ticket** (simil sistemas de tickets/mesa de ayuda): franja debajo del título, visible sin importar la solapa activa (Datos/Historial/Adjuntos), con Tipo (`TIPOS_TRAMITE.NOMBRE`), Categoría (`CATEGORIAS_TIPOS_TRAMITE.NOMBRE`), Entidad (label resuelto del registro real — número de legajo, apellido+nombre de cliente, o número de cuenta, según `TIPOS_TRAMITE.ID_ENTIDAD` — mismo criterio que "Aplicar a" más abajo), N° (el propio `TRAMITES.ID`, no una columna `NUMERO` nueva — no existe tal columna en el schema) y Estado (`ESTADOS.NOMBRE` actual). Resuelto por `getCabeceraTramite` en `packages/core/src/tramites.ts`, que reusa la misma lógica de resolución de label por entidad que `resolverCandidatosAplicarA` (factorizada en `resolverLabelRegistro`). En alta nueva (sin `idTramite`), Tipo/Categoría/Entidad ya se conocen (vienen de las props); N°/Estado muestran "(nuevo)"/"—" hasta la primera gestión.
+- **Cabecera fija tipo-ticket** (simil sistemas de tickets/mesa de ayuda): franja debajo del título, visible sin importar la solapa activa (Datos/Historial/Adjuntos), con Tipo (`TIPOS_TRAMITE.NOMBRE`), Categoría (`CATEGORIAS_TIPOS_TRAMITE.NOMBRE`), Entidad (label resuelto del registro real — número de legajo, apellido+nombre de cliente, o número de cuenta, según `TIPOS_TRAMITE.ID_ENTIDAD` — mismo criterio que "Aplicar a" más abajo), N° (`TRAMITES.NUMERO`, ver más abajo — antes era el propio `ID`) y Estado (`ESTADOS.NOMBRE` actual). Tipo/Categoría/Entidad resueltos por `getCabeceraTramite` en `packages/core/src/tramites.ts`, que reusa la misma lógica de resolución de label por entidad que `resolverCandidatosAplicarA` (factorizada en `resolverLabelRegistro`). N° se resuelve aparte (`getNumeroTramiteAction` → `getTramiteDetalle(idTramite).numero`, solo si `idTramite` existe — no hay `NUMERO` hasta que el trigger lo genera al crear la fila). En alta nueva (sin `idTramite`), Tipo/Categoría/Entidad ya se conocen (vienen de las props); N°/Estado muestran "(nuevo)"/"—" hasta la primera gestión.
 - Dibuja los campos según `TIPOS_TRAMITE_CAMPOS` de ese tipo (respetando `ORDEN`, `OBLIGATORIO`, `PLACEHOLDER`, `AYUDA`, `REGEX`, `LONGITUD_MAX`, `NUM_MIN`/`MAX`/`STEP`). `TIPOS_TRAMITE.COMPONENTE` no se usa todavía (ver arriba).
 - Selector de estímulo: si `idTramite` existe, parte de su `ID_ESTADO` real; si no, del estado inicial de la estrategia del tipo de trámite (`getEstimulosDisponiblesTramite` en `packages/core/src/tramites.ts`, que reusa `getEstimulosDesdeEstado` — extraído de `motor-estados.ts` para no duplicar el filtro por `PERFILES_ESTIMULOS`).
 - Todo el mapeo de valores (formulario → columna de `TRAMITES_CAMPOS_DATOS` y viceversa) vive en server actions (`apps/web/src/app/dashboard/tramites/actions.ts`), nunca en el componente cliente — importar funciones de `@valgian/core` que tocan `db` desde un componente `"use client"` arrastraría el cliente de Postgres al bundle del navegador. El cliente solo maneja `{ idTipoTramiteCampo, codigoTipoCampo, valor }` crudo.
@@ -166,7 +184,7 @@ Herramienta embebible (sin entrada en `MENUES_OPCIONES`), configurada en la sola
 
 ### Bandeja "Trámites"
 
-Reutiliza el motor de Bandejas/Filtros existente **sin ningún cambio de código** — solo datos nuevos (`FILTROS`/`BANDEJAS`/`BANDEJAS_FILTROS` en el seed de configuración). La única pieza de código nueva es la apertura polimórfica: `BANDEJAS.TIPO_APERTURA = 'tramite'` hace que `bandejas-tool.tsx` monte el Modal de Trámites (usando `tipo_tramite_id`/`registro_id`, alias que expone `BANDEJAS.QUERY`) en vez de `LegajoLayoutModal` — ver `domain/bandejas.md`.
+Reutiliza el motor de Bandejas/Filtros existente **sin ningún cambio de código** — solo datos nuevos (`FILTROS`/`BANDEJAS`/`BANDEJAS_FILTROS` en el seed de configuración). La única pieza de código nueva es la apertura polimórfica: `BANDEJAS.TIPO_APERTURA = 'tramite'` hace que `bandejas-tool.tsx` monte el Modal de Trámites (usando `tipo_tramite_id`/`registro_id`, alias que expone `BANDEJAS.QUERY`) en vez de `LegajoLayoutModal` — ver `domain/bandejas.md`. Primera columna: N° (`TRAMITES.NUMERO`).
 
 ## Pendiente
 

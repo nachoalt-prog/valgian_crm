@@ -96,7 +96,7 @@ export function HistorialTool({ idLegajo, idEntidad, revision }: HistorialToolPr
                   <TableCell>{formatearFecha(fila.auditFecha)}</TableCell>
                   <TableCell>{fila.auditUsuarioNombre ?? "—"}</TableCell>
                   <TableCell>{formatearStatus(fila)}</TableCell>
-                  <TableCell className="max-w-md min-w-[16rem] wrap-break-word whitespace-normal">{fila.observacion ?? "—"}</TableCell>
+                  <TableCell className="max-w-md min-w-[16rem] wrap-break-word whitespace-pre-wrap">{fila.observacion ?? "—"}</TableCell>
                   <TableCell>
                     <Button
                       variant="ghost"

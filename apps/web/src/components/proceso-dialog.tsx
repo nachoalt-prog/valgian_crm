@@ -7,8 +7,22 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { cronDesdeFriendly, friendlyDesdeCron, type CronFriendly } from "@/lib/cron-friendly";
 import type { ProcesoInput } from "@valgian/core";
 import { listPasosPorProcesoAction } from "@/app/dashboard/procesos/actions";
+
+const DIAS_SEMANA = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+
+const FRECUENCIA_ITEMS: Record<CronFriendly["tipo"], string> = {
+  minutos: "Cada N minutos",
+  horas: "Cada N horas",
+  diario: "Diario",
+  semanal: "Semanal",
+  mensual: "Mensual",
+};
+
+const FRECUENCIA_DEFAULT: CronFriendly = { tipo: "diario", hora: 0, minuto: 0 };
 
 interface PasoRow {
   id: string;
@@ -40,7 +54,9 @@ export function ProcesoDialog({ open, onOpenChange, proceso, onSave }: ProcesoDi
   const [codigo, setCodigo] = useState(proceso?.codigo ?? "");
   const [nombre, setNombre] = useState(proceso?.nombre ?? "");
   const [descripcion, setDescripcion] = useState(proceso?.descripcion ?? "");
-  const [cron, setCron] = useState(proceso?.cron ?? "");
+  const cronExistente = proceso ? friendlyDesdeCron(proceso.cron) : null;
+  const [cronNoReconocido] = useState(!!proceso && !cronExistente);
+  const [frecuencia, setFrecuencia] = useState<CronFriendly>(cronExistente ?? FRECUENCIA_DEFAULT);
   const [activo, setActivo] = useState(proceso?.activo ?? true);
   const [reintentoMinutos, setReintentoMinutos] = useState(proceso?.reintentoMinutos != null ? String(proceso.reintentoMinutos) : "");
   const [reintentosMax, setReintentosMax] = useState(proceso?.reintentosMax != null ? String(proceso.reintentosMax) : "");
@@ -71,7 +87,7 @@ export function ProcesoDialog({ open, onOpenChange, proceso, onSave }: ProcesoDi
         codigo,
         nombre,
         descripcion: descripcion.trim() || null,
-        cron,
+        cron: cronDesdeFriendly(frecuencia),
         activo,
         reintentoMinutos: reintentoMinutos.trim() === "" ? null : Number(reintentoMinutos),
         reintentosMax: reintentosMax.trim() === "" ? null : Number(reintentosMax),
@@ -116,15 +132,129 @@ export function ProcesoDialog({ open, onOpenChange, proceso, onSave }: ProcesoDi
             <Input id="descripcion" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
           </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="cron" className="text-xs uppercase tracking-wider text-muted-foreground">
-              Expresión cron
-            </Label>
-            <Input id="cron" value={cron} onChange={(e) => setCron(e.target.value)} placeholder="0 1 * * *" className="font-mono text-sm" required />
-            <p className="text-xs text-muted-foreground">
-              5 campos: minuto hora día-mes mes día-semana. Ej. <code className="font-mono">0 1 * * *</code> = todos los días a la 1am,{" "}
-              <code className="font-mono">*/15 * * * *</code> = cada 15 minutos. Evaluada en la zona horaria de esta instalación.
-            </p>
+          <div className="space-y-3 rounded-lg border border-border p-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground">Frecuencia</Label>
+              {cronNoReconocido && (
+                <p className="text-xs text-destructive">
+                  El valor actual (<code className="font-mono">{proceso?.cron}</code>) no se reconoce con este formulario — elegí una frecuencia de abajo
+                  para reemplazarlo.
+                </p>
+              )}
+              <Select
+                items={FRECUENCIA_ITEMS}
+                value={frecuencia.tipo}
+                onValueChange={(v) => {
+                  const tipo = (v ?? "diario") as CronFriendly["tipo"];
+                  if (tipo === "minutos" || tipo === "horas") setFrecuencia({ tipo, cada: 5 });
+                  else if (tipo === "diario") setFrecuencia({ tipo, hora: 0, minuto: 0 });
+                  else if (tipo === "semanal") setFrecuencia({ tipo, diaSemana: 1, hora: 0, minuto: 0 });
+                  else setFrecuencia({ tipo, diaMes: 1, hora: 0, minuto: 0 });
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(FRECUENCIA_ITEMS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {(frecuencia.tipo === "minutos" || frecuencia.tipo === "horas") && (
+              <div className="space-y-1.5">
+                <Label htmlFor="cada" className="text-xs text-muted-foreground">
+                  Cada cuántos {frecuencia.tipo === "minutos" ? "minutos" : "horas"}
+                </Label>
+                <Input
+                  id="cada"
+                  type="number"
+                  min={1}
+                  max={frecuencia.tipo === "minutos" ? 59 : 23}
+                  value={frecuencia.cada}
+                  onChange={(e) => setFrecuencia({ ...frecuencia, cada: Number(e.target.value) })}
+                  required
+                />
+              </div>
+            )}
+
+            {frecuencia.tipo === "semanal" && (
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Día de la semana</Label>
+                <Select
+                  items={Object.fromEntries(DIAS_SEMANA.map((d, i) => [String(i), d]))}
+                  value={String(frecuencia.diaSemana)}
+                  onValueChange={(v) => setFrecuencia({ ...frecuencia, diaSemana: Number(v ?? 1) })}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DIAS_SEMANA.map((d, i) => (
+                      <SelectItem key={i} value={String(i)}>
+                        {d}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {frecuencia.tipo === "mensual" && (
+              <div className="space-y-1.5">
+                <Label htmlFor="diaMes" className="text-xs text-muted-foreground">
+                  Día del mes
+                </Label>
+                <Input
+                  id="diaMes"
+                  type="number"
+                  min={1}
+                  max={31}
+                  value={frecuencia.diaMes}
+                  onChange={(e) => setFrecuencia({ ...frecuencia, diaMes: Number(e.target.value) })}
+                  required
+                />
+              </div>
+            )}
+
+            {(frecuencia.tipo === "diario" || frecuencia.tipo === "semanal" || frecuencia.tipo === "mensual") && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="hora" className="text-xs text-muted-foreground">
+                    Hora
+                  </Label>
+                  <Input
+                    id="hora"
+                    type="number"
+                    min={0}
+                    max={23}
+                    value={frecuencia.hora}
+                    onChange={(e) => setFrecuencia({ ...frecuencia, hora: Number(e.target.value) })}
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="minuto" className="text-xs text-muted-foreground">
+                    Minuto
+                  </Label>
+                  <Input
+                    id="minuto"
+                    type="number"
+                    min={0}
+                    max={59}
+                    value={frecuencia.minuto}
+                    onChange={(e) => setFrecuencia({ ...frecuencia, minuto: Number(e.target.value) })}
+                    required
+                  />
+                </div>
+              </div>
+            )}
+
+            <p className="text-xs text-muted-foreground">Evaluada en la zona horaria de esta instalación.</p>
           </div>
 
           <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2.5">

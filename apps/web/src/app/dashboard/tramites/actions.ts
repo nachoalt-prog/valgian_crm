@@ -119,6 +119,13 @@ export async function getCabeceraTramiteAction(idTipoTramite: string, idRegistro
   return { data: await getCabeceraTramite(idTipoTramite, idRegistro) };
 }
 
+/** TRAMITES.NUMERO de un trámite existente — para mostrar en el modal en vez del UUID. */
+export async function getNumeroTramiteAction(idTramite: string) {
+  const check = await requireAcceso();
+  if (check.error) return { error: check.error };
+  return { data: (await getTramiteDetalle(idTramite))?.numero ?? null };
+}
+
 /** Valores ya reconstruidos (crudos, listos para el formulario) de un trámite existente. */
 export async function getValoresParaEditarAction(idTipoTramite: string, idTramite: string) {
   const check = await requireAcceso();

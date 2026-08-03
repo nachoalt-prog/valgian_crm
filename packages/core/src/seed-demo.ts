@@ -318,11 +318,11 @@ async function getTipoCampoPorCodigo(codigo: string) {
   return tipo;
 }
 
-async function ensureCategoriaTipoTramite(codigo: string, nombre: string) {
+async function ensureCategoriaTipoTramite(codigo: string, nombre: string, prefijo: string) {
   const [existente] = await db.select().from(categoriasTiposTramite).where(eq(categoriasTiposTramite.codigo, codigo));
   if (existente) return existente;
 
-  const [creada] = await db.insert(categoriasTiposTramite).values({ codigo, nombre }).returning();
+  const [creada] = await db.insert(categoriasTiposTramite).values({ codigo, nombre, prefijo }).returning();
   return creada;
 }
 
@@ -534,8 +534,8 @@ async function main() {
   const entidadClientes = await getEntidadPorCodigo("clientes");
   const estrategiaTramites = await getEstrategiaPorCodigo("STD_TRAMITE_1");
 
-  const categoriaSobreLegajos = await ensureCategoriaTipoTramite("sobre_legajos", "Sobre Legajos");
-  const categoriaSobreClientes = await ensureCategoriaTipoTramite("sobre_clientes", "Sobre Clientes");
+  const categoriaSobreLegajos = await ensureCategoriaTipoTramite("sobre_legajos", "Sobre Legajos", "LEG");
+  const categoriaSobreClientes = await ensureCategoriaTipoTramite("sobre_clientes", "Sobre Clientes", "CLI");
 
   const tipoCampoTexto = await getTipoCampoPorCodigo("INPUT_TEXT");
   const tipoCampoFecha = await getTipoCampoPorCodigo("INPUT_DATETIME");

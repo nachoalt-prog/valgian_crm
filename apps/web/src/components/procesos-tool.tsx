@@ -10,6 +10,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { ProcesoDialog } from "@/components/proceso-dialog";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { cn } from "@/lib/utils";
+import { cronATexto } from "@/lib/cron-friendly";
 import type { ProcesoInput } from "@valgian/core";
 import {
   createProcesoAction,
@@ -156,7 +157,7 @@ export function ProcesosTool({ procesosIniciales, canGestionar }: ProcesosToolPr
                   <TableRow key={p.id} className="group">
                     <TableCell className="font-mono text-xs text-primary">{p.codigo}</TableCell>
                     <TableCell>{p.nombre}</TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">{p.cron}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{cronATexto(p.cron)}</TableCell>
                     <TableCell>
                       <Badge variant={p.activo ? "outline" : "destructive"} className="text-[10px]">
                         {p.activo ? "Activo" : "Pausado"}

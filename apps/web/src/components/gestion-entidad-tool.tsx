@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Zap, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { handleTabEnTextarea } from "@/lib/utils";
 import { getEstimulosDisponiblesAction, aplicarEstimuloAction } from "@/app/dashboard/gestion-entidad/actions";
 import type { EstimulosDisponiblesResult } from "@valgian/core";
 
@@ -99,14 +100,15 @@ export function GestionEntidadTool({ idLegajo, idEntidad, canGestionar, onCambio
         )}
       </div>
 
-      <div className="mb-4 flex flex-col gap-1.5">
+      <div className="mb-4 flex flex-1 flex-col gap-1.5">
         <label className="text-xs uppercase tracking-wider text-muted-foreground">Observación</label>
         <textarea
           value={observacion}
           onChange={(e) => setObservacion(e.target.value)}
+          onKeyDown={(e) => handleTabEnTextarea(e, setObservacion)}
           disabled={!canGestionar}
           rows={6}
-          className="w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
+          className="w-full flex-1 rounded-lg border border-input bg-transparent px-3 py-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
         />
       </div>
 

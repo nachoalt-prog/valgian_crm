@@ -218,6 +218,34 @@
       "when": 1785711450778,
       "tag": "0030_mensajeria_placeholders_forzar_inmediato",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1785722250349,
+      "tag": "0031_naive_prowler",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1785722358030,
+      "tag": "0032_hard_ben_parker",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1785722684375,
+      "tag": "0033_slippery_the_leader",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1785722778862,
+      "tag": "0034_powerful_anita_blake",
+      "breakpoints": true
     }
   ]
 }

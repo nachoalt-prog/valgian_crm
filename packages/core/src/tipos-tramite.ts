@@ -1,10 +1,71 @@
-import { eq, sql } from "drizzle-orm";
+import { eq, count, sql } from "drizzle-orm";
 import { db, categoriasTiposTramite, tiposTramite, tiposTramiteCampos, tiposCampos } from "@valgian/db";
 
 /** Catálogos de configuración de trámites — CATEGORIAS_TIPOS_TRAMITE, TIPOS_TRAMITE, TIPOS_TRAMITE_CAMPOS. */
 
+interface Resultado<T> {
+  data?: T;
+  error?: string;
+}
+
+function esViolacionUnica(err: unknown): boolean {
+  return typeof err === "object" && err !== null && "code" in err && (err as { code: string }).code === "23505";
+}
+
+const PREFIJO_REGEX = /^[A-Z]{1,3}$/;
+
 export async function listCategoriasTiposTramite() {
   return db.select().from(categoriasTiposTramite).orderBy(categoriasTiposTramite.nombre);
+}
+
+export interface CategoriaTipoTramiteInput {
+  codigo: string;
+  nombre: string;
+  prefijo: string;
+}
+
+function validarPrefijo(prefijo: string): string | null {
+  return PREFIJO_REGEX.test(prefijo) ? null : "El prefijo tiene que ser de 1 a 3 letras mayúsculas.";
+}
+
+/** ABM de CATEGORIAS_TIPOS_TRAMITE — antepone el PREFIJO a TRAMITES.NUMERO (ver domain/tramites.md). */
+export async function crearCategoriaTipoTramite(data: CategoriaTipoTramiteInput): Promise<Resultado<typeof categoriasTiposTramite.$inferSelect>> {
+  const errorPrefijo = validarPrefijo(data.prefijo);
+  if (errorPrefijo) return { error: errorPrefijo };
+
+  try {
+    const [fila] = await db.insert(categoriasTiposTramite).values(data).returning();
+    return { data: fila };
+  } catch (err) {
+    if (esViolacionUnica(err)) return { error: `Ya existe una categoría con el código o el prefijo "${data.codigo}"/"${data.prefijo}".` };
+    throw err;
+  }
+}
+
+export async function actualizarCategoriaTipoTramite(
+  id: string,
+  data: CategoriaTipoTramiteInput,
+): Promise<Resultado<typeof categoriasTiposTramite.$inferSelect>> {
+  const errorPrefijo = validarPrefijo(data.prefijo);
+  if (errorPrefijo) return { error: errorPrefijo };
+
+  try {
+    const [fila] = await db.update(categoriasTiposTramite).set(data).where(eq(categoriasTiposTramite.id, id)).returning();
+    return { data: fila };
+  } catch (err) {
+    if (esViolacionUnica(err)) return { error: `Ya existe una categoría con el código o el prefijo "${data.codigo}"/"${data.prefijo}".` };
+    throw err;
+  }
+}
+
+export async function borrarCategoriaTipoTramite(id: string): Promise<Resultado<true>> {
+  const [{ value: tiposCount }] = await db.select({ value: count() }).from(tiposTramite).where(eq(tiposTramite.idCategoria, id));
+  if (Number(tiposCount) > 0) {
+    return { error: `No se puede eliminar: hay ${tiposCount} tipo${Number(tiposCount) !== 1 ? "s" : ""} de trámite en esta categoría.` };
+  }
+
+  await db.delete(categoriasTiposTramite).where(eq(categoriasTiposTramite.id, id));
+  return { data: true };
 }
 
 export interface TipoTramiteResumen {

@@ -57,11 +57,11 @@ async function getTitularDelLegajo(idLegajo: string) {
   return titular;
 }
 
-async function ensureCategoriaTipoTramite(codigo: string, nombre: string) {
+async function ensureCategoriaTipoTramite(codigo: string, nombre: string, prefijo: string) {
   const [existente] = await db.select().from(categoriasTiposTramite).where(eq(categoriasTiposTramite.codigo, codigo));
   if (existente) return existente;
 
-  const [creada] = await db.insert(categoriasTiposTramite).values({ codigo, nombre }).returning();
+  const [creada] = await db.insert(categoriasTiposTramite).values({ codigo, nombre, prefijo }).returning();
   return creada;
 }
 
@@ -421,7 +421,7 @@ async function main() {
   });
 
   // --- Tipo de trámite 1: sobre LEGAJOS, estrategia propia y aislada ---
-  const categoriaPruebasMensajeria = await ensureCategoriaTipoTramite("pruebas_mensajeria", "Pruebas de Mensajería");
+  const categoriaPruebasMensajeria = await ensureCategoriaTipoTramite("pruebas_mensajeria", "Pruebas de Mensajería", "MSJ");
 
   const estrategiaMsgLegajo = await ensureEstrategia("MSG_LEGAJO_1", "Mensajería demo — trámites de legajo", entidadTramites.id);
   const estadoActivoLegajo = await ensureEstado(estrategiaMsgLegajo.id, "activo", "Activo", true, false);

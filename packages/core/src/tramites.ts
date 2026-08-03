@@ -168,6 +168,7 @@ export interface TramiteDetalle {
   idTipoTramite: string | null;
   idRegistro: string | null;
   idEstado: string | null;
+  numero: string;
   valores: TramiteCampoValor[];
 }
 
@@ -188,7 +189,7 @@ export async function getTramiteDetalle(idTramite: string): Promise<TramiteDetal
     .from(tramitesCamposDatos)
     .where(eq(tramitesCamposDatos.idTramite, idTramite));
 
-  return { id: fila.id, idTipoTramite: fila.idTipoTramite, idRegistro: fila.idRegistro, idEstado: fila.idEstado, valores };
+  return { id: fila.id, idTipoTramite: fila.idTipoTramite, idRegistro: fila.idRegistro, idEstado: fila.idEstado, numero: fila.numero, valores };
 }
 
 export interface TramiteListadoFila {
