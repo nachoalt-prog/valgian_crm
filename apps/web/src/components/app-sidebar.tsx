@@ -47,6 +47,7 @@ const RUTA_POR_CODIGO: Record<string, string> = {
   acciones_externas: "/dashboard/acciones-externas",
   procesos: "/dashboard/procesos",
   categorias_tipos_tramite: "/dashboard/categorias-tipos-tramite",
+  tipos_tramite: "/dashboard/tipos-tramite",
 };
 
 export function AppSidebar({

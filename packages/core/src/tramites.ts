@@ -1,5 +1,5 @@
 import { eq, and, sql } from "drizzle-orm";
-import { db, tramites, tramitesCamposDatos, tiposTramite, categoriasTiposTramite, entidades, clientes, cuentas, legajos, estados } from "@valgian/db";
+import { db, tramites, tramitesCamposDatos, tiposTramite, categoriasTiposTramite, entidades, clientes, cuentas, legajos, estados, transiciones } from "@valgian/db";
 import { validarIdentificador, getEstimulosDesdeEstado, type EstimuloDisponible } from "./motor-estados";
 
 /**
@@ -120,6 +120,32 @@ export interface EstimulosDisponiblesTramiteResult {
 }
 
 /**
+ * Estado desde el que se gestiona un trámite en el Modal de Trámites. Si
+ * `idTramite` es null (alta nueva) es el estado inicial de la estrategia del
+ * tipo de trámite — usado tanto para listar estímulos disponibles como para
+ * resolver el estado destino al validar obligatoriedad condicional.
+ */
+export async function resolverEstadoActualTramite(idTipoTramite: string, idTramite: string | null): Promise<{ id: string; nombre: string } | null> {
+  if (idTramite) {
+    const [fila] = await db
+      .select({ id: estados.id, nombre: estados.nombre })
+      .from(tramites)
+      .innerJoin(estados, eq(estados.id, tramites.idEstado))
+      .where(eq(tramites.id, idTramite));
+    return fila ?? null;
+  }
+
+  const [tipo] = await db.select({ idEstrategia: tiposTramite.idEstrategia }).from(tiposTramite).where(eq(tiposTramite.id, idTipoTramite));
+  if (!tipo?.idEstrategia) return null;
+
+  const [inicial] = await db
+    .select({ id: estados.id, nombre: estados.nombre })
+    .from(estados)
+    .where(and(eq(estados.idEstrategia, tipo.idEstrategia), eq(estados.esInicial, true)));
+  return inicial ?? null;
+}
+
+/**
  * Estímulos aplicables para el Modal de Trámites. Si `idTramite` es null (alta
  * nueva) se parte del estado inicial de la estrategia del tipo de trámite.
  */
@@ -128,30 +154,20 @@ export async function getEstimulosDisponiblesTramite(
   idTramite: string | null,
   perfilId: string,
 ): Promise<EstimulosDisponiblesTramiteResult> {
-  let estadoActual: { id: string; nombre: string } | null = null;
-
-  if (idTramite) {
-    const [fila] = await db
-      .select({ id: estados.id, nombre: estados.nombre })
-      .from(tramites)
-      .innerJoin(estados, eq(estados.id, tramites.idEstado))
-      .where(eq(tramites.id, idTramite));
-    estadoActual = fila ?? null;
-  } else {
-    const [tipo] = await db.select({ idEstrategia: tiposTramite.idEstrategia }).from(tiposTramite).where(eq(tiposTramite.id, idTipoTramite));
-    if (tipo?.idEstrategia) {
-      const [inicial] = await db
-        .select({ id: estados.id, nombre: estados.nombre })
-        .from(estados)
-        .where(and(eq(estados.idEstrategia, tipo.idEstrategia), eq(estados.esInicial, true)));
-      estadoActual = inicial ?? null;
-    }
-  }
-
+  const estadoActual = await resolverEstadoActualTramite(idTipoTramite, idTramite);
   if (!estadoActual) return { estadoActual: null, estimulos: [] };
 
   const disponibles = await getEstimulosDesdeEstado(estadoActual.id, perfilId);
   return { estadoActual, estimulos: disponibles };
+}
+
+/** Resuelve a qué ESTADO lleva un estímulo aplicado desde `idEstadoOrigen` — para validar obligatoriedad condicional (defensa en profundidad). */
+export async function resolverEstadoDestino(idEstadoOrigen: string, idEstimulo: string): Promise<string | null> {
+  const [fila] = await db
+    .select({ idEstadoDestino: transiciones.idEstado1 })
+    .from(transiciones)
+    .where(and(eq(transiciones.idEstado0, idEstadoOrigen), eq(transiciones.idEstimulo, idEstimulo)));
+  return fila?.idEstadoDestino ?? null;
 }
 
 export interface TramiteCampoValor {

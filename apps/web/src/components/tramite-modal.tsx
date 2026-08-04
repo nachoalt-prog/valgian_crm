@@ -51,7 +51,7 @@ export function TramiteModal({ open, onOpenChange, idTipoTramite, idRegistro, id
   const [campos, setCampos] = useState<TipoTramiteCampoConTipo[] | null>(null);
   const [valores, setValores] = useState<Valores>({});
   const [opciones, setOpciones] = useState<Opciones>({});
-  const [estimulos, setEstimulos] = useState<{ id: string; nombre: string }[]>([]);
+  const [estimulos, setEstimulos] = useState<{ id: string; nombre: string; idEstadoDestino: string }[]>([]);
   const [idEstimulo, setIdEstimulo] = useState<string | null>(null);
   const [observacion, setObservacion] = useState("");
   const [pending, setPending] = useState(false);
@@ -137,7 +137,7 @@ export function TramiteModal({ open, onOpenChange, idTipoTramite, idRegistro, id
     setError(null);
     setExito(false);
 
-    const faltantes = campos.filter((c) => c.obligatorio && esValorVacio(valores[c.id], c.tipoCampoCodigo));
+    const faltantes = campos.filter((c) => esObligatorioAhora(c) && esValorVacio(valores[c.id], c.tipoCampoCodigo));
     if (faltantes.length > 0) {
       setCamposInvalidos(new Set(faltantes.map((c) => c.id)));
       setError(`Completá los campos obligatorios: ${faltantes.map((c) => c.nombre).join(", ")}.`);
@@ -171,12 +171,20 @@ export function TramiteModal({ open, onOpenChange, idTipoTramite, idRegistro, id
     setTimeout(() => onOpenChange(false), 700);
   }
 
+  // Obligatoriedad condicional al ESTADO_DESTINO del estímulo elegido — sin
+  // estímulo seleccionado todavía no hay forma de saber si un campo es
+  // obligatorio o no, así que no se marca nada.
+  function esObligatorioAhora(campo: TipoTramiteCampoConTipo): boolean {
+    const idEstadoDestino = estimulos.find((e) => e.id === idEstimulo)?.idEstadoDestino;
+    return !!idEstadoDestino && campo.obligatorioEnEstados.includes(idEstadoDestino);
+  }
+
   function renderCampo(campo: TipoTramiteCampoConTipo, todosCampos: TipoTramiteCampoConTipo[]) {
     const valor = valores[campo.id];
     const disabled = !canGestionar || campo.editable === false;
     const comun = {
       id: campo.id,
-      required: campo.obligatorio ?? false,
+      required: esObligatorioAhora(campo),
       disabled,
       placeholder: campo.placeholder ?? undefined,
     };
@@ -377,7 +385,7 @@ export function TramiteModal({ open, onOpenChange, idTipoTramite, idRegistro, id
                   <div key={campo.id} className="space-y-1.5">
                     <Label className={cn("text-xs uppercase tracking-wider", camposInvalidos.has(campo.id) ? "text-destructive" : "text-muted-foreground")}>
                       {campo.nombre}
-                      {campo.obligatorio && <span className="text-destructive"> *</span>}
+                      {esObligatorioAhora(campo) && <span className="text-destructive"> *</span>}
                     </Label>
                     {renderCampo(campo, campos)}
                     {campo.ayuda && <p className="text-xs text-muted-foreground">{campo.ayuda}</p>}

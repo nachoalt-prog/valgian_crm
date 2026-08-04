@@ -25,6 +25,7 @@ import {
   tiposTramite,
   tiposCampos,
   tiposTramiteCampos,
+  tiposTramiteCamposObligatorios,
   interfaz,
   perfiles,
   herramientas,
@@ -34,7 +35,7 @@ import {
 import { gestionarTramite, mapearValorCampo, type DatoTramiteInput } from "./tramites";
 import { crearPlantillaAdjunto } from "./plantillas-adjunto";
 import { OPERACION_ADJUNTOS_BORRAR } from "./archivos-adjuntos";
-import { aplicarEstimulo } from "./motor-estados";
+import { aplicarEstimulo, listEstadosPorEstrategia } from "./motor-estados";
 import { crearMensajeriaPlantilla, getMensajeriaPlantillaPorCodigo } from "./mensajeria-plantillas";
 
 const ADMIN_USERNAME = "admin";
@@ -347,11 +348,16 @@ async function ensureTipoTramiteCampo(params: {
   idTipoTramite: string;
   idTipoCampo: string;
   orden: number;
-  obligatorio?: boolean;
+  // Azúcar del seed: si es true, el campo queda obligatorio en TODOS los
+  // estados de la estrategia del tipo (equivalente al viejo booleano
+  // OBLIGATORIO=true) — ver TIPOS_TRAMITE_CAMPOS_OBLIGATORIOS en domain/tramites.md.
+  obligatorioSiempre?: boolean;
   placeholder?: string;
   numMin?: number;
   listaValores?: string;
 }) {
+  const { obligatorioSiempre, ...columnas } = params;
+
   const [existente] = await db
     .select()
     .from(tiposTramiteCampos)
@@ -360,8 +366,21 @@ async function ensureTipoTramiteCampo(params: {
 
   const [creado] = await db
     .insert(tiposTramiteCampos)
-    .values({ ...params, visible: true, editable: true })
+    .values({ ...columnas, visible: true, editable: true })
     .returning();
+
+  if (obligatorioSiempre) {
+    const [tipo] = await db.select({ idEstrategia: tiposTramite.idEstrategia }).from(tiposTramite).where(eq(tiposTramite.id, params.idTipoTramite));
+    if (tipo?.idEstrategia) {
+      const todosLosEstados = await listEstadosPorEstrategia(tipo.idEstrategia);
+      if (todosLosEstados.length > 0) {
+        await db
+          .insert(tiposTramiteCamposObligatorios)
+          .values(todosLosEstados.map((e) => ({ idTipoTramiteCampo: creado.id, idEstado: e.id })));
+      }
+    }
+  }
+
   return creado;
 }
 
@@ -559,7 +578,7 @@ async function main() {
     idTipoTramite: tipoTramiteLegajo.id,
     idTipoCampo: tipoCampoTexto.id,
     orden: 1,
-    obligatorio: true,
+    obligatorioSiempre: true,
     placeholder: "Asunto del trámite",
   });
   await ensureTipoTramiteCampo({
@@ -598,7 +617,7 @@ async function main() {
     idTipoTramite: tipoTramiteCliente.id,
     idTipoCampo: tipoCampoTexto.id,
     orden: 1,
-    obligatorio: true,
+    obligatorioSiempre: true,
   });
   const campoTelefonoContacto = await ensureTipoTramiteCampo({
     codigo: "telefono_contacto",
@@ -630,7 +649,7 @@ async function main() {
     idTipoTramite: tipoTramiteClienteTitular.id,
     idTipoCampo: tipoCampoEmail.id,
     orden: 1,
-    obligatorio: true,
+    obligatorioSiempre: true,
   });
   const campoCanalPreferido = await ensureTipoTramiteCampo({
     codigo: "canal_preferido",
@@ -646,7 +665,7 @@ async function main() {
     idTipoTramite: tipoTramiteClienteTitular.id,
     idTipoCampo: tipoCampoCheckbox.id,
     orden: 3,
-    obligatorio: true,
+    obligatorioSiempre: true,
   });
 
   // --- Instancias de trámite de prueba, sobre algunos de los legajos demo ---

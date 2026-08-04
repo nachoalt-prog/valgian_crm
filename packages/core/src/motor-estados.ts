@@ -1,5 +1,15 @@
 import { eq, and, sql } from "drizzle-orm";
-import { db, entidades, estados, estimulos, transiciones, perfilesEstimulos } from "@valgian/db";
+import { db, entidades, estados, estimulos, transiciones, perfilesEstimulos, estrategias } from "@valgian/db";
+
+/** Todas las ESTRATEGIAS — para el selector del ABM de Tipos de Trámite. */
+export async function listEstrategias(): Promise<{ id: string; codigo: string; nombre: string }[]> {
+  return db.select({ id: estrategias.id, codigo: estrategias.codigo, nombre: estrategias.nombre }).from(estrategias).orderBy(estrategias.nombre);
+}
+
+/** Estados de una estrategia — para selectores (multi-select de obligatoriedad, ABMs). */
+export async function listEstadosPorEstrategia(idEstrategia: string): Promise<{ id: string; nombre: string }[]> {
+  return db.select({ id: estados.id, nombre: estados.nombre }).from(estados).where(eq(estados.idEstrategia, idEstrategia)).orderBy(estados.nombre);
+}
 
 const IDENTIFICADOR_VALIDO = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 
@@ -34,6 +44,7 @@ export interface EstimuloDisponible {
   id: string;
   codigo: string;
   nombre: string;
+  idEstadoDestino: string;
 }
 
 export interface EstimulosDisponiblesResult {
@@ -49,18 +60,19 @@ export interface EstimulosDisponiblesResult {
  */
 export async function getEstimulosDesdeEstado(idEstado: string, perfilId: string): Promise<EstimuloDisponible[]> {
   const transicionesDesdeEstado = await db
-    .select({ id: estimulos.id, codigo: estimulos.codigo, nombre: estimulos.nombre })
+    .select({ id: estimulos.id, codigo: estimulos.codigo, nombre: estimulos.nombre, idEstadoDestino: transiciones.idEstado1 })
     .from(transiciones)
     .innerJoin(estimulos, eq(estimulos.id, transiciones.idEstimulo))
     .where(eq(transiciones.idEstado0, idEstado));
 
   const disponibles: EstimuloDisponible[] = [];
   for (const e of transicionesDesdeEstado) {
+    if (!e.idEstadoDestino) continue; // TRANSICIONES mal configurada (sin ID_ESTADO_1) — no debería pasar en la práctica.
     const [permiso] = await db
       .select()
       .from(perfilesEstimulos)
       .where(and(eq(perfilesEstimulos.idPerfil, perfilId), eq(perfilesEstimulos.idEstimulo, e.id)));
-    if (permiso) disponibles.push(e);
+    if (permiso) disponibles.push({ ...e, idEstadoDestino: e.idEstadoDestino });
   }
 
   return disponibles;

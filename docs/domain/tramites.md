@@ -35,6 +35,8 @@ ABM propio (`/dashboard/categorias-tipos-tramite`, `HERRAMIENTAS.CODIGO = 'categ
 
 **`COMPONENTE`**: mismo patrón que `HERRAMIENTAS`/`LEGAJO_HERRAMIENTAS` — un código estable que el frontend resuelve a un componente React, para reemplazar el dibujado automático de `TIPOS_TRAMITE_CAMPOS` por uno a medida. **No implementado todavía**: el Modal de Trámites siempre dibuja automático, sea cual sea el valor de esta columna.
 
+ABM propio (`/dashboard/tipos-tramite`, `HERRAMIENTAS.CODIGO = 'tipos_tramite'`, `packages/core/src/tipos-tramite.ts`: `crearTipoTramite`/`actualizarTipoTramite`/`borrarTipoTramite`) — antes de esto la tabla era de solo lectura, poblada únicamente por seed (`ensureTipoTramite*` en `seed-demo.ts`/`seed-config.ts`). Es un maestro-detalle: el panel izquierdo administra `TIPOS_TRAMITE`, y al seleccionar uno el panel derecho (`TipoTramiteCamposTool`) administra sus `TIPOS_TRAMITE_CAMPOS` (ver más abajo). Borrado de un tipo: bloqueado si tiene `TRAMITES`; si no tiene ninguno, cascadea sus `TIPOS_TRAMITE_CAMPOS` (y la obligatoriedad de esos campos) — sin trámites no hay datos que perder.
+
 ### TIPOS_CAMPOS
 
 | Campo  | Tipo     |
@@ -55,7 +57,6 @@ Catálogo de tipos de campo soportados por el dibujado automático del Modal de 
 | ID_TIPO_TRAMITE| FK → TIPOS_TRAMITE, nullable                              |
 | ID_TIPO_CAMPO  | FK → TIPOS_CAMPOS, nullable                               |
 | ORDEN          | integer, nullable                                         |
-| OBLIGATORIO    | boolean, nullable                                         |
 | VISIBLE        | boolean, nullable                                         |
 | EDITABLE       | boolean, nullable                                         |
 | LONGITUD_MAX   | integer, nullable                                         |
@@ -70,6 +71,24 @@ Catálogo de tipos de campo soportados por el dibujado automático del Modal de 
 | LISTA_VALORES  | text, nullable — SQL de confianza (ver `domain/bandejas.md` ADR 0009) que devuelve `value`/`label`, para `SELECT`/`SELECT_MULTIPLE` |
 
 `ID_TIPO_CAMPO`/`ID_TIPO_TRAMITE_CAMPO` (abajo) son los nombres correctos de estas columnas — el pedido original las llamaba `ID_TIPO_DATO`/`TIPO_TRAMITE_CAMPO`, normalizados acá para seguir la convención `ID_<tabla>` del resto del sistema.
+
+ABM propio, anidado dentro del ABM de Tipos de Trámite (`/dashboard/tipos-tramite`, ver más arriba) — no tiene ruta propia porque un campo no tiene sentido fuera del contexto de su tipo. `packages/core/src/tipos-tramite.ts`: `crearTipoTramiteCampo`/`actualizarTipoTramiteCampo`/`borrarTipoTramiteCampo`. Borrado bloqueado si el campo ya tiene datos cargados en algún `TRAMITES_CAMPOS_DATOS`.
+
+### TIPOS_TRAMITE_CAMPOS_OBLIGATORIOS — obligatoriedad condicional por estado destino
+
+| Campo               | Tipo                                    |
+| ------------------- | ------------------------------------------ |
+| ID                  | UUID, PK                                    |
+| ID_TIPO_TRAMITE_CAMPO| FK → TIPOS_TRAMITE_CAMPOS, nullable        |
+| ID_ESTADO           | FK → ESTADOS, nullable                      |
+
+Reemplaza al viejo booleano `TIPOS_TRAMITE_CAMPOS.OBLIGATORIO` (fijo, sin importar el estado del trámite). Un campo es obligatorio en un momento dado si existe una fila acá para `(ese campo, el ESTADO_DESTINO de la transición que dispara el estímulo elegido)` — **no** el estado actual del trámite, sino a dónde va a parar tras aplicar el estímulo. La razón: la obligatoriedad tiene sentido validarla contra lo que el trámite está por convertirse, no contra lo que ya es (ej. un campo puede no ser obligatorio para "Tomar" un trámite pero sí para "Resolver" uno).
+
+"Obligatorio siempre" (equivalente al viejo `OBLIGATORIO = true`) se modela marcando **todos** los estados de la estrategia del tipo — no hay un flag aparte para esto, es una decisión de diseño explícita: un solo mecanismo, sin dos fuentes de verdad compitiendo. El diálogo de edición del campo ofrece un checkbox "Todos (siempre)" como atajo de UI que selecciona todos los estados de una — no es una columna de base, solo azúcar en el formulario.
+
+**Trade-off aceptado**: si más adelante se agrega un `ESTADO` nuevo a la estrategia, un campo marcado "siempre obligatorio" no lo va a incluir automáticamente — hay que volver a tildarlo a mano. Se prefirió esto (simple, un solo mecanismo) a agregar lógica de propagación automática.
+
+**Validación en dos capas** (mismo patrón de defensa en profundidad que el resto de `TIPOS_TRAMITE_CAMPOS`): el Modal de Trámites (`tramite-modal.tsx`) resuelve el estado destino del estímulo elegido (ya lo trae `getEstimulosDisponiblesTramiteAction`, que expone `EstimuloDisponible.idEstadoDestino`) y valida contra `TipoTramiteCampoConTipo.obligatorioEnEstados` del lado del cliente; `gestionarTramiteAction` repite la misma resolución server-side (`resolverEstadoActualTramite` + `resolverEstadoDestino`, en `packages/core/src/tramites.ts`) antes de persistir — un llamador que se salte el cliente no puede dejar guardado un campo obligatorio vacío.
 
 ### TRAMITES
 
@@ -168,7 +187,7 @@ Si `TIPOS_TRAMITE.ID_CATEGORIA` es null, o esa categoría no tiene `PREFIJO` (no
 Componente compartido, usado tanto desde el ABM de Trámites como desde la bandeja "Trámites" (ver más abajo). Recibe `idTipoTramite`, `idRegistro`, `idUsuario` (resuelto siempre server-side desde la sesión, nunca del cliente) y **`idTramite` opcional**: si viene, carga y edita ese trámite; si no, es una alta nueva — esto último solo puede pasar desde el botón "Iniciar" del ABM. Mismo tamaño que el modal de legajo (`h-[85vh] max-w-5xl`) — hasta hace poco era más chico (`max-w-3xl`), pero le quedaba justo con las solapas Historial/Adjuntos sumadas.
 
 - **Cabecera fija tipo-ticket** (simil sistemas de tickets/mesa de ayuda): franja debajo del título, visible sin importar la solapa activa (Datos/Historial/Adjuntos), con Tipo (`TIPOS_TRAMITE.NOMBRE`), Categoría (`CATEGORIAS_TIPOS_TRAMITE.NOMBRE`), Entidad (label resuelto del registro real — número de legajo, apellido+nombre de cliente, o número de cuenta, según `TIPOS_TRAMITE.ID_ENTIDAD` — mismo criterio que "Aplicar a" más abajo), N° (`TRAMITES.NUMERO`, ver más abajo — antes era el propio `ID`) y Estado (`ESTADOS.NOMBRE` actual). Tipo/Categoría/Entidad resueltos por `getCabeceraTramite` en `packages/core/src/tramites.ts`, que reusa la misma lógica de resolución de label por entidad que `resolverCandidatosAplicarA` (factorizada en `resolverLabelRegistro`). N° se resuelve aparte (`getNumeroTramiteAction` → `getTramiteDetalle(idTramite).numero`, solo si `idTramite` existe — no hay `NUMERO` hasta que el trigger lo genera al crear la fila). En alta nueva (sin `idTramite`), Tipo/Categoría/Entidad ya se conocen (vienen de las props); N°/Estado muestran "(nuevo)"/"—" hasta la primera gestión.
-- Dibuja los campos según `TIPOS_TRAMITE_CAMPOS` de ese tipo (respetando `ORDEN`, `OBLIGATORIO`, `PLACEHOLDER`, `AYUDA`, `REGEX`, `LONGITUD_MAX`, `NUM_MIN`/`MAX`/`STEP`). `TIPOS_TRAMITE.COMPONENTE` no se usa todavía (ver arriba).
+- Dibuja los campos según `TIPOS_TRAMITE_CAMPOS` de ese tipo (respetando `ORDEN`, `PLACEHOLDER`, `AYUDA`, `REGEX`, `LONGITUD_MAX`, `NUM_MIN`/`MAX`/`STEP`, y la obligatoriedad condicional de `TIPOS_TRAMITE_CAMPOS_OBLIGATORIOS` — ver más arriba). `TIPOS_TRAMITE.COMPONENTE` no se usa todavía (ver arriba).
 - Selector de estímulo: si `idTramite` existe, parte de su `ID_ESTADO` real; si no, del estado inicial de la estrategia del tipo de trámite (`getEstimulosDisponiblesTramite` en `packages/core/src/tramites.ts`, que reusa `getEstimulosDesdeEstado` — extraído de `motor-estados.ts` para no duplicar el filtro por `PERFILES_ESTIMULOS`).
 - Todo el mapeo de valores (formulario → columna de `TRAMITES_CAMPOS_DATOS` y viceversa) vive en server actions (`apps/web/src/app/dashboard/tramites/actions.ts`), nunca en el componente cliente — importar funciones de `@valgian/core` que tocan `db` desde un componente `"use client"` arrastraría el cliente de Postgres al bundle del navegador. El cliente solo maneja `{ idTipoTramiteCampo, codigoTipoCampo, valor }` crudo.
 - El padre debe montarlo con una `key` que cambie según `(idTipoTramite, idRegistro, idTramite)` — arranca con estado limpio por remount en vez de resetear a mano en un efecto (mismo motivo que en `legajo-layout-modal.tsx`: `setState` síncrono al inicio de un efecto dispara el lint `react-hooks/set-state-in-effect`).

@@ -1,5 +1,14 @@
-import { eq, count, sql } from "drizzle-orm";
-import { db, categoriasTiposTramite, tiposTramite, tiposTramiteCampos, tiposCampos } from "@valgian/db";
+import { eq, inArray, count, sql } from "drizzle-orm";
+import {
+  db,
+  categoriasTiposTramite,
+  tiposTramite,
+  tiposTramiteCampos,
+  tiposTramiteCamposObligatorios,
+  tiposCampos,
+  tramitesCamposDatos,
+  tramites,
+} from "@valgian/db";
 
 /** Catálogos de configuración de trámites — CATEGORIAS_TIPOS_TRAMITE, TIPOS_TRAMITE, TIPOS_TRAMITE_CAMPOS. */
 
@@ -16,6 +25,11 @@ const PREFIJO_REGEX = /^[A-Z]{1,3}$/;
 
 export async function listCategoriasTiposTramite() {
   return db.select().from(categoriasTiposTramite).orderBy(categoriasTiposTramite.nombre);
+}
+
+/** Catálogo fijo de TIPOS_CAMPOS (INPUT_TEXT, SELECT, etc.) — para el selector de "tipo de campo" del ABM de TIPOS_TRAMITE_CAMPOS. */
+export async function listTiposCampos() {
+  return db.select().from(tiposCampos).orderBy(tiposCampos.nombre);
 }
 
 export interface CategoriaTipoTramiteInput {
@@ -91,18 +105,72 @@ export async function listTodosTiposTramite(): Promise<TipoTramiteResumen[]> {
     .orderBy(tiposTramite.nombre);
 }
 
+/** Todos los TIPOS_TRAMITE con sus columnas completas — para el ABM (a diferencia de listTodosTiposTramite/listTiposTramitePorCategoria, que son un resumen para el selector del lanzador de trámites). */
+export async function listTiposTramiteAdmin() {
+  return db.select().from(tiposTramite).orderBy(tiposTramite.nombre);
+}
+
 export async function getTipoTramite(id: string) {
   const [fila] = await db.select().from(tiposTramite).where(eq(tiposTramite.id, id));
   return fila ?? null;
+}
+
+export interface TipoTramiteInput {
+  codigo: string;
+  nombre: string;
+  idCategoria: string | null;
+  idEstrategia: string | null;
+  idEntidad: string | null;
+  filtro: string | null;
+  componente: string | null;
+}
+
+/** ABM de TIPOS_TRAMITE — el tipo fija con qué ENTIDAD/ESTRATEGIA se gestiona cada trámite (ver domain/tramites.md). */
+export async function crearTipoTramite(data: TipoTramiteInput): Promise<Resultado<typeof tiposTramite.$inferSelect>> {
+  try {
+    const [fila] = await db.insert(tiposTramite).values(data).returning();
+    return { data: fila };
+  } catch (err) {
+    if (esViolacionUnica(err)) return { error: `Ya existe un tipo de trámite con el código "${data.codigo}".` };
+    throw err;
+  }
+}
+
+export async function actualizarTipoTramite(id: string, data: TipoTramiteInput): Promise<Resultado<typeof tiposTramite.$inferSelect>> {
+  try {
+    const [fila] = await db.update(tiposTramite).set(data).where(eq(tiposTramite.id, id)).returning();
+    return { data: fila };
+  } catch (err) {
+    if (esViolacionUnica(err)) return { error: `Ya existe un tipo de trámite con el código "${data.codigo}".` };
+    throw err;
+  }
+}
+
+/** Borra un TIPOS_TRAMITE — bloquea si tiene trámites; si no, cascadea sus campos (y la obligatoriedad de esos campos). */
+export async function borrarTipoTramite(id: string): Promise<Resultado<true>> {
+  const [{ value: tramitesCount }] = await db.select({ value: count() }).from(tramites).where(eq(tramites.idTipoTramite, id));
+  if (Number(tramitesCount) > 0) {
+    return { error: `No se puede eliminar: hay ${tramitesCount} trámite${Number(tramitesCount) !== 1 ? "s" : ""} de este tipo.` };
+  }
+
+  const campos = await db.select({ id: tiposTramiteCampos.id }).from(tiposTramiteCampos).where(eq(tiposTramiteCampos.idTipoTramite, id));
+  const idsCampos = campos.map((c) => c.id);
+  if (idsCampos.length > 0) {
+    await db.delete(tiposTramiteCamposObligatorios).where(inArray(tiposTramiteCamposObligatorios.idTipoTramiteCampo, idsCampos));
+    await db.delete(tiposTramiteCampos).where(inArray(tiposTramiteCampos.id, idsCampos));
+  }
+  await db.delete(tiposTramite).where(eq(tiposTramite.id, id));
+  return { data: true };
 }
 
 export interface TipoTramiteCampoConTipo {
   id: string;
   codigo: string;
   nombre: string;
+  idTipoCampo: string | null;
   tipoCampoCodigo: string | null;
   orden: number | null;
-  obligatorio: boolean | null;
+  obligatorioEnEstados: string[];
   visible: boolean | null;
   editable: boolean | null;
   longitudMax: number | null;
@@ -119,14 +187,14 @@ export interface TipoTramiteCampoConTipo {
 
 /** Campos configurados para un tipo de trámite, en el orden en que se dibujan. */
 export async function listTiposTramiteCampos(idTipoTramite: string): Promise<TipoTramiteCampoConTipo[]> {
-  return db
+  const filas = await db
     .select({
       id: tiposTramiteCampos.id,
       codigo: tiposTramiteCampos.codigo,
       nombre: tiposTramiteCampos.nombre,
+      idTipoCampo: tiposTramiteCampos.idTipoCampo,
       tipoCampoCodigo: tiposCampos.codigo,
       orden: tiposTramiteCampos.orden,
-      obligatorio: tiposTramiteCampos.obligatorio,
       visible: tiposTramiteCampos.visible,
       editable: tiposTramiteCampos.editable,
       longitudMax: tiposTramiteCampos.longitudMax,
@@ -144,6 +212,93 @@ export async function listTiposTramiteCampos(idTipoTramite: string): Promise<Tip
     .leftJoin(tiposCampos, eq(tiposCampos.id, tiposTramiteCampos.idTipoCampo))
     .where(eq(tiposTramiteCampos.idTipoTramite, idTipoTramite))
     .orderBy(tiposTramiteCampos.orden);
+
+  if (filas.length === 0) return [];
+
+  const obligatorios = await db
+    .select({ idTipoTramiteCampo: tiposTramiteCamposObligatorios.idTipoTramiteCampo, idEstado: tiposTramiteCamposObligatorios.idEstado })
+    .from(tiposTramiteCamposObligatorios)
+    .where(
+      inArray(
+        tiposTramiteCamposObligatorios.idTipoTramiteCampo,
+        filas.map((f) => f.id),
+      ),
+    );
+  const estadosPorCampo = new Map<string, string[]>();
+  for (const o of obligatorios) {
+    if (!o.idTipoTramiteCampo || !o.idEstado) continue;
+    const lista = estadosPorCampo.get(o.idTipoTramiteCampo) ?? [];
+    lista.push(o.idEstado);
+    estadosPorCampo.set(o.idTipoTramiteCampo, lista);
+  }
+
+  return filas.map((f) => ({ ...f, obligatorioEnEstados: estadosPorCampo.get(f.id) ?? [] }));
+}
+
+export interface TipoTramiteCampoInput {
+  codigo: string;
+  nombre: string;
+  idTipoCampo: string | null;
+  orden: number | null;
+  visible: boolean;
+  editable: boolean;
+  longitudMax: number | null;
+  numMin: number | null;
+  numMax: number | null;
+  numStep: number | null;
+  radioGroup: number | null;
+  placeholder: string | null;
+  ayuda: string | null;
+  regex: string | null;
+  listaValores: string | null;
+  obligatorioEnEstados: string[];
+}
+
+async function sincronizarObligatoriedad(idTipoTramiteCampo: string, obligatorioEnEstados: string[]): Promise<void> {
+  await db.delete(tiposTramiteCamposObligatorios).where(eq(tiposTramiteCamposObligatorios.idTipoTramiteCampo, idTipoTramiteCampo));
+  if (obligatorioEnEstados.length > 0) {
+    await db.insert(tiposTramiteCamposObligatorios).values(obligatorioEnEstados.map((idEstado) => ({ idTipoTramiteCampo, idEstado })));
+  }
+}
+
+/** ABM de TIPOS_TRAMITE_CAMPOS — dibuja el formulario autogenerado del Modal de Trámites (ver domain/tramites.md). */
+export async function crearTipoTramiteCampo(idTipoTramite: string, data: TipoTramiteCampoInput): Promise<Resultado<{ id: string }>> {
+  const { obligatorioEnEstados, ...columnas } = data;
+  try {
+    const [fila] = await db
+      .insert(tiposTramiteCampos)
+      .values({ ...columnas, idTipoTramite })
+      .returning({ id: tiposTramiteCampos.id });
+    await sincronizarObligatoriedad(fila.id, obligatorioEnEstados);
+    return { data: fila };
+  } catch (err) {
+    if (esViolacionUnica(err)) return { error: `Ya existe un campo con el código "${data.codigo}" en este tipo de trámite.` };
+    throw err;
+  }
+}
+
+export async function actualizarTipoTramiteCampo(id: string, data: TipoTramiteCampoInput): Promise<Resultado<{ id: string }>> {
+  const { obligatorioEnEstados, ...columnas } = data;
+  try {
+    await db.update(tiposTramiteCampos).set(columnas).where(eq(tiposTramiteCampos.id, id));
+    await sincronizarObligatoriedad(id, obligatorioEnEstados);
+    return { data: { id } };
+  } catch (err) {
+    if (esViolacionUnica(err)) return { error: `Ya existe un campo con el código "${data.codigo}" en este tipo de trámite.` };
+    throw err;
+  }
+}
+
+/** Bloquea el borrado si el campo ya tiene datos cargados en algún trámite. */
+export async function borrarTipoTramiteCampo(id: string): Promise<Resultado<true>> {
+  const [{ value: datosCount }] = await db.select({ value: count() }).from(tramitesCamposDatos).where(eq(tramitesCamposDatos.idTipoTramiteCampo, id));
+  if (Number(datosCount) > 0) {
+    return { error: `No se puede eliminar: ${datosCount} trámite${Number(datosCount) !== 1 ? "s" : ""} ya tienen datos cargados en este campo.` };
+  }
+
+  await db.delete(tiposTramiteCamposObligatorios).where(eq(tiposTramiteCamposObligatorios.idTipoTramiteCampo, id));
+  await db.delete(tiposTramiteCampos).where(eq(tiposTramiteCampos.id, id));
+  return { data: true };
 }
 
 export interface OpcionListaValores {

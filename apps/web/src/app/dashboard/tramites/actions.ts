@@ -11,6 +11,8 @@ import {
   listTramitesPorLegajo,
   getTramiteDetalle,
   getEstimulosDisponiblesTramite,
+  resolverEstadoActualTramite,
+  resolverEstadoDestino,
   getCabeceraTramite,
   gestionarTramite,
   reconstruirValorCampo,
@@ -162,10 +164,17 @@ export async function gestionarTramiteAction(input: {
 
   // Defensa en profundidad — el Modal de Trámites ya valida esto del lado del
   // cliente, pero un llamador que se salte esa capa (o un bug futuro ahí) no
-  // debería poder dejar guardado un campo obligatorio vacío.
+  // debería poder dejar guardado un campo obligatorio vacío. La obligatoriedad
+  // es condicional al ESTADO_DESTINO de la transición que dispara el estímulo
+  // elegido, no al estado actual — hay que resolverlo igual que lo hace el cliente.
+  const estadoActual = await resolverEstadoActualTramite(input.idTipoTramite, input.idTramite ?? null);
+  const idEstadoDestino = estadoActual ? await resolverEstadoDestino(estadoActual.id, input.idEstimulo) : null;
+
   const campos = await listTiposTramiteCampos(input.idTipoTramite);
   const porId = new Map(input.datosCrudos.map((d) => [d.idTipoTramiteCampo, d.valor]));
-  const faltantes = campos.filter((c) => c.obligatorio && esValorVacio(porId.get(c.id), c.tipoCampoCodigo));
+  const faltantes = campos.filter(
+    (c) => !!idEstadoDestino && c.obligatorioEnEstados.includes(idEstadoDestino) && esValorVacio(porId.get(c.id), c.tipoCampoCodigo),
+  );
   if (faltantes.length > 0) {
     return { error: `Completá los campos obligatorios: ${faltantes.map((c) => c.nombre).join(", ")}.` };
   }

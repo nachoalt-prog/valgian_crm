@@ -297,6 +297,7 @@ async function main() {
     "Categorías de Tipos de Trámite",
     "categorias_tipos_tramite.gestionar",
   );
+  const herramientaTiposTramite = await ensureHerramienta("tipos_tramite", "Tipos de Trámite", "tipos_tramite.gestionar");
   // Estas no se navegan desde el sidebar — se cargan embebidas dentro de un
   // LAYOUTS_LEGAJO dentro del modal de legajo abierto desde Bandejas.
   const herramientaLegajoDatos = await ensureHerramienta("LEGAJO_DAT_1", "Datos de Legajo", "legajo_dat_1.gestionar");
@@ -331,6 +332,7 @@ async function main() {
     herramientaAccionesExternas,
     herramientaProcesos,
     herramientaCategoriasTiposTramite,
+    herramientaTiposTramite,
     herramientaLegajoDatos,
     herramientaLegajoClientes,
     herramientaGestionEntidad,
@@ -378,6 +380,7 @@ async function main() {
     herramientaMonedas,
     herramientaMensajeriaPlantillas,
     herramientaCategoriasTiposTramite,
+    herramientaTiposTramite,
     herramientaLegajoDatos,
     herramientaLegajoClientes,
     herramientaGestionEntidad,
@@ -427,6 +430,7 @@ async function main() {
     "icon.categoriasTiposTramite",
     17,
   );
+  await ensureMenuOpcion(menuConfiguracion.id, herramientaTiposTramite.id, "tipos_tramite", "Tipos de Trámite", "icon.tiposTramite", 18);
 
   await ensureInterfazMenu(interfazDefault.id, menuPrincipal.id);
   await ensureInterfazMenu(interfazDefault.id, menuConfiguracion.id);

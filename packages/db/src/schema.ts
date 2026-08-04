@@ -546,7 +546,6 @@ export const tiposTramiteCampos = pgTable("TIPOS_TRAMITE_CAMPOS", {
   idTipoTramite: uuid("ID_TIPO_TRAMITE").references(() => tiposTramite.id),
   idTipoCampo: uuid("ID_TIPO_CAMPO").references(() => tiposCampos.id),
   orden: integer("ORDEN"),
-  obligatorio: boolean("OBLIGATORIO"),
   visible: boolean("VISIBLE"),
   editable: boolean("EDITABLE"),
   longitudMax: integer("LONGITUD_MAX"),
@@ -563,6 +562,21 @@ export const tiposTramiteCampos = pgTable("TIPOS_TRAMITE_CAMPOS", {
   // SQL de confianza (ADR 0009) que devuelve las opciones de SELECT/SELECT_MULTIPLE.
   listaValores: text("LISTA_VALORES"),
 });
+
+// Reemplaza al viejo TIPOS_TRAMITE_CAMPOS.OBLIGATORIO (booleano fijo) — la
+// obligatoriedad ahora es condicional al ID_ESTADO_DESTINO de la transición
+// que dispara el estímulo elegido, no un valor único para todo el ciclo de
+// vida del trámite. "Obligatorio siempre" se modela con una fila por cada
+// ESTADO de la estrategia del tipo (ver domain/tramites.md).
+export const tiposTramiteCamposObligatorios = pgTable(
+  "TIPOS_TRAMITE_CAMPOS_OBLIGATORIOS",
+  {
+    id: uuid("ID").primaryKey().defaultRandom(),
+    idTipoTramiteCampo: uuid("ID_TIPO_TRAMITE_CAMPO").references(() => tiposTramiteCampos.id),
+    idEstado: uuid("ID_ESTADO").references(() => estados.id),
+  },
+  (table) => [uniqueIndex("TIPOS_TRAMITE_CAMPOS_OBLIGATORIOS_CAMPO_ESTADO_UNIQUE").on(table.idTipoTramiteCampo, table.idEstado)],
+);
 
 export const tramites = pgTable(
   "TRAMITES",
