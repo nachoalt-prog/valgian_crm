@@ -16,7 +16,6 @@ Todo lo que está identificado pero no resuelto todavía, sin importar de qué s
 ## Módulos
 
 - **Módulo de mensajería** (`MSJ_CANALES`, `MSJ_MODELOS`, `MSJ_TAGS`, `MSJ_COLA`): deliberadamente pospuesto hasta tener el core andando. Se retoma en una pasada posterior.
-- **Contrato de módulos** (`contracts/modulo.md`): todavía no escrito — pendiente definir qué debe cumplir cualquier módulo para engancharse al core (registro de `HERRAMIENTAS`, entradas en `MENUES_OPCIONES`, uso del patrón `ID_ENTIDAD`/`ID_RELACION`).
 
 ## Infraestructura de despliegue
 

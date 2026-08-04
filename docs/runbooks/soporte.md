@@ -15,8 +15,8 @@ Nunca se toca código. Nunca se toca la base de datos de otro cliente. Se opera 
 
 1. Confirmar con precisión qué registro está mal: qué tabla, qué fila, qué valor tiene hoy y cuál debería tener.
 2. Preferir siempre la pantalla de administración correspondiente dentro del propio sistema (ej. las pantallas de permisos que ya existen en `apps/web/src/components`), entrando como usuario admin a la instancia de ESE cliente. Es preferible a tocar la base directamente porque queda auditado por el propio sistema — quién lo hizo y cuándo.
-3. Si no existe una pantalla para ese caso puntual: conectarse directo a la base de datos de ESE cliente (nunca a la local de desarrollo, nunca a la de otro cliente) y hacer el `UPDATE`/`INSERT` mínimo necesario para corregir exactamente esa fila.
-4. Documentar el ajuste hecho en algún lugar rastreable (un issue, un ticket de soporte) — qué tabla, qué fila, qué valor, por qué — aunque no haya habido cambio de código. Sin esto, no queda ningún rastro de que ese dato se tocó a mano.
+3. Si no existe una pantalla para ese caso puntual: escribir el `UPDATE`/`INSERT` mínimo necesario como un script (`.sql` o `.ts`) — no lo tipees suelto en una consola y lo tires después.
+4. Correrlo contra la base de datos de ESE cliente (nunca la local de desarrollo, nunca la de otro cliente), y **commitear ese mismo script de forma permanente** (no se borra) bajo `docs/runbooks/soporte-parches/<client-slug>/<fecha>-<descripcion>.sql` — ese archivo ES el registro de qué se tocó, cuándo y por qué (el "por qué" va como comentario arriba del `UPDATE`). Ver ADR 0020. Es distinto del mecanismo de "parches de datos estándar" (`packages/db/parches/`) — este parche es de UN cliente puntual, nunca se reejecuta en otra base ni queda trackeado en `_PARCHES_APLICADOS`.
 5. Si el mismo tipo de ajuste se repite para varios clientes, es una señal de que falta una pantalla o una regla de negocio en el core o en un módulo. En ese caso, dejar de resolverlo a mano y convertirlo en una mejora de código real, siguiendo `docs/runbooks/actualizaciones.md`.
 
 ## Nota de seguridad
