@@ -33,6 +33,23 @@ Aplican a todas las tablas del sistema salvo indicación contraria — ver tambi
 | CODIGO  | string      |
 | NOMBRE  | string      |
 
+### TIPOS_FERIADO / FERIADOS
+
+| Campo (TIPOS_FERIADO) | Tipo     |
+| ---------------------- | -------- |
+| ID                     | UUID, PK |
+| CODIGO                 | string   |
+| NOMBRE                 | string   |
+
+| Campo (FERIADOS) | Tipo                                     |
+| ------------------ | ----------------------------------------- |
+| ID                  | UUID, PK                                   |
+| ID_TIPO_FERIADO     | FK → TIPOS_FERIADO                         |
+| FECHA               | date, único                                |
+| DESCRIPCION         | string, nullable                           |
+
+Genérico (no específico de ningún módulo) — cualquiera que necesite noción de "día hábil" las consulta vía `fn_es_dia_habil` (`packages/db/sql/0020_fn_es_dia_habil.sql`, función del core, no del módulo Cuenta Corriente que la motivó — ver `docs/módulo XCC`). Los 4 `TIPOS_FERIADO` (no laborable/inamovible/trasladable/turístico) son catálogo real y permanente, sembrados siempre — lo que sí es dato de PRUEBA son las filas puntuales de `FERIADOS`: el calendario real completo queda para un módulo futuro que lo puebla desde un servicio externo (ver `open-issues.md`).
+
 ## Legajos
 
 Entidad raíz del sistema — el expediente central del que cuelga todo lo demás. Deliberadamente mínima: el detalle vive en las entidades relacionadas.
@@ -156,27 +173,32 @@ ABM embebido en el modal de Legajo, dentro de la herramienta de Clientes (botón
 
 ## Productos y cuentas
 
-Cadena de configuración de producto → instancia real por legajo.
+Cadena de configuración de producto → instancia real por legajo. `PRODUCTOS`/`SUB_PRODUCTOS` se renombraron a `CATEGORIAS_PRODUCTOS`/`PRODUCTOS` (el nivel específico pasa a llamarse simplemente "producto", sin el prefijo "sub-") como parte de la Fase 1 del módulo Cuenta Corriente (ver `docs/módulo XCC`) — cualquier módulo opcional de producto futuro (préstamos, tarjetas...) usa esta misma cadena, no es exclusivo de XCC.
+
+### CATEGORIAS_PRODUCTOS
+
+| Campo          | Tipo                                                                       |
+| -------------- | --------------------------------------------------------------------------- |
+| ID             | UUID, PK                                                                    |
+| MODULO         | string, nullable — código del módulo opcional dueño de esta categoría      |
+| CODIGO         | string                                                                      |
+| NOMBRE         | string                                                                      |
+| SP_PAGO        | string, nullable — nombre de SP invocado dinámicamente por un motor genérico de pagos para impactar un pago de esta categoría (mismo patrón que `ACCIONES.COMANDO`) |
+| SP_ANULAR_PAGO | string, nullable — ídem, para anular un pago                               |
+| COMODIN        | jsonb, nullable                                                            |
 
 ### PRODUCTOS
 
-| Campo   | Tipo                                                                      |
-| ------- | ------------------------------------------------------------------------- |
-| ID      | UUID, PK                                                                  |
-| MODULO  | string (prefijo de la tabla de extensión correspondiente, ej. 'XP', 'XS') |
-| CODIGO  | string                                                                    |
-| NOMBRE  | string                                                                    |
-| COMODIN | jsonb, nullable                                                           |
+| Campo         | Tipo                        |
+| ------------- | --------------------------- |
+| ID            | UUID, PK                    |
+| ID_CATEGORIA  | FK → CATEGORIAS_PRODUCTOS   |
+| ID_MONEDA     | FK → MONEDAS, nullable      |
+| CODIGO        | string                      |
+| NOMBRE        | string                      |
+| COMODIN       | jsonb, nullable             |
 
-### SUB_PRODUCTOS
-
-| Campo       | Tipo            |
-| ----------- | --------------- |
-| ID          | UUID, PK        |
-| ID_PRODUCTO | FK → PRODUCTOS  |
-| CODIGO      | string          |
-| NOMBRE      | string          |
-| COMODIN     | jsonb, nullable |
+ABM propio en `/dashboard/productos` (`packages/core/src/productos.ts`), maestro-detalle: categorías a la izquierda, productos de la categoría seleccionada a la derecha — mismo patrón visual que otros ABMs maestro-detalle del proyecto.
 
 ### CUENTAS
 
@@ -193,7 +215,11 @@ Cadena de configuración de producto → instancia real por legajo.
 | AUDIT_USUARIO | FK → USUARIOS                                    |
 | COMODIN       | jsonb, nullable                                  |
 
-Tabla creada deliberadamente mínima (schema-only, sin ABM ni seed todavía) como base para la fase de Trámites (ver `domain/tramites.md`, que sí referencia `CUENTAS` como una de las entidades sobre las que puede aplicarse un trámite). Referencia `PRODUCTOS` directo, no `SUB_PRODUCTOS` — la idea original de extensiones 1 a 1 por tipo de producto (`XP_CUENTAS`, etc.) queda pendiente de retomar cuando se implemente el ABM real, ver `open-issues.md`.
+Ya participa del subsistema de Trámites (`ENTIDADES.CODIGO = 'cuentas'`, usada como "Aplicar a" — ver `domain/tramites.md`) y, desde la Fase 1 del módulo Cuenta Corriente, tiene motor de estados propio (`ESTRATEGIAS.CODIGO = 'STD_CUENTA_1'`, estados Abierta/Cerrada — una cuenta nace directo en Abierta, sin estado intermedio). Sigue sin ABM de alta/edición ni seed de datos de ejemplo — eso es del módulo Cuenta Corriente (`docs/módulo XCC`), no del core.
+
+### Canales de pago y desembolso (core, genérico)
+
+Tablas para que cualquier módulo de producto pueda cobrar/pagar sin reinventar el mecanismo: `ENTES` (quién mueve la plata — Caja, RapiPago, MercadoPago...), `FORMAS_PAGO`/`FORMAS_DESEMBOLSO` (cómo — efectivo, transferencia, débito automático...), `CANALES_PAGO`/`CANALES_DESEMBOLSO` (vínculo único `ENTES`×`FORMAS_*`), y `PRODUCTOS_CANALES_PAGO`/`PRODUCTOS_CANALES_DESEMBOLSO` (qué canales están habilitados para cada `PRODUCTOS` puntual — acá se resuelve la variación por categoría, sin necesitar forkear `ENTES`/`FORMAS_PAGO` por tipo de producto). Sin ABM ni datos todavía — quedan como schema puro hasta que un módulo (XCC u otro) las use.
 
 ## Entidades (catálogo transversal)
 

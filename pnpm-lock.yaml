@@ -26,6 +26,9 @@ importers:
       '@valgian/module-cotizaciones-argentina':
         specifier: workspace:*
         version: link:../../packages/modules/cotizaciones-argentina
+      '@valgian/module-cuenta-corriente':
+        specifier: workspace:*
+        version: link:../../packages/modules/cuenta-corriente
       '@valgian/module-mensajeria-smtp':
         specifier: workspace:*
         version: link:../../packages/modules/mensajeria-smtp
@@ -153,6 +156,37 @@ importers:
       '@types/node':
         specifier: ^20.17.10
         version: 20.19.43
+      tsx:
+        specifier: ^4.23.1
+        version: 4.23.1
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
+  packages/modules/cuenta-corriente:
+    dependencies:
+      '@valgian/core':
+        specifier: workspace:*
+        version: link:../../core
+      '@valgian/db':
+        specifier: workspace:*
+        version: link:../../db
+      dotenv:
+        specifier: ^17.4.2
+        version: 17.4.2
+      drizzle-orm:
+        specifier: ^0.45.2
+        version: 0.45.2(postgres@3.4.9)
+      postgres:
+        specifier: ^3.4.9
+        version: 3.4.9
+    devDependencies:
+      '@types/node':
+        specifier: ^20.17.10
+        version: 20.19.43
+      drizzle-kit:
+        specifier: ^0.31.10
+        version: 0.31.10
       tsx:
         specifier: ^4.23.1
         version: 4.23.1

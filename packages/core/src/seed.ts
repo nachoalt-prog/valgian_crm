@@ -277,7 +277,7 @@ async function main() {
   const herramientaMenues = await ensureHerramienta("menues", "Menúes y Opciones", "menues.gestionar");
   const herramientaInterfaces = await ensureHerramienta("interfaces", "Interfaces", "interfaces.gestionar");
   const herramientaPermisos = await ensureHerramienta("permisos", "Permisos", "permisos.gestionar");
-  const herramientaProductos = await ensureHerramienta("productos", "Productos y Sub-productos", "productos.gestionar");
+  const herramientaProductos = await ensureHerramienta("productos", "Categorías de Producto y Productos", "productos.gestionar");
   const herramientaBandejas = await ensureHerramienta("bandejas", "Bandejas", "bandejas.ver");
   const herramientaFiltros = await ensureHerramienta("filtros", "Filtros", "filtros.gestionar");
   const herramientaBandejasAdmin = await ensureHerramienta("bandejas_admin", "Bandejas (ABM)", "bandejas_admin.gestionar");

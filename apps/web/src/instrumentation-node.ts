@@ -16,6 +16,7 @@ import {
 } from "@valgian/core";
 import { registrar as registrarCotizacionesArgentina } from "@valgian/module-cotizaciones-argentina";
 import { registrar as registrarMensajeriaSmtp } from "@valgian/module-mensajeria-smtp";
+import { registrar as registrarCuentaCorriente } from "@valgian/module-cuenta-corriente";
 
 const SEGUNDOS_BARRIDO_SEGURIDAD = 15 * 60;
 const SEGUNDOS_BARRIDO_ACCIONES_EXTERNAS = 60;
@@ -70,6 +71,7 @@ try {
   // Registro explícito de módulos opcionales (ver docs/contracts/modulo.md) — nada de autodescubrimiento.
   registrarCotizacionesArgentina();
   registrarMensajeriaSmtp();
+  registrarCuentaCorriente();
 
   await escucharAccionesExternasPendientes(() => {
     void barrerAccionesExternas("notify");

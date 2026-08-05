@@ -253,6 +253,20 @@
       "when": 1785854180507,
       "tag": "0035_ancient_gladiator",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1785939115907,
+      "tag": "0036_rename_productos_y_canales_pago",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1785945300560,
+      "tag": "0037_stale_red_ghost",
+      "breakpoints": true
     }
   ]
 }

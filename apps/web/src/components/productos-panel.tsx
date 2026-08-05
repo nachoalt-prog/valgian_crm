@@ -1,50 +1,51 @@
 "use client";
 
 import { useState } from "react";
-import { PlusCircle, Pencil, Trash2, Package } from "lucide-react";
+import { PlusCircle, Pencil, Trash2, Boxes, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ProductoDialog } from "@/components/producto-dialog";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import type { ProductoConContador } from "@valgian/core";
+import type { CategoriaProductoConContador, ProductoConCategoria } from "@valgian/core";
+
+interface MonedaOption {
+  id: string;
+  codigo: string;
+  nombre: string;
+}
 
 interface ProductosPanelProps {
-  productos: ProductoConContador[];
-  selectedProductoId: string | null;
-  onSelectProducto: (id: string) => void;
+  productos: ProductoConCategoria[];
+  selectedCategoria: CategoriaProductoConContador | null;
+  monedas: MonedaOption[];
   canGestionar: boolean;
   onSinPermiso: () => void;
-  onSave: (data: { modulo: string | null; codigo: string; nombre: string }, id?: string) => Promise<{ error?: string } | void>;
+  onSave: (data: { idCategoria: string; idMoneda: string | null; codigo: string; nombre: string }, id?: string) => Promise<{ error?: string } | void>;
   onDelete: (id: string) => Promise<{ error?: string } | void>;
 }
 
-export function ProductosPanel({
-  productos,
-  selectedProductoId,
-  onSelectProducto,
-  canGestionar,
-  onSinPermiso,
-  onSave,
-  onDelete,
-}: ProductosPanelProps) {
+export function ProductosPanel({ productos, selectedCategoria, monedas, canGestionar, onSinPermiso, onSave, onDelete }: ProductosPanelProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingProducto, setEditingProducto] = useState<ProductoConContador | null>(null);
-  const [deleteConfirm, setDeleteConfirm] = useState<ProductoConContador | null>(null);
+  const [editing, setEditing] = useState<ProductoConCategoria | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<ProductoConCategoria | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  const filtrados = selectedCategoria ? productos.filter((p) => p.idCategoria === selectedCategoria.id) : productos;
+
   function abrirNuevo() {
+    if (!selectedCategoria) return;
     if (!canGestionar) return onSinPermiso();
-    setEditingProducto(null);
+    setEditing(null);
     setDialogOpen(true);
   }
 
-  function abrirEdicion(p: ProductoConContador) {
+  function abrirEdicion(p: ProductoConCategoria) {
     if (!canGestionar) return onSinPermiso();
-    setEditingProducto(p);
+    setEditing(p);
     setDialogOpen(true);
   }
 
-  function pedirBorrado(p: ProductoConContador) {
+  function pedirBorrado(p: ProductoConCategoria) {
     if (!canGestionar) return onSinPermiso();
     setDeleteError(null);
     setDeleteConfirm(p);
@@ -61,78 +62,92 @@ export function ProductosPanel({
   }
 
   return (
-    <section className="flex h-full flex-col bg-card/50">
+    <section className="flex h-full flex-col">
       <div className="flex items-center justify-between border-b border-border px-5 py-4">
-        <div className="flex items-center gap-2">
-          <Package className="size-4 text-primary" />
-          <h2 className="text-sm font-semibold uppercase tracking-widest text-primary">Productos</h2>
+        <div className="flex min-w-0 items-center gap-2">
+          <Boxes className="size-4 shrink-0 text-accent" />
+          <div className="flex min-w-0 items-center gap-1.5">
+            <h2 className="text-sm font-semibold uppercase tracking-widest text-accent">Productos</h2>
+            {selectedCategoria && (
+              <>
+                <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />
+                <span className="truncate text-xs text-muted-foreground">
+                  <span className="font-mono text-primary">[{selectedCategoria.codigo}]</span> {selectedCategoria.nombre}
+                </span>
+              </>
+            )}
+          </div>
         </div>
-        <Button size="sm" onClick={abrirNuevo} className="h-8 gap-1.5 text-xs">
+        <Button
+          size="sm"
+          onClick={abrirNuevo}
+          disabled={!selectedCategoria}
+          className="h-8 shrink-0 gap-1.5 bg-accent text-accent-foreground hover:bg-accent/90 text-xs"
+        >
           <PlusCircle className="size-3.5" />
           Nuevo
         </Button>
       </div>
 
-      <ul className="flex-1 divide-y divide-border overflow-y-auto">
-        {productos.length === 0 && (
-          <li className="px-5 py-10 text-center text-sm text-muted-foreground">Sin productos. Creá el primero.</li>
-        )}
-        {productos.map((p) => {
-          const isSelected = selectedProductoId === p.id;
-          return (
-            <li
-              key={p.id}
-              onClick={() => onSelectProducto(p.id)}
-              className={`group flex cursor-pointer items-center justify-between border-l-2 px-5 py-3.5 transition-colors ${
-                isSelected ? "border-l-primary bg-primary/10" : "border-l-transparent hover:bg-muted/60"
-              }`}
-            >
-              <div className="min-w-0">
-                <div className="mb-0.5 flex items-center gap-2">
-                  <span className="font-mono text-xs font-bold text-primary">[{p.codigo}]</span>
-                  <span className="truncate text-sm font-medium text-foreground">{p.nombre}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  {p.modulo && (
-                    <Badge variant="outline" className="h-4 border-accent/40 px-1.5 font-mono text-[10px] text-accent">
-                      {p.modulo}
-                    </Badge>
-                  )}
-                  <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">
-                    {p.subProductosCount} sub-producto{p.subProductosCount !== 1 ? "s" : ""}
-                  </Badge>
-                </div>
-              </div>
-              <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-7 text-muted-foreground hover:text-primary"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    abrirEdicion(p);
-                  }}
-                >
-                  <Pencil className="size-3.5" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-7 text-muted-foreground hover:text-destructive"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    pedirBorrado(p);
-                  }}
-                >
-                  <Trash2 className="size-3.5" />
-                </Button>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+      {!selectedCategoria && (
+        <div className="border-b border-border bg-muted/30 px-5 py-2.5">
+          <p className="text-xs text-muted-foreground">Seleccioná una categoría para ver y agregar sus productos.</p>
+        </div>
+      )}
 
-      <ProductoDialog key={editingProducto?.id ?? "new"} open={dialogOpen} onOpenChange={setDialogOpen} producto={editingProducto} onSave={onSave} />
+      <div className="flex-1 overflow-auto">
+        {filtrados.length === 0 ? (
+          <div className="flex h-40 flex-col items-center justify-center gap-2 text-muted-foreground">
+            <Boxes className="size-8 opacity-30" />
+            <p className="text-sm">Sin productos{selectedCategoria ? " en esta categoría" : ""}.</p>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nombre</TableHead>
+                <TableHead className="hidden md:table-cell">Categoría</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtrados.map((p) => (
+                <TableRow key={p.id} className="group">
+                  <TableCell>
+                    <span className="font-medium text-foreground">{p.nombre}</span>{" "}
+                    <span className="font-mono text-xs text-muted-foreground">[{p.codigo}]</span>
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+                    {p.categoriaNombre ?? <span className="italic">Sin categoría</span>}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                      <Button variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-accent" onClick={() => abrirEdicion(p)}>
+                        <Pencil className="size-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-destructive" onClick={() => pedirBorrado(p)}>
+                        <Trash2 className="size-3.5" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </div>
+
+      {selectedCategoria && (
+        <ProductoDialog
+          key={editing?.id ?? "new"}
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          producto={editing}
+          categoriaId={selectedCategoria.id}
+          monedas={monedas}
+          onSave={onSave}
+        />
+      )}
 
       <ConfirmDialog
         open={!!deleteConfirm}

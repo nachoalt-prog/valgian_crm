@@ -1,0 +1,950 @@
+{
+  "id": "0257445e-1207-4d99-afff-ad3a208e32b3",
+  "prevId": "43e79bb7-edb2-443c-be9b-8af4fcaf1ee4",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.XCC_CHECKPOINT": {
+      "name": "XCC_CHECKPOINT",
+      "schema": "",
+      "columns": {
+        "ID": {
+          "name": "ID",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "ID_CUENTA": {
+          "name": "ID_CUENTA",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "FECHA": {
+          "name": "FECHA",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "SALDO_CAPITAL": {
+          "name": "SALDO_CAPITAL",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "SALDO_INTERES": {
+          "name": "SALDO_INTERES",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "OBSERVACIONES": {
+          "name": "OBSERVACIONES",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ALTA_FECHA": {
+          "name": "ALTA_FECHA",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ALTA_USUARIO": {
+          "name": "ALTA_USUARIO",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "XCC_CHECKPOINT_ID_CUENTA_CUENTAS_ID_fk": {
+          "name": "XCC_CHECKPOINT_ID_CUENTA_CUENTAS_ID_fk",
+          "tableFrom": "XCC_CHECKPOINT",
+          "tableTo": "CUENTAS",
+          "columnsFrom": [
+            "ID_CUENTA"
+          ],
+          "columnsTo": [
+            "ID"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "XCC_CHECKPOINT_ALTA_USUARIO_USUARIOS_ID_fk": {
+          "name": "XCC_CHECKPOINT_ALTA_USUARIO_USUARIOS_ID_fk",
+          "tableFrom": "XCC_CHECKPOINT",
+          "tableTo": "USUARIOS",
+          "columnsFrom": [
+            "ALTA_USUARIO"
+          ],
+          "columnsTo": [
+            "ID"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.XCC_CLIENTES": {
+      "name": "XCC_CLIENTES",
+      "schema": "",
+      "columns": {
+        "ID": {
+          "name": "ID",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "ID_CLIENTE": {
+          "name": "ID_CLIENTE",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ID_CONDICION_IMPOSITIVA": {
+          "name": "ID_CONDICION_IMPOSITIVA",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "XCC_CLIENTES_ID_CLIENTE_UNIQUE": {
+          "name": "XCC_CLIENTES_ID_CLIENTE_UNIQUE",
+          "columns": [
+            {
+              "expression": "ID_CLIENTE",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "XCC_CLIENTES_ID_CLIENTE_CLIENTES_ID_fk": {
+          "name": "XCC_CLIENTES_ID_CLIENTE_CLIENTES_ID_fk",
+          "tableFrom": "XCC_CLIENTES",
+          "tableTo": "CLIENTES",
+          "columnsFrom": [
+            "ID_CLIENTE"
+          ],
+          "columnsTo": [
+            "ID"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "XCC_CLIENTES_ID_CONDICION_IMPOSITIVA_XCC_CONDICIONES_IMPOSITIVAS_ID_fk": {
+          "name": "XCC_CLIENTES_ID_CONDICION_IMPOSITIVA_XCC_CONDICIONES_IMPOSITIVAS_ID_fk",
+          "tableFrom": "XCC_CLIENTES",
+          "tableTo": "XCC_CONDICIONES_IMPOSITIVAS",
+          "columnsFrom": [
+            "ID_CONDICION_IMPOSITIVA"
+          ],
+          "columnsTo": [
+            "ID"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.XCC_CLIENTES_CONDICION_HISTORICO": {
+      "name": "XCC_CLIENTES_CONDICION_HISTORICO",
+      "schema": "",
+      "columns": {
+        "ID": {
+          "name": "ID",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "ID_CLIENTE": {
+          "name": "ID_CLIENTE",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ID_CONDICION_IMPOSITIVA": {
+          "name": "ID_CONDICION_IMPOSITIVA",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "VIGENTE_DESDE": {
+          "name": "VIGENTE_DESDE",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "XCC_CLIENTES_CONDICION_HISTORICO_ID_CLIENTE_CLIENTES_ID_fk": {
+          "name": "XCC_CLIENTES_CONDICION_HISTORICO_ID_CLIENTE_CLIENTES_ID_fk",
+          "tableFrom": "XCC_CLIENTES_CONDICION_HISTORICO",
+          "tableTo": "CLIENTES",
+          "columnsFrom": [
+            "ID_CLIENTE"
+          ],
+          "columnsTo": [
+            "ID"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "XCC_CLIENTES_CONDICION_HISTORICO_ID_CONDICION_IMPOSITIVA_XCC_CONDICIONES_IMPOSITIVAS_ID_fk": {
+          "name": "XCC_CLIENTES_CONDICION_HISTORICO_ID_CONDICION_IMPOSITIVA_XCC_CONDICIONES_IMPOSITIVAS_ID_fk",
+          "tableFrom": "XCC_CLIENTES_CONDICION_HISTORICO",
+          "tableTo": "XCC_CONDICIONES_IMPOSITIVAS",
+          "columnsFrom": [
+            "ID_CONDICION_IMPOSITIVA"
+          ],
+          "columnsTo": [
+            "ID"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.XCC_CONDICIONES_IMPOSITIVAS": {
+      "name": "XCC_CONDICIONES_IMPOSITIVAS",
+      "schema": "",
+      "columns": {
+        "ID": {
+          "name": "ID",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "CODIGO": {
+          "name": "CODIGO",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "NOMBRE": {
+          "name": "NOMBRE",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ALICUOTA_GANANCIAS": {
+          "name": "ALICUOTA_GANANCIAS",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.XCC_CUENTAS": {
+      "name": "XCC_CUENTAS",
+      "schema": "",
+      "columns": {
+        "ID": {
+          "name": "ID",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "ID_CUENTA": {
+          "name": "ID_CUENTA",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "TASA_INTERES": {
+          "name": "TASA_INTERES",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "SALDO_MIN_INTERES": {
+          "name": "SALDO_MIN_INTERES",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "GASTO_MENSUAL": {
+          "name": "GASTO_MENSUAL",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "SALDO_MIN_GASTO_MENSUAL": {
+          "name": "SALDO_MIN_GASTO_MENSUAL",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "XCC_CUENTAS_ID_CUENTA_UNIQUE": {
+          "name": "XCC_CUENTAS_ID_CUENTA_UNIQUE",
+          "columns": [
+            {
+              "expression": "ID_CUENTA",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "XCC_CUENTAS_ID_CUENTA_CUENTAS_ID_fk": {
+          "name": "XCC_CUENTAS_ID_CUENTA_CUENTAS_ID_fk",
+          "tableFrom": "XCC_CUENTAS",
+          "tableTo": "CUENTAS",
+          "columnsFrom": [
+            "ID_CUENTA"
+          ],
+          "columnsTo": [
+            "ID"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.XCC_CUENTAS_TASA_HISTORICO": {
+      "name": "XCC_CUENTAS_TASA_HISTORICO",
+      "schema": "",
+      "columns": {
+        "ID": {
+          "name": "ID",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "ID_CUENTA": {
+          "name": "ID_CUENTA",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "TASA": {
+          "name": "TASA",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "VIGENTE_DESDE": {
+          "name": "VIGENTE_DESDE",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "XCC_CUENTAS_TASA_HISTORICO_ID_CUENTA_CUENTAS_ID_fk": {
+          "name": "XCC_CUENTAS_TASA_HISTORICO_ID_CUENTA_CUENTAS_ID_fk",
+          "tableFrom": "XCC_CUENTAS_TASA_HISTORICO",
+          "tableTo": "CUENTAS",
+          "columnsFrom": [
+            "ID_CUENTA"
+          ],
+          "columnsTo": [
+            "ID"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.XCC_MOVIMIENTOS": {
+      "name": "XCC_MOVIMIENTOS",
+      "schema": "",
+      "columns": {
+        "ID": {
+          "name": "ID",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "ID_CUENTA": {
+          "name": "ID_CUENTA",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ID_TIPO_MOVIMIENTO": {
+          "name": "ID_TIPO_MOVIMIENTO",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "FECHA": {
+          "name": "FECHA",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "MONTO": {
+          "name": "MONTO",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "OBSERVACIONES": {
+          "name": "OBSERVACIONES",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "NRO_RECIBO": {
+          "name": "NRO_RECIBO",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ID_TRAMITE": {
+          "name": "ID_TRAMITE",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ALTA_FECHA": {
+          "name": "ALTA_FECHA",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ALTA_USUARIO": {
+          "name": "ALTA_USUARIO",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "XCC_MOVIMIENTOS_ID_CUENTA_CUENTAS_ID_fk": {
+          "name": "XCC_MOVIMIENTOS_ID_CUENTA_CUENTAS_ID_fk",
+          "tableFrom": "XCC_MOVIMIENTOS",
+          "tableTo": "CUENTAS",
+          "columnsFrom": [
+            "ID_CUENTA"
+          ],
+          "columnsTo": [
+            "ID"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "XCC_MOVIMIENTOS_ID_TIPO_MOVIMIENTO_XCC_TIPOS_MOVIMIENTOS_ID_fk": {
+          "name": "XCC_MOVIMIENTOS_ID_TIPO_MOVIMIENTO_XCC_TIPOS_MOVIMIENTOS_ID_fk",
+          "tableFrom": "XCC_MOVIMIENTOS",
+          "tableTo": "XCC_TIPOS_MOVIMIENTOS",
+          "columnsFrom": [
+            "ID_TIPO_MOVIMIENTO"
+          ],
+          "columnsTo": [
+            "ID"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "XCC_MOVIMIENTOS_ID_TRAMITE_TRAMITES_ID_fk": {
+          "name": "XCC_MOVIMIENTOS_ID_TRAMITE_TRAMITES_ID_fk",
+          "tableFrom": "XCC_MOVIMIENTOS",
+          "tableTo": "TRAMITES",
+          "columnsFrom": [
+            "ID_TRAMITE"
+          ],
+          "columnsTo": [
+            "ID"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "XCC_MOVIMIENTOS_ALTA_USUARIO_USUARIOS_ID_fk": {
+          "name": "XCC_MOVIMIENTOS_ALTA_USUARIO_USUARIOS_ID_fk",
+          "tableFrom": "XCC_MOVIMIENTOS",
+          "tableTo": "USUARIOS",
+          "columnsFrom": [
+            "ALTA_USUARIO"
+          ],
+          "columnsTo": [
+            "ID"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.XCC_PRODUCTOS": {
+      "name": "XCC_PRODUCTOS",
+      "schema": "",
+      "columns": {
+        "ID": {
+          "name": "ID",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "ID_PRODUCTO": {
+          "name": "ID_PRODUCTO",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "TASA_INTERES": {
+          "name": "TASA_INTERES",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "SALDO_MIN_INTERES": {
+          "name": "SALDO_MIN_INTERES",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "GASTO_MENSUAL": {
+          "name": "GASTO_MENSUAL",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "SALDO_MIN_GASTO_MENSUAL": {
+          "name": "SALDO_MIN_GASTO_MENSUAL",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "XCC_PRODUCTOS_ID_PRODUCTO_UNIQUE": {
+          "name": "XCC_PRODUCTOS_ID_PRODUCTO_UNIQUE",
+          "columns": [
+            {
+              "expression": "ID_PRODUCTO",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "XCC_PRODUCTOS_ID_PRODUCTO_PRODUCTOS_ID_fk": {
+          "name": "XCC_PRODUCTOS_ID_PRODUCTO_PRODUCTOS_ID_fk",
+          "tableFrom": "XCC_PRODUCTOS",
+          "tableTo": "PRODUCTOS",
+          "columnsFrom": [
+            "ID_PRODUCTO"
+          ],
+          "columnsTo": [
+            "ID"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.XCC_RECALCULO_PENDIENTE": {
+      "name": "XCC_RECALCULO_PENDIENTE",
+      "schema": "",
+      "columns": {
+        "ID": {
+          "name": "ID",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "ID_CUENTA": {
+          "name": "ID_CUENTA",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "FECHA_DESDE": {
+          "name": "FECHA_DESDE",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "XCC_RECALCULO_PENDIENTE_ID_CUENTA_UNIQUE": {
+          "name": "XCC_RECALCULO_PENDIENTE_ID_CUENTA_UNIQUE",
+          "columns": [
+            {
+              "expression": "ID_CUENTA",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "XCC_RECALCULO_PENDIENTE_ID_CUENTA_CUENTAS_ID_fk": {
+          "name": "XCC_RECALCULO_PENDIENTE_ID_CUENTA_CUENTAS_ID_fk",
+          "tableFrom": "XCC_RECALCULO_PENDIENTE",
+          "tableTo": "CUENTAS",
+          "columnsFrom": [
+            "ID_CUENTA"
+          ],
+          "columnsTo": [
+            "ID"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.XCC_SALDOS": {
+      "name": "XCC_SALDOS",
+      "schema": "",
+      "columns": {
+        "ID": {
+          "name": "ID",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "ID_CUENTA": {
+          "name": "ID_CUENTA",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "FECHA": {
+          "name": "FECHA",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ID_TIPO_MOVIMIENTO": {
+          "name": "ID_TIPO_MOVIMIENTO",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ID_XCC_MOVIMIENTO": {
+          "name": "ID_XCC_MOVIMIENTO",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ID_TIPO_RETENCION": {
+          "name": "ID_TIPO_RETENCION",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "CONCEPTO": {
+          "name": "CONCEPTO",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "MONTO": {
+          "name": "MONTO",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "SALDO_CAPITAL": {
+          "name": "SALDO_CAPITAL",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "SALDO_INTERES": {
+          "name": "SALDO_INTERES",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "TASA_APLICADA": {
+          "name": "TASA_APLICADA",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "XCC_SALDOS_ID_CUENTA_CUENTAS_ID_fk": {
+          "name": "XCC_SALDOS_ID_CUENTA_CUENTAS_ID_fk",
+          "tableFrom": "XCC_SALDOS",
+          "tableTo": "CUENTAS",
+          "columnsFrom": [
+            "ID_CUENTA"
+          ],
+          "columnsTo": [
+            "ID"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "XCC_SALDOS_ID_TIPO_MOVIMIENTO_XCC_TIPOS_MOVIMIENTOS_ID_fk": {
+          "name": "XCC_SALDOS_ID_TIPO_MOVIMIENTO_XCC_TIPOS_MOVIMIENTOS_ID_fk",
+          "tableFrom": "XCC_SALDOS",
+          "tableTo": "XCC_TIPOS_MOVIMIENTOS",
+          "columnsFrom": [
+            "ID_TIPO_MOVIMIENTO"
+          ],
+          "columnsTo": [
+            "ID"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "XCC_SALDOS_ID_XCC_MOVIMIENTO_XCC_MOVIMIENTOS_ID_fk": {
+          "name": "XCC_SALDOS_ID_XCC_MOVIMIENTO_XCC_MOVIMIENTOS_ID_fk",
+          "tableFrom": "XCC_SALDOS",
+          "tableTo": "XCC_MOVIMIENTOS",
+          "columnsFrom": [
+            "ID_XCC_MOVIMIENTO"
+          ],
+          "columnsTo": [
+            "ID"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "XCC_SALDOS_ID_TIPO_RETENCION_XCC_TIPOS_RETENCION_ID_fk": {
+          "name": "XCC_SALDOS_ID_TIPO_RETENCION_XCC_TIPOS_RETENCION_ID_fk",
+          "tableFrom": "XCC_SALDOS",
+          "tableTo": "XCC_TIPOS_RETENCION",
+          "columnsFrom": [
+            "ID_TIPO_RETENCION"
+          ],
+          "columnsTo": [
+            "ID"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.XCC_TIPOS_MOVIMIENTOS": {
+      "name": "XCC_TIPOS_MOVIMIENTOS",
+      "schema": "",
+      "columns": {
+        "ID": {
+          "name": "ID",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "CODIGO": {
+          "name": "CODIGO",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "NOMBRE": {
+          "name": "NOMBRE",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "SIGNO": {
+          "name": "SIGNO",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "AFECTA_CAPITAL": {
+          "name": "AFECTA_CAPITAL",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "AFECTA_INTERES": {
+          "name": "AFECTA_INTERES",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ES_DEVENGAMIENTO": {
+          "name": "ES_DEVENGAMIENTO",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ES_ACREDITACION_INTERES": {
+          "name": "ES_ACREDITACION_INTERES",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ORDEN": {
+          "name": "ORDEN",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "GENERADO_POR_MOTOR": {
+          "name": "GENERADO_POR_MOTOR",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.XCC_TIPOS_RETENCION": {
+      "name": "XCC_TIPOS_RETENCION",
+      "schema": "",
+      "columns": {
+        "ID": {
+          "name": "ID",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "CODIGO": {
+          "name": "CODIGO",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "NOMBRE": {
+          "name": "NOMBRE",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ORDEN": {
+          "name": "ORDEN",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ACTIVA": {
+          "name": "ACTIVA",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ALICUOTA": {
+          "name": "ALICUOTA",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "USA_CONDICION_IMPOSITIVA": {
+          "name": "USA_CONDICION_IMPOSITIVA",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

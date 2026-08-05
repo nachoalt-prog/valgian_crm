@@ -5,7 +5,6 @@ Todo lo que está identificado pero no resuelto todavía, sin importar de qué s
 ## Dominio
 
 - **Editor visual de QUERY/COLUMNAS en el ABM de Bandejas/Filtros**: el ABM ya existe (`/dashboard/bandejas-admin`, `/dashboard/filtros`), pero `BANDEJAS.QUERY`/`COLUMNAS` y `FILTROS.QUERY` se cargan como SQL/JSON crudo en un textarea — no hay un query-builder visual. Queda como mejora futura, no bloqueante. (`domain/bandejas.md`)
-- **`CUENTAS` sin ABM ni extensiones por producto**: la tabla existe (schema-only) desde la fase de Trámites, pero no tiene ABM, seed de datos, ni la estrategia/entidad del motor de estados wireada — y la idea original de tablas de extensión 1 a 1 por tipo de producto (`XP_CUENTAS`) no se retomó. (`domain/core.md`)
 - **Parcialmente resuelto — Campo `FILE` en Trámites**: el Modal de Trámites ya tiene una solapa "Adjuntos" completa (adjuntos generales del trámite, reutilizando `ArchivosAdjuntosTool`) — ver `domain/archivos-adjuntos.md` y `domain/tramites.md`. Lo que sigue sin conectar es específicamente el campo de tipo `FILE` **dentro** del formulario dinámico de un trámite (`TIPOS_CAMPOS.CODIGO = 'FILE'`, `TRAMITES_CAMPOS_DATOS.ID_ARCHIVO_ADJUNTO`) — sigue mostrando un placeholder, no está conectado a `guardarArchivo`.
 
 ## Infraestructura
@@ -16,6 +15,7 @@ Todo lo que está identificado pero no resuelto todavía, sin importar de qué s
 ## Módulos
 
 - **Módulo de mensajería** (`MSJ_CANALES`, `MSJ_MODELOS`, `MSJ_TAGS`, `MSJ_COLA`): deliberadamente pospuesto hasta tener el core andando. Se retoma en una pasada posterior.
+- **Servicio de feriados para `FERIADOS`**: las tablas core `FERIADOS`/`TIPOS_FERIADO` (agregadas para el motor de cálculo de Cuenta Corriente, ver `docs/módulo XCC`, aunque son genéricas y no exclusivas de ese módulo) tienen `TIPOS_FERIADO` como catálogo real y permanente (siempre sembrado), pero las filas puntuales de `FERIADOS` hoy son solo datos de PRUEBA cargados a mano. Falta un módulo separado que consuma un servicio diario (API de feriados) y puebla `FERIADOS` automáticamente — no evaluado todavía qué servicio usar.
 
 ## Infraestructura de despliegue
 

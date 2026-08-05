@@ -26,6 +26,8 @@ import {
   tiposCampos,
   procesos,
   procesosPasos,
+  tiposFeriado,
+  feriados,
 } from "@valgian/db";
 
 /**
@@ -225,6 +227,22 @@ async function ensureTipoCampo(codigo: string, nombre: string) {
   return creado;
 }
 
+async function ensureTipoFeriado(codigo: string, nombre: string) {
+  const [existente] = await db.select().from(tiposFeriado).where(eq(tiposFeriado.codigo, codigo));
+  if (existente) return existente;
+
+  const [creado] = await db.insert(tiposFeriado).values({ codigo, nombre }).returning();
+  return creado;
+}
+
+async function ensureFeriado(idTipoFeriado: string, fecha: string, descripcion: string) {
+  const [existente] = await db.select().from(feriados).where(eq(feriados.fecha, fecha));
+  if (existente) return existente;
+
+  const [creado] = await db.insert(feriados).values({ idTipoFeriado, fecha, descripcion }).returning();
+  return creado;
+}
+
 async function ensureProceso(params: {
   codigo: string;
   nombre: string;
@@ -399,6 +417,46 @@ async function main() {
   await ensurePerfilEstimulo(perfilAdmin.id, estimuloActualizar.id);
   await ensurePerfilEstimulo(perfilAdmin.id, estimuloResolver.id);
   await ensurePerfilEstimulo(perfilAdmin.id, estimuloReabrir.id);
+
+  // --- Cuentas ---
+  // ENTIDADES.CODIGO='cuentas' ya existe (ver seed.ts) — acá se le suma por
+  // primera vez el motor de estados. El legacy que inspiramos esto en crea la
+  // cuenta directo en estado ABIERTA (sin un estado "iniciada" intermedio),
+  // así que replicamos ese comportamiento en vez de inventar uno nuevo.
+
+  const entidadCuentas = await getEntidadPorCodigo("cuentas");
+  const estrategiaCuentas = await ensureEstrategia("STD_CUENTA_1", "Estrategia estándar cuentas 1", entidadCuentas.id);
+  const estadoAbierta = await ensureEstado(estrategiaCuentas.id, "abierta", "Abierta", true, false);
+  const estadoCerrada = await ensureEstado(estrategiaCuentas.id, "cerrada", "Cerrada", false, true);
+
+  const estimuloCerrar = await ensureEstimulo(estrategiaCuentas.id, "cerrar", "Cerrar");
+  const estimuloReabrirCuenta = await ensureEstimulo(estrategiaCuentas.id, "reabrir", "Reabrir");
+
+  await ensureTransicion(estrategiaCuentas.id, estadoAbierta.id, estimuloCerrar.id, estadoCerrada.id);
+  await ensureTransicion(estrategiaCuentas.id, estadoCerrada.id, estimuloReabrirCuenta.id, estadoAbierta.id);
+
+  await ensurePerfilEstimulo(perfilAdmin.id, estimuloCerrar.id);
+  await ensurePerfilEstimulo(perfilAdmin.id, estimuloReabrirCuenta.id);
+
+  // --- Feriados ---
+  // Genérico (no específico de XCC, aunque lo motivó — ver domain/core.md,
+  // fn_es_dia_habil vive en packages/db/sql/, no en el módulo). Los 4 TIPOS
+  // de acá SÍ son catálogo real y permanente, igual que TIPOS_CAMPOS más
+  // abajo — no son de prueba. Lo que SÍ es de prueba son las filas de
+  // FERIADOS puntuales: el calendario real completo lo puebla, a futuro, un
+  // módulo aparte que consuma un servicio diario (ver open-issues.md).
+  const tipoFeriadoInamovible = await ensureTipoFeriado("inamovible", "Feriado Inamovible");
+  const tipoFeriadoTrasladable = await ensureTipoFeriado("trasladable", "Feriado Trasladable");
+  const tipoFeriadoNoLaborable = await ensureTipoFeriado("no_laborable", "No Laborable");
+  await ensureTipoFeriado("turistico", "Feriado Turístico");
+
+  // Filas de ejemplo (datos de prueba, no el calendario real completo).
+  await ensureFeriado(tipoFeriadoInamovible.id, "2026-01-01", "Año Nuevo");
+  await ensureFeriado(tipoFeriadoInamovible.id, "2026-05-25", "Día de la Revolución de Mayo");
+  await ensureFeriado(tipoFeriadoInamovible.id, "2026-07-09", "Día de la Independencia");
+  await ensureFeriado(tipoFeriadoInamovible.id, "2026-12-25", "Navidad");
+  await ensureFeriado(tipoFeriadoTrasladable.id, "2026-05-01", "Día del Trabajador");
+  await ensureFeriado(tipoFeriadoNoLaborable.id, "2026-11-20", "Día de la Soberanía Nacional (dato de prueba)");
 
   await ensureTipoCampo("INPUT_TEXT", "Texto");
   await ensureTipoCampo("INPUT_DATETIME", "Fecha y hora");

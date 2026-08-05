@@ -2,27 +2,34 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { CategoriasProductosPanel } from "@/components/categorias-productos-panel";
 import { ProductosPanel } from "@/components/productos-panel";
-import { SubProductosPanel } from "@/components/sub-productos-panel";
-import type { ProductoConContador, SubProductoConProducto } from "@valgian/core";
+import type { CategoriaProductoConContador, ProductoConCategoria } from "@valgian/core";
 import {
+  createCategoriaProductoAction,
+  updateCategoriaProductoAction,
+  deleteCategoriaProductoAction,
   createProductoAction,
   updateProductoAction,
   deleteProductoAction,
-  createSubProductoAction,
-  updateSubProductoAction,
-  deleteSubProductoAction,
 } from "@/app/dashboard/productos/actions";
 
+interface MonedaOption {
+  id: string;
+  codigo: string;
+  nombre: string;
+}
+
 interface ProductosToolProps {
-  productosIniciales: ProductoConContador[];
-  subProductosIniciales: SubProductoConProducto[];
+  categoriasIniciales: CategoriaProductoConContador[];
+  productosIniciales: ProductoConCategoria[];
+  monedas: MonedaOption[];
   canGestionar: boolean;
 }
 
-export function ProductosTool({ productosIniciales, subProductosIniciales, canGestionar }: ProductosToolProps) {
+export function ProductosTool({ categoriasIniciales, productosIniciales, monedas, canGestionar }: ProductosToolProps) {
   const router = useRouter();
-  const [selectedProductoId, setSelectedProductoId] = useState<string | null>(null);
+  const [selectedCategoriaId, setSelectedCategoriaId] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
 
   function avisarSinPermiso() {
@@ -30,7 +37,25 @@ export function ProductosTool({ productosIniciales, subProductosIniciales, canGe
     setTimeout(() => setAviso(null), 3500);
   }
 
-  async function handleSaveProducto(data: { modulo: string | null; codigo: string; nombre: string }, id?: string) {
+  async function handleSaveCategoria(
+    data: { modulo: string | null; codigo: string; nombre: string; spPago: string | null; spAnularPago: string | null },
+    id?: string,
+  ) {
+    const result = id ? await updateCategoriaProductoAction(id, data) : await createCategoriaProductoAction(data);
+    if (!result.error) router.refresh();
+    return result;
+  }
+
+  async function handleDeleteCategoria(id: string) {
+    const result = await deleteCategoriaProductoAction(id);
+    if (!result.error) {
+      router.refresh();
+      if (selectedCategoriaId === id) setSelectedCategoriaId(null);
+    }
+    return result;
+  }
+
+  async function handleSaveProducto(data: { idCategoria: string; idMoneda: string | null; codigo: string; nombre: string }, id?: string) {
     const result = id ? await updateProductoAction(id, data) : await createProductoAction(data);
     if (!result.error) router.refresh();
     return result;
@@ -38,26 +63,11 @@ export function ProductosTool({ productosIniciales, subProductosIniciales, canGe
 
   async function handleDeleteProducto(id: string) {
     const result = await deleteProductoAction(id);
-    if (!result.error) {
-      router.refresh();
-      if (selectedProductoId === id) setSelectedProductoId(null);
-    }
-    return result;
-  }
-
-  async function handleSaveSubProducto(data: { idProducto: string; codigo: string; nombre: string }, id?: string) {
-    const result = id ? await updateSubProductoAction(id, data) : await createSubProductoAction(data);
     if (!result.error) router.refresh();
     return result;
   }
 
-  async function handleDeleteSubProducto(id: string) {
-    const result = await deleteSubProductoAction(id);
-    if (!result.error) router.refresh();
-    return result;
-  }
-
-  const selectedProducto = productosIniciales.find((p) => p.id === selectedProductoId) ?? null;
+  const selectedCategoria = categoriasIniciales.find((c) => c.id === selectedCategoriaId) ?? null;
 
   return (
     <div className="flex h-full gap-4">
@@ -68,25 +78,26 @@ export function ProductosTool({ productosIniciales, subProductosIniciales, canGe
       )}
 
       <aside className="w-72 shrink-0 overflow-hidden rounded-xl border border-border">
-        <ProductosPanel
-          productos={productosIniciales}
-          selectedProductoId={selectedProductoId}
-          onSelectProducto={(id) => setSelectedProductoId((prev) => (prev === id ? null : id))}
+        <CategoriasProductosPanel
+          categorias={categoriasIniciales}
+          selectedCategoriaId={selectedCategoriaId}
+          onSelectCategoria={(id) => setSelectedCategoriaId((prev) => (prev === id ? null : id))}
           canGestionar={canGestionar}
           onSinPermiso={avisarSinPermiso}
-          onSave={handleSaveProducto}
-          onDelete={handleDeleteProducto}
+          onSave={handleSaveCategoria}
+          onDelete={handleDeleteCategoria}
         />
       </aside>
 
       <div className="flex-1 overflow-hidden rounded-xl border border-border">
-        <SubProductosPanel
-          subProductos={subProductosIniciales}
-          selectedProducto={selectedProducto}
+        <ProductosPanel
+          productos={productosIniciales}
+          selectedCategoria={selectedCategoria}
+          monedas={monedas}
           canGestionar={canGestionar}
           onSinPermiso={avisarSinPermiso}
-          onSave={handleSaveSubProducto}
-          onDelete={handleDeleteSubProducto}
+          onSave={handleSaveProducto}
+          onDelete={handleDeleteProducto}
         />
       </div>
     </div>

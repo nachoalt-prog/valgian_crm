@@ -7,6 +7,7 @@ import {
   integer,
   doublePrecision,
   timestamp,
+  date,
   jsonb,
   uniqueIndex,
   type AnyPgColumn,
@@ -141,27 +142,116 @@ export const interfacesMenues = pgTable(
   (table) => [uniqueIndex("INTERFACES_MENUES_INTERFAZ_MENU_UNIQUE").on(table.idInterfaz, table.idMenu)],
 );
 
-export const productos = pgTable("PRODUCTOS", {
+export const categoriasProductos = pgTable("CATEGORIAS_PRODUCTOS", {
   id: uuid("ID").primaryKey().defaultRandom(),
   modulo: text("MODULO"),
+  codigo: text("CODIGO").notNull(),
+  nombre: text("NOMBRE").notNull(),
+  // Nombre de SP invocado dinámicamente por un motor genérico global para
+  // impactar/anular un pago de esta categoría — mismo patrón que ACCIONES.COMANDO.
+  spPago: text("SP_PAGO"),
+  spAnularPago: text("SP_ANULAR_PAGO"),
+  comodin: jsonb("COMODIN"),
+});
+
+export const productos = pgTable("PRODUCTOS", {
+  id: uuid("ID").primaryKey().defaultRandom(),
+  idCategoria: uuid("ID_CATEGORIA").references(() => categoriasProductos.id),
+  idMoneda: uuid("ID_MONEDA").references(() => monedas.id),
   codigo: text("CODIGO").notNull(),
   nombre: text("NOMBRE").notNull(),
   comodin: jsonb("COMODIN"),
 });
 
-export const subProductos = pgTable("SUB_PRODUCTOS", {
+// Quién mueve la plata (Caja, RapiPago, MercadoPago...) — genérico, le sirve
+// a cualquier módulo de producto que necesite cobrar/pagar, no solo XCC.
+export const entes = pgTable("ENTES", {
   id: uuid("ID").primaryKey().defaultRandom(),
-  idProducto: uuid("ID_PRODUCTO").references(() => productos.id),
   codigo: text("CODIGO").notNull(),
   nombre: text("NOMBRE").notNull(),
-  comodin: jsonb("COMODIN"),
 });
+
+export const formasPago = pgTable("FORMAS_PAGO", {
+  id: uuid("ID").primaryKey().defaultRandom(),
+  codigo: text("CODIGO").notNull(),
+  nombre: text("NOMBRE").notNull(),
+});
+
+export const formasDesembolso = pgTable("FORMAS_DESEMBOLSO", {
+  id: uuid("ID").primaryKey().defaultRandom(),
+  codigo: text("CODIGO").notNull(),
+  nombre: text("NOMBRE").notNull(),
+});
+
+export const canalesPago = pgTable(
+  "CANALES_PAGO",
+  {
+    id: uuid("ID").primaryKey().defaultRandom(),
+    idEnte: uuid("ID_ENTE").references(() => entes.id),
+    idFormaPago: uuid("ID_FORMA_PAGO").references(() => formasPago.id),
+  },
+  (table) => [uniqueIndex("CANALES_PAGO_ENTE_FORMA_UNIQUE").on(table.idEnte, table.idFormaPago)],
+);
+
+export const canalesDesembolso = pgTable(
+  "CANALES_DESEMBOLSO",
+  {
+    id: uuid("ID").primaryKey().defaultRandom(),
+    idEnte: uuid("ID_ENTE").references(() => entes.id),
+    idFormaDesembolso: uuid("ID_FORMA_DESEMBOLSO").references(() => formasDesembolso.id),
+  },
+  (table) => [uniqueIndex("CANALES_DESEMBOLSO_ENTE_FORMA_UNIQUE").on(table.idEnte, table.idFormaDesembolso)],
+);
+
+// Qué canales están habilitados para cada producto puntual — acá se resuelve
+// la variación por categoría (un préstamo puede habilitar canales distintos
+// que una cuenta corriente) sin necesitar forkear ENTES/FORMAS_PAGO por categoría.
+export const productosCanalesPago = pgTable(
+  "PRODUCTOS_CANALES_PAGO",
+  {
+    id: uuid("ID").primaryKey().defaultRandom(),
+    idProducto: uuid("ID_PRODUCTO").references(() => productos.id),
+    idCanalPago: uuid("ID_CANAL_PAGO").references(() => canalesPago.id),
+  },
+  (table) => [uniqueIndex("PRODUCTOS_CANALES_PAGO_UNIQUE").on(table.idProducto, table.idCanalPago)],
+);
+
+export const productosCanalesDesembolso = pgTable(
+  "PRODUCTOS_CANALES_DESEMBOLSO",
+  {
+    id: uuid("ID").primaryKey().defaultRandom(),
+    idProducto: uuid("ID_PRODUCTO").references(() => productos.id),
+    idCanalDesembolso: uuid("ID_CANAL_DESEMBOLSO").references(() => canalesDesembolso.id),
+  },
+  (table) => [uniqueIndex("PRODUCTOS_CANALES_DESEMBOLSO_UNIQUE").on(table.idProducto, table.idCanalDesembolso)],
+);
 
 export const paises = pgTable("PAISES", {
   id: uuid("ID").primaryKey().defaultRandom(),
   codigo: text("CODIGO").notNull(),
   nombre: text("NOMBRE").notNull(),
 });
+
+// Genérico — cualquier módulo que necesite noción de "día hábil" (no solo
+// Cuenta Corriente) consulta esto. Cargado con datos de prueba por ahora; el
+// histórico real de feriados queda para un módulo futuro que lo puebla desde
+// un servicio externo (ver open-issues.md).
+export const tiposFeriado = pgTable("TIPOS_FERIADO", {
+  id: uuid("ID").primaryKey().defaultRandom(),
+  codigo: text("CODIGO").notNull(),
+  nombre: text("NOMBRE").notNull(),
+});
+
+export const feriados = pgTable(
+  "FERIADOS",
+  {
+    id: uuid("ID").primaryKey().defaultRandom(),
+    idTipoFeriado: uuid("ID_TIPO_FERIADO").references(() => tiposFeriado.id),
+    fecha: date("FECHA").notNull(),
+    descripcion: text("DESCRIPCION"),
+  },
+  (table) => [uniqueIndex("FERIADOS_FECHA_UNIQUE").on(table.fecha)],
+);
 
 export const provincias = pgTable("PROVINCIAS", {
   id: uuid("ID").primaryKey().defaultRandom(),
