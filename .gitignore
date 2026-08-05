@@ -34,3 +34,6 @@ Thumbs.db
 
 # Uploads (volumen local de archivos, ver ADR 0011)
 uploads/
+
+# Diario de desarrollo personal — nunca compartido en el repo
+docs/notas_diario_desarrollo.md
