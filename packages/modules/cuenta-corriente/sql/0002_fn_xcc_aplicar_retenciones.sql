@@ -1,8 +1,8 @@
 -- Aplica las retenciones activas sobre un interés bruto ya acreditado —
 -- invocada desde sp_xcc_recalcular_cuenta (0003_...) en sus dos puntos de
 -- acreditación (capitalización mensual y cierre de cuenta), nunca duplicada
--- entre ambos (ver docs/módulo XCC, sección 4 — checklist sección 0 contra
--- "dos copias que divergen").
+-- entre ambos (ver docs/domain/cuenta-corriente.md — principios de diseño
+-- contra "dos copias que divergen").
 --
 -- Verificado contra el legacy real (docs/runbooks/archivos de apoyo/procesos
 -- cuenta corriente.sql): cada retención se calcula sobre el interés BRUTO,

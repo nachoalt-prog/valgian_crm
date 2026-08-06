@@ -48,7 +48,7 @@ Aplican a todas las tablas del sistema salvo indicación contraria — ver tambi
 | FECHA               | date, único                                |
 | DESCRIPCION         | string, nullable                           |
 
-Genérico (no específico de ningún módulo) — cualquiera que necesite noción de "día hábil" las consulta vía `fn_es_dia_habil` (`packages/db/sql/0020_fn_es_dia_habil.sql`, función del core, no del módulo Cuenta Corriente que la motivó — ver `docs/módulo XCC`). Los 4 `TIPOS_FERIADO` (no laborable/inamovible/trasladable/turístico) son catálogo real y permanente, sembrados siempre — lo que sí es dato de PRUEBA son las filas puntuales de `FERIADOS`: el calendario real completo queda para un módulo futuro que lo puebla desde un servicio externo (ver `open-issues.md`).
+Genérico (no específico de ningún módulo) — cualquiera que necesite noción de "día hábil" las consulta vía `fn_es_dia_habil` (`packages/db/sql/0020_fn_es_dia_habil.sql`, función del core, no del módulo Cuenta Corriente que la motivó — ver `domain/cuenta-corriente.md`). Los 4 `TIPOS_FERIADO` (no laborable/inamovible/trasladable/turístico) son catálogo real y permanente, sembrados siempre — lo que sí es dato de PRUEBA son las filas puntuales de `FERIADOS`: el calendario real completo queda para un módulo futuro que lo puebla desde un servicio externo (ver `open-issues.md`).
 
 ## Legajos
 
@@ -173,7 +173,7 @@ ABM embebido en el modal de Legajo, dentro de la herramienta de Clientes (botón
 
 ## Productos y cuentas
 
-Cadena de configuración de producto → instancia real por legajo. `PRODUCTOS`/`SUB_PRODUCTOS` se renombraron a `CATEGORIAS_PRODUCTOS`/`PRODUCTOS` (el nivel específico pasa a llamarse simplemente "producto", sin el prefijo "sub-") como parte de la Fase 1 del módulo Cuenta Corriente (ver `docs/módulo XCC`) — cualquier módulo opcional de producto futuro (préstamos, tarjetas...) usa esta misma cadena, no es exclusivo de XCC.
+Cadena de configuración de producto → instancia real por legajo. `PRODUCTOS`/`SUB_PRODUCTOS` se renombraron a `CATEGORIAS_PRODUCTOS`/`PRODUCTOS` (el nivel específico pasa a llamarse simplemente "producto", sin el prefijo "sub-") como parte de la Fase 1 del módulo Cuenta Corriente (ver `domain/cuenta-corriente.md`) — cualquier módulo opcional de producto futuro (préstamos, tarjetas...) usa esta misma cadena, no es exclusivo de XCC.
 
 ### CATEGORIAS_PRODUCTOS
 
@@ -215,7 +215,7 @@ ABM propio en `/dashboard/productos` (`packages/core/src/productos.ts`), maestro
 | AUDIT_USUARIO | FK → USUARIOS                                    |
 | COMODIN       | jsonb, nullable                                  |
 
-Ya participa del subsistema de Trámites (`ENTIDADES.CODIGO = 'cuentas'`, usada como "Aplicar a" — ver `domain/tramites.md`) y, desde la Fase 1 del módulo Cuenta Corriente, tiene motor de estados propio (`ESTRATEGIAS.CODIGO = 'STD_CUENTA_1'`, estados Abierta/Cerrada — una cuenta nace directo en Abierta, sin estado intermedio). Sigue sin ABM de alta/edición ni seed de datos de ejemplo — eso es del módulo Cuenta Corriente (`docs/módulo XCC`), no del core.
+Ya participa del subsistema de Trámites (`ENTIDADES.CODIGO = 'cuentas'`, usada como "Aplicar a" — ver `domain/tramites.md`) y, desde la Fase 1 del módulo Cuenta Corriente, tiene motor de estados propio (`ESTRATEGIAS.CODIGO = 'STD_CUENTA_1'`, estados Abierta/Cerrada — una cuenta nace directo en Abierta, sin estado intermedio). Sigue sin ABM de alta/edición ni seed de datos de ejemplo — eso es del módulo Cuenta Corriente (`domain/cuenta-corriente.md`), no del core.
 
 ### Canales de pago y desembolso (core, genérico)
 

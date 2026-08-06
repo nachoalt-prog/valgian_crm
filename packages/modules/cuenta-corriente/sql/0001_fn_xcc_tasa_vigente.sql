@@ -1,6 +1,6 @@
 -- Tasa efectiva de una cuenta a una fecha dada — la última fila de
 -- XCC_CUENTAS_TASA_HISTORICO con VIGENTE_DESDE <= p_fecha. Necesario porque
--- el motor puede recalcular el pasado (ver docs/módulo XCC, sección 3): cada
+-- el motor puede recalcular el pasado (ver docs/domain/cuenta-corriente.md): cada
 -- día recalculado tiene que usar la tasa que regía ESE día, no la actual.
 -- Devuelve 0 (no NULL) si la cuenta todavía no tiene ninguna tasa cargada,
 -- para que el cálculo de interés que la multiplica dé 0 en vez de romper.

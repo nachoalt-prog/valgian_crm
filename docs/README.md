@@ -16,3 +16,7 @@ Este repositorio de documentación es la fuente de verdad técnica del proyecto.
 ## Regla general
 
 Si estás por escribir código y algo no está definido en esta documentación, se pregunta antes de asumir un criterio — no se inventa sobre la marcha.
+
+## Qué NO va acá
+
+Notas de diario, planes de diseño en proceso (con idas y vueltas, decisiones descartadas en el camino) y mockups viven en `Desarrollo/` en la raíz del repo — carpeta de trabajo personal, gitignoreada, nunca compartida. Cuando algo de ahí decanta en una decisión o comportamiento final estable, su versión destilada pasa a vivir acá (`domain/`, `decisions/`, etc.).

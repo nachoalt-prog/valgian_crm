@@ -60,7 +60,7 @@ async function ensureTipoRetencion(codigo: string, nombre: string, orden: number
   const [existente] = await db.select().from(xccTiposRetencion).where(eq(xccTiposRetencion.codigo, codigo));
   if (existente) return existente;
   // activa: false a propósito — no arrancar descontando plata sin que una
-  // instalación real lo decida explícitamente (ver docs/módulo XCC, sección 5).
+  // instalación real lo decida explícitamente (ver docs/domain/cuenta-corriente.md).
   const [creada] = await db
     .insert(xccTiposRetencion)
     .values({ codigo, nombre, orden, activa: false, alicuota, usaCondicionImpositiva })
@@ -259,12 +259,12 @@ async function main() {
   // La alícuota de Ganancias no se usa desde acá — se resuelve por XCC_CLIENTES_CONDICION_HISTORICO.
   await ensureTipoRetencion("ganancias", "Impuesto a las Ganancias", 2, 0, true);
 
-  // Cola de recálculo — ver docs/módulo XCC, sección 3. Los triggers y el
+  // Cola de recálculo — ver docs/domain/cuenta-corriente.md. Los triggers y el
   // proceso xcc_consolidacion_saldos solo encolan en XCC_RECALCULO_PENDIENTE;
   // xcc_procesar_recalculos_pendientes (abajo) es el único que efectivamente
   // llama al motor (sp_xcc_recalcular_cuenta), vía CALL a
   // sp_xcc_drenar_recalculos_pendientes — 100% base de datos, sin componente
-  // de aplicación (ver docs/módulo XCC, sección 3, y ADR 0015).
+  // de aplicación (ver docs/domain/cuenta-corriente.md, y ADR 0015).
   const procesoConsolidacionSaldos = await ensureProceso({
     codigo: "xcc_consolidacion_saldos",
     nombre: "Consolidación de saldos Cuenta Corriente",

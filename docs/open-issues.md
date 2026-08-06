@@ -15,7 +15,8 @@ Todo lo que está identificado pero no resuelto todavía, sin importar de qué s
 ## Módulos
 
 - **Módulo de mensajería** (`MSJ_CANALES`, `MSJ_MODELOS`, `MSJ_TAGS`, `MSJ_COLA`): deliberadamente pospuesto hasta tener el core andando. Se retoma en una pasada posterior.
-- **Servicio de feriados para `FERIADOS`**: las tablas core `FERIADOS`/`TIPOS_FERIADO` (agregadas para el motor de cálculo de Cuenta Corriente, ver `docs/módulo XCC`, aunque son genéricas y no exclusivas de ese módulo) tienen `TIPOS_FERIADO` como catálogo real y permanente (siempre sembrado), pero las filas puntuales de `FERIADOS` hoy son solo datos de PRUEBA cargados a mano. Falta un módulo separado que consuma un servicio diario (API de feriados) y puebla `FERIADOS` automáticamente — no evaluado todavía qué servicio usar.
+- **Servicio de feriados para `FERIADOS`**: las tablas core `FERIADOS`/`TIPOS_FERIADO` (agregadas para el motor de cálculo de Cuenta Corriente, ver `domain/cuenta-corriente.md`, aunque son genéricas y no exclusivas de ese módulo) tienen `TIPOS_FERIADO` como catálogo real y permanente (siempre sembrado), pero las filas puntuales de `FERIADOS` hoy son solo datos de PRUEBA cargados a mano. Falta un módulo separado que consuma un servicio diario (API de feriados) y puebla `FERIADOS` automáticamente — no evaluado todavía qué servicio usar.
+- **Módulo Cuenta Corriente (XCC) — Fase 4 pendiente**: motor de cálculo y retenciones ya implementados y verificados (`domain/cuenta-corriente.md`). Falta la capa de ABMs: `XCC_TIPOS_MOVIMIENTOS`, `XCC_TIPOS_RETENCION`, `XCC_CONDICIONES_IMPOSITIVAS` y gestión de cuentas (posible reuso de `GestionEntidadTool`).
 
 ## Infraestructura de despliegue
 

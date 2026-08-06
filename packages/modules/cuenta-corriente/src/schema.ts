@@ -39,7 +39,7 @@ export const xccCuentas = pgTable(
 );
 
 // Tasa efectiva de cada cuenta a través del tiempo — necesaria porque el
-// motor puede recalcular el pasado (ver docs/módulo XCC, sección 3).
+// motor puede recalcular el pasado (ver docs/domain/cuenta-corriente.md).
 // ALTA_FECHA con default: desempate determinista cuando dos filas comparten
 // el mismo VIGENTE_DESDE (ej. una corrección posterior con la misma fecha de
 // vigencia que la original) — sin esto, fn_xcc_tasa_vigente podía devolver
@@ -89,7 +89,7 @@ export const xccClientesCondicionHistorico = pgTable("XCC_CLIENTES_CONDICION_HIS
 // Catálogo único para TODO tipo de asiento — movimientos reales (depósito,
 // extracción...) Y asientos que genera el motor solo (apertura, devengamiento,
 // acreditación, cierre). GENERADO_POR_MOTOR distingue cuáles puede elegir un
-// usuario/API al cargar un XCC_MOVIMIENTOS manual (ver docs/módulo XCC, sección 2).
+// usuario/API al cargar un XCC_MOVIMIENTOS manual (ver docs/domain/cuenta-corriente.md).
 export const xccTiposMovimientos = pgTable("XCC_TIPOS_MOVIMIENTOS", {
   id: uuid("ID").primaryKey().defaultRandom(),
   codigo: text("CODIGO").notNull(),
@@ -123,7 +123,7 @@ export const xccMovimientos = pgTable("XCC_MOVIMIENTOS", {
 // Catálogo editable por ABM — porcentaje como dato, no delegado a función
 // (salvo Ganancias, que resuelve contra XCC_CLIENTES_CONDICION_HISTORICO).
 // USA_CONDICION_IMPOSITIVA distingue ese caso como DATO, no comparando
-// CODIGO en el motor (ver docs/módulo XCC, sección 4 y checklist sección 0).
+// CODIGO en el motor (ver docs/domain/cuenta-corriente.md).
 export const xccTiposRetencion = pgTable("XCC_TIPOS_RETENCION", {
   id: uuid("ID").primaryKey().defaultRandom(),
   codigo: text("CODIGO").notNull(),
@@ -135,7 +135,7 @@ export const xccTiposRetencion = pgTable("XCC_TIPOS_RETENCION", {
 });
 
 // El libro mayor calculado — reemplaza XU_ACTUALIZACION_SALDOS del legacy,
-// sin cursor (ver docs/módulo XCC, sección 3: función de ventana + trigger).
+// sin cursor (ver docs/domain/cuenta-corriente.md: función de ventana + trigger).
 export const xccSaldos = pgTable("XCC_SALDOS", {
   id: uuid("ID").primaryKey().defaultRandom(),
   idCuenta: uuid("ID_CUENTA").references(() => cuentas.id),
@@ -144,7 +144,7 @@ export const xccSaldos = pgTable("XCC_SALDOS", {
   // Null para asientos generados por el motor solo (devengamiento, acreditación...).
   idXccMovimiento: uuid("ID_XCC_MOVIMIENTO").references(() => xccMovimientos.id),
   // Trazabilidad de qué XCC_TIPOS_RETENCION generó este asiento — solo en
-  // asientos de retención, null en cualquier otro (ver docs/módulo XCC, sección 4).
+  // asientos de retención, null en cualquier otro (ver docs/domain/cuenta-corriente.md).
   idTipoRetencion: uuid("ID_TIPO_RETENCION").references(() => xccTiposRetencion.id),
   concepto: text("CONCEPTO"),
   monto: doublePrecision("MONTO"),
@@ -174,7 +174,7 @@ export const xccCheckpoint = pgTable("XCC_CHECKPOINT", {
 // nocturno) encolan acá en vez de llamar a sp_xcc_recalcular_cuenta directo:
 // un recálculo retroactivo viejo puede recorrer miles de días, y hacerlo
 // dentro de la misma transacción del INSERT que lo dispara bloquearía a quien
-// lo cargó (ver docs/módulo XCC, sección 3). ID_CUENTA único: si ya hay un
+// lo cargó (ver docs/domain/cuenta-corriente.md). ID_CUENTA único: si ya hay un
 // pendiente para esa cuenta, se actualiza a la FECHA_DESDE más antigua de las
 // dos (dedup) en vez de duplicar filas. El proceso xcc_procesar_recalculos_pendientes
 // (cada 2 min, CALL sp_xcc_drenar_recalculos_pendientes) es el único lugar

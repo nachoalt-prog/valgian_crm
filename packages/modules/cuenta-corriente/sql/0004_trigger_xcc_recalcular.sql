@@ -9,7 +9,7 @@
 -- transacción del INSERT que lo dispara bloquearía a quien lo cargó; una
 -- carga masiva (importar historial de una cuenta) dispararía ese recálculo
 -- completo una vez por cada fila insertada (cuadrático). Se desacopla
--- encolando (ver docs/módulo XCC, sección 3, incluida la evaluación de por
+-- encolando (ver docs/domain/cuenta-corriente.md, incluida la evaluación de por
 -- qué esto es 100% base de datos, sin worker de Node) — el proceso
 -- xcc_procesar_recalculos_pendientes (cada 2 min, CALL a
 -- sp_xcc_drenar_recalculos_pendientes, ver seed.ts del módulo) es el único

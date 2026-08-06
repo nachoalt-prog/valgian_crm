@@ -1,7 +1,7 @@
 -- Día hábil = ni sábado/domingo ni fila en FERIADOS. Genérico — cualquier
 -- módulo o pieza del core que necesite noción de "día hábil" la consulta
 -- (nació para el devengamiento de interés del módulo Cuenta Corriente, ver
--- docs/módulo XCC, pero FERIADOS/TIPOS_FERIADO son tablas del core, no
+-- docs/domain/cuenta-corriente.md, pero FERIADOS/TIPOS_FERIADO son tablas del core, no
 -- exclusivas de ese módulo — ver domain/core.md). Trata CUALQUIER fila de
 -- FERIADOS como no-hábil, sin distinguir por TIPOS_FERIADO (inamovible/
 -- trasladable/no laborable/turístico) — simplificación explícita, documentada.
