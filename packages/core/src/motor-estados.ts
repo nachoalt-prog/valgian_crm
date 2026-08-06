@@ -1,4 +1,4 @@
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, inArray, sql } from "drizzle-orm";
 import { db, entidades, estados, estimulos, transiciones, perfilesEstimulos, estrategias } from "@valgian/db";
 
 /** Todas las ESTRATEGIAS — para el selector del ABM de Tipos de Trámite. */
@@ -65,14 +65,22 @@ export async function getEstimulosDesdeEstado(idEstado: string, perfilId: string
     .innerJoin(estimulos, eq(estimulos.id, transiciones.idEstimulo))
     .where(eq(transiciones.idEstado0, idEstado));
 
+  const idsEstimulos = transicionesDesdeEstado.map((e) => e.id);
+  if (idsEstimulos.length === 0) return [];
+
+  // Un solo IN en vez de un SELECT por transición (antes: N round-trips
+  // secuenciales, uno por estímulo — contribuía a la latencia de abrir un
+  // legajo, ver "Gestión de Entidad" en domain/motor-de-estados.md).
+  const permisosDelPerfil = await db
+    .select({ idEstimulo: perfilesEstimulos.idEstimulo })
+    .from(perfilesEstimulos)
+    .where(and(eq(perfilesEstimulos.idPerfil, perfilId), inArray(perfilesEstimulos.idEstimulo, idsEstimulos)));
+  const idsPermitidos = new Set(permisosDelPerfil.map((p) => p.idEstimulo));
+
   const disponibles: EstimuloDisponible[] = [];
   for (const e of transicionesDesdeEstado) {
     if (!e.idEstadoDestino) continue; // TRANSICIONES mal configurada (sin ID_ESTADO_1) — no debería pasar en la práctica.
-    const [permiso] = await db
-      .select()
-      .from(perfilesEstimulos)
-      .where(and(eq(perfilesEstimulos.idPerfil, perfilId), eq(perfilesEstimulos.idEstimulo, e.id)));
-    if (permiso) disponibles.push({ ...e, idEstadoDestino: e.idEstadoDestino });
+    if (idsPermitidos.has(e.id)) disponibles.push({ ...e, idEstadoDestino: e.idEstadoDestino });
   }
 
   return disponibles;

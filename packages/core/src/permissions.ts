@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db, herramientas, operaciones, permisos } from "@valgian/db";
 
 /** Toda herramienta tiene como mínimo esta operación — decide si se ve o no. */
@@ -28,4 +28,30 @@ export async function getPermisoParaOperacion(
     .where(and(eq(permisos.idPerfil, perfilId), eq(permisos.idOperacion, operacion.id)));
 
   return !!permiso;
+}
+
+/**
+ * Versión batcheada de getPermisoParaOperacion — resuelve de una sola vez el
+ * acceso a la MISMA operación (normalmente "acceso") en varias herramientas
+ * distintas, en vez de N round-trips secuenciales (ej. al filtrar las
+ * solapas de un layout de legajo según el perfil actual, ver
+ * layouts-legajo.ts). Mismo criterio "sin fila en PERMISOS, sin acceso" que
+ * la versión simple — no una forma alternativa de decidir permisos, solo
+ * batchea la misma consulta.
+ */
+export async function getPermisosParaHerramientas(
+  perfilId: string,
+  herramientaCodigos: string[],
+  operacionCodigo: string,
+): Promise<Set<string>> {
+  if (herramientaCodigos.length === 0) return new Set();
+
+  const filas = await db
+    .select({ herramientaCodigo: herramientas.codigo })
+    .from(permisos)
+    .innerJoin(operaciones, eq(operaciones.id, permisos.idOperacion))
+    .innerJoin(herramientas, eq(herramientas.id, operaciones.idHerramienta))
+    .where(and(eq(permisos.idPerfil, perfilId), eq(operaciones.codigo, operacionCodigo), inArray(herramientas.codigo, herramientaCodigos)));
+
+  return new Set(filas.map((f) => f.herramientaCodigo));
 }

@@ -15,10 +15,14 @@ const ADMIN_USERNAME = "admin";
  * - `pnpm db:seed` de este módulo: categoría CUENTAS/producto CC, tipos de
  *   movimiento, condiciones impositivas, tipos de retención.
  *
- * Crea 3 cuentas con historia real (movimientos con fechas pasadas) y termina
- * llamando `CALL sp_xcc_drenar_recalculos_pendientes()` directo, así
- * XCC_SALDOS queda poblado al terminar el seed — no hace falta esperar al
- * proceso xcc_procesar_recalculos_pendientes (cada 2 min).
+ * Crea UN legajo (DEMO-XCC-0001) con 3 cuentas de Cuenta Corriente — activa
+ * con historia, recién abierta, y cerrada — con movimientos de fechas
+ * pasadas, y termina llamando `CALL sp_xcc_drenar_recalculos_pendientes()`
+ * directo, así XCC_SALDOS queda poblado al terminar el seed — no hace falta
+ * esperar al proceso xcc_procesar_recalculos_pendientes (cada 2 min). Un solo
+ * legajo con varias cuentas es a propósito: es el escenario que necesita la
+ * solapa "Cuenta Corriente" (resumen consolidado por legajo, ver
+ * docs/domain/cuenta-corriente.md).
  *
  * Las retenciones (XCC_TIPOS_RETENCION.ACTIVA) NO se tocan acá — activarlas
  * es una decisión de configuración de una instalación real, no algo que un
@@ -212,13 +216,14 @@ async function main() {
   if (!productoCC) throw new Error(`No existe PRODUCTOS.CODIGO = "CC" — corré el seed del módulo cuenta-corriente primero.`);
 
   const condicionResponsableInscripto = await getCondicionImpositivaPorCodigo("responsable_inscripto");
-  const condicionNoInscripto = await getCondicionImpositivaPorCodigo("no_inscripto");
-  const condicionConCertificado = await getCondicionImpositivaPorCodigo("con_certificado");
 
   const tipoDeposito = await getTipoMovimientoPorCodigo("deposito");
   const tipoExtraccion = await getTipoMovimientoPorCodigo("extraccion");
 
-  // --- Cuenta 1: activa, con varios meses de historia (varias acreditaciones esperadas) ---
+  // Un solo legajo con 3 cuentas (antes eran 3 legajos separados, uno por
+  // cuenta — sin motivo real, simplemente no se había pensado el caso
+  // "legajo con varias cuentas de Cuenta Corriente", que es justamente lo
+  // que necesita probarse la solapa de resumen consolidado del legajo).
   const altaFecha1 = haceMeses(4);
   const legajo1 = await ensureLegajo("DEMO-XCC-0001", estadoAbierta.id, admin.id);
   const titular1 = await ensureClienteTitular({
@@ -233,6 +238,8 @@ async function main() {
     idUsuarioAudit: admin.id,
   });
   await ensureXccCliente(titular1.id, condicionResponsableInscripto.id, altaFecha1);
+
+  // --- Cuenta 1: activa, con varios meses de historia (varias acreditaciones esperadas) ---
   const cuenta1 = await ensureCuentaXcc({
     numero: "DEMO-XCC-0001",
     idLegajo: legajo1.id,
@@ -251,22 +258,9 @@ async function main() {
 
   // --- Cuenta 2: recién abierta, sin acreditación todavía ---
   const altaFecha2 = haceDias(10);
-  const legajo2 = await ensureLegajo("DEMO-XCC-0002", estadoAbierta.id, admin.id);
-  const titular2 = await ensureClienteTitular({
-    idLegajo: legajo2.id,
-    idCaracter: caracterTitular.id,
-    idTipoDocumento: tipoDocumentoDni.id,
-    nroDocumento: "90000002",
-    apellido: "Fernández",
-    nombre: "Diego",
-    idGenero: generoM.id,
-    idProvincia: provinciaCaba.id,
-    idUsuarioAudit: admin.id,
-  });
-  await ensureXccCliente(titular2.id, condicionNoInscripto.id, altaFecha2);
   const cuenta2 = await ensureCuentaXcc({
     numero: "DEMO-XCC-0002",
-    idLegajo: legajo2.id,
+    idLegajo: legajo1.id,
     idProducto: productoCC.id,
     idEstado: estadoAbierta.id,
     altaFecha: altaFecha2,
@@ -279,22 +273,9 @@ async function main() {
 
   // --- Cuenta 3: cerrada (asiento de cierre esperado tras drenar) ---
   const altaFecha3 = haceMeses(3);
-  const legajo3 = await ensureLegajo("DEMO-XCC-0003", estadoCerrada.id, admin.id);
-  const titular3 = await ensureClienteTitular({
-    idLegajo: legajo3.id,
-    idCaracter: caracterTitular.id,
-    idTipoDocumento: tipoDocumentoDni.id,
-    nroDocumento: "90000003",
-    apellido: "Suárez",
-    nombre: "Lucía",
-    idGenero: generoF.id,
-    idProvincia: provinciaCaba.id,
-    idUsuarioAudit: admin.id,
-  });
-  await ensureXccCliente(titular3.id, condicionConCertificado.id, altaFecha3);
   const cuenta3 = await ensureCuentaXcc({
     numero: "DEMO-XCC-0003",
-    idLegajo: legajo3.id,
+    idLegajo: legajo1.id,
     idProducto: productoCC.id,
     idEstado: estadoCerrada.id,
     altaFecha: altaFecha3,
@@ -313,7 +294,7 @@ async function main() {
 
   const totalAsientos = await db.select().from(xccSaldos);
   console.log(
-    `Seed de demo de Cuenta Corriente aplicado (idempotente): 3 cuentas (DEMO-XCC-0001 activa con historia, DEMO-XCC-0002 recién abierta, DEMO-XCC-0003 cerrada), ${totalAsientos.length} asientos totales en XCC_SALDOS tras drenar.`,
+    `Seed de demo de Cuenta Corriente aplicado (idempotente): legajo DEMO-XCC-0001 con 3 cuentas (0001 activa con historia, 0002 recién abierta, 0003 cerrada), ${totalAsientos.length} asientos totales en XCC_SALDOS tras drenar.`,
   );
 }
 

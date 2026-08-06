@@ -1,11 +1,39 @@
-import { eq, and } from "drizzle-orm";
-import { db, closeDb, categoriasProductos, productos, monedas, procesos, procesosPasos } from "@valgian/db";
+import { eq, and, isNull } from "drizzle-orm";
+import {
+  db,
+  closeDb,
+  categoriasProductos,
+  productos,
+  monedas,
+  procesos,
+  procesosPasos,
+  perfiles,
+  herramientas,
+  operaciones,
+  permisos,
+  layoutsLegajo,
+  layoutsLegajoSolapas,
+  filtros,
+  bandejas,
+  bandejasFiltros,
+  bandejasPerfiles,
+} from "@valgian/db";
 import { xccProductos, xccTiposMovimientos, xccTiposRetencion, xccCondicionesImpositivas } from "./schema";
 
 /**
  * Seed del módulo Cuenta Corriente (XCC) — categoría/producto base (tablas
- * del core) + catálogos propios. Idempotente (patrón ensureX, insert-only —
- * ver ADR 0020 sobre cómo corregir un registro ya sembrado con un parche).
+ * del core) + catálogos propios + la solapa de legajo/bandeja/layout propios
+ * del módulo. Idempotente (patrón ensureX, insert-only — ver ADR 0020 sobre
+ * cómo corregir un registro ya sembrado con un parche).
+ *
+ * Requiere haber corrido "pnpm db:seed" y "pnpm db:seed:config" del core
+ * antes (necesita PERFILES, LAYOUTS_LEGAJO "layout_legajo_default_1" y los
+ * FILTROS de la bandeja "legajos" ya sembrados).
+ *
+ * Nada de esto se siembra desde packages/core — @valgian/core no puede
+ * depender de ningún módulo opcional (docs/contracts/modulo.md), y la
+ * bandeja "Legajos CC" de acá abajo referencia XCC_CUENTAS en su QUERY, así
+ * que ni la herramienta ni el layout ni la bandeja pueden vivir en el core.
  */
 
 async function ensureCategoriaProducto(codigo: string, nombre: string, modulo: string) {
@@ -106,6 +134,137 @@ async function ensureProcesoPaso(params: { idProceso: string; orden: number; nom
     .returning();
   return creado;
 }
+
+async function getPerfilAdmin() {
+  const [admin] = await db.select().from(perfiles).where(eq(perfiles.codigo, "admin"));
+  if (!admin) throw new Error('No existe PERFILES.CODIGO = "admin" — corré el seed principal ("pnpm db:seed") primero.');
+  return admin;
+}
+
+async function ensureHerramienta(codigo: string, nombre: string, slug: string) {
+  const [existente] = await db.select().from(herramientas).where(eq(herramientas.codigo, codigo));
+  if (existente) return existente;
+  const [creada] = await db.insert(herramientas).values({ codigo, nombre, slug }).returning();
+  return creada;
+}
+
+async function ensureOperacion(idHerramienta: string, codigo: string, nombre: string) {
+  const [existente] = await db
+    .select()
+    .from(operaciones)
+    .where(and(eq(operaciones.idHerramienta, idHerramienta), eq(operaciones.codigo, codigo)));
+  if (existente) return existente;
+  const [creada] = await db.insert(operaciones).values({ idHerramienta, codigo, nombre }).returning();
+  return creada;
+}
+
+async function ensurePermisoOperacion(idPerfil: string, idOperacion: string) {
+  const [existente] = await db
+    .select()
+    .from(permisos)
+    .where(and(eq(permisos.idPerfil, idPerfil), eq(permisos.idOperacion, idOperacion)));
+  if (existente) return existente;
+  const [creado] = await db.insert(permisos).values({ idPerfil, idOperacion }).returning();
+  return creado;
+}
+
+async function getLayoutPorCodigo(codigo: string) {
+  const [layout] = await db.select().from(layoutsLegajo).where(eq(layoutsLegajo.codigo, codigo));
+  if (!layout) throw new Error(`No existe LAYOUTS_LEGAJO.CODIGO = "${codigo}" — corré "pnpm db:seed:config" del core primero.`);
+  return layout;
+}
+
+// A diferencia del ensureX insert-only de siempre, este devuelve también si
+// la fila fue creada recién — el clon de solapas de más abajo lo necesita
+// para copiar las solapas del default UNA sola vez, no en cada corrida.
+async function ensureLayout(codigo: string, nombre: string) {
+  const [existente] = await db.select().from(layoutsLegajo).where(eq(layoutsLegajo.codigo, codigo));
+  if (existente) return { layout: existente, creado: false as const };
+  const [creado] = await db.insert(layoutsLegajo).values({ codigo, nombre }).returning();
+  return { layout: creado, creado: true as const };
+}
+
+async function ensureLayoutSolapa(idLayout: string, orden: number, nombre: string, idHerramienta: string | null, visible: boolean) {
+  const [existente] = await db
+    .select()
+    .from(layoutsLegajoSolapas)
+    .where(and(eq(layoutsLegajoSolapas.idLayout, idLayout), eq(layoutsLegajoSolapas.orden, orden)));
+  if (existente) return existente;
+  const [creada] = await db.insert(layoutsLegajoSolapas).values({ idLayout, orden, nombre, idHerramienta, visible }).returning();
+  return creada;
+}
+
+async function ensureFiltro(codigo: string, nombre: string, tipo: string, query: string | null) {
+  const [existente] = await db.select().from(filtros).where(eq(filtros.codigo, codigo));
+  if (existente) return existente;
+  const [creado] = await db.insert(filtros).values({ codigo, nombre, tipo, query }).returning();
+  return creado;
+}
+
+async function ensureBandeja(codigo: string, nombre: string, query: string, columnas: unknown) {
+  const [existente] = await db.select().from(bandejas).where(eq(bandejas.codigo, codigo));
+  if (existente) return existente;
+  const [creada] = await db.insert(bandejas).values({ codigo, nombre, query, columnas }).returning();
+  return creada;
+}
+
+async function ensureBandejaFiltro(idBandeja: string, idFiltro: string, campo: string, orden: number) {
+  const [existente] = await db
+    .select()
+    .from(bandejasFiltros)
+    .where(and(eq(bandejasFiltros.idBandeja, idBandeja), eq(bandejasFiltros.idFiltro, idFiltro), eq(bandejasFiltros.campo, campo)));
+  if (existente) return existente;
+  const [creada] = await db.insert(bandejasFiltros).values({ idBandeja, idFiltro, campo, orden }).returning();
+  return creada;
+}
+
+async function ensureBandejaPerfil(idBandeja: string, idPerfil: string) {
+  const [existente] = await db
+    .select()
+    .from(bandejasPerfiles)
+    .where(and(eq(bandejasPerfiles.idBandeja, idBandeja), eq(bandejasPerfiles.idPerfil, idPerfil)));
+  if (existente) return existente;
+  const [creada] = await db.insert(bandejasPerfiles).values({ idBandeja, idPerfil }).returning();
+  return creada;
+}
+
+async function ensureBandejaLayout(idBandeja: string, idLayout: string) {
+  await db.update(bandejas).set({ idLayout }).where(and(eq(bandejas.id, idBandeja), isNull(bandejas.idLayout)));
+}
+
+const BANDEJA_LEGAJOS_CC_QUERY = `
+SELECT
+  L."ID" AS id,
+  L."NUMERO" AS numero,
+  C."APELLIDO" || ', ' || C."NOMBRE" AS titular,
+  TD."CODIGO" || ': ' || C."NRO_DOCUMENTO" AS documento,
+  E."NOMBRE" AS estado,
+  E."ID" AS estado_id,
+  L."ALTA_FECHA" AS alta_fecha,
+  L."ALTA_USUARIO" AS alta_usuario_id,
+  C."APELLIDO" AS titular_apellido,
+  C."NOMBRE" AS titular_nombre,
+  C."NRO_DOCUMENTO" AS titular_documento
+FROM "LEGAJOS" L
+LEFT JOIN "CLIENTES" C ON C."ID_LEGAJO" = L."ID" AND C."ES_TITULAR" = true
+LEFT JOIN "ESTADOS" E ON E."ID" = L."ID_ESTADO"
+LEFT JOIN "TIPOS_DOCUMENTO" TD ON TD."ID" = C."ID_TIPO_DOCUMENTO"
+WHERE EXISTS (
+  SELECT 1 FROM "CUENTAS" CU
+  JOIN "XCC_CUENTAS" XC ON XC."ID_CUENTA" = CU."ID"
+  WHERE CU."ID_LEGAJO" = L."ID"
+)
+`.trim();
+
+// Idéntica a BANDEJA_LEGAJOS_COLUMNAS del core (packages/core/src/seed-config.ts) —
+// mismos alias de salida de arriba, la query solo agrega el WHERE EXISTS.
+const BANDEJA_LEGAJOS_CC_COLUMNAS = [
+  { campo: "numero", label: "Nro. Legajo" },
+  { campo: "titular", label: "Titular" },
+  { campo: "documento", label: "Documento" },
+  { campo: "estado", label: "Estado", tipo: "badge" },
+  { campo: "alta_fecha", label: "Alta", tipo: "fecha" },
+];
 
 async function main() {
   const categoriaCuentas = await ensureCategoriaProducto("CUENTAS", "Cuentas", "XCC");
@@ -305,6 +464,59 @@ async function main() {
     comando: `CALL sp_xcc_drenar_recalculos_pendientes()`,
     timeoutMinutos: 15,
   });
+
+  // --- Solapa de legajo "Cuenta Corriente" + layout/bandeja propios del
+  // módulo. Nunca se toca layout_legajo_default_1 ni la bandeja "legajos"
+  // del core — ver docs/domain/cuenta-corriente.md.
+  const herramientaResumen = await ensureHerramienta("XCC_RESUMEN_1", "Cuenta Corriente (Legajo)", "xcc_resumen_1.ver");
+  const perfilAdmin = await getPerfilAdmin();
+  const operacionAccesoResumen = await ensureOperacion(herramientaResumen.id, "acceso", "Acceso");
+  await ensurePermisoOperacion(perfilAdmin.id, operacionAccesoResumen.id);
+
+  const layoutDefault = await getLayoutPorCodigo("layout_legajo_default_1");
+  const { layout: layoutXcc, creado: layoutXccCreado } = await ensureLayout("layout_legajo_xcc_1", "Layout Legajo — Cuenta Corriente");
+  if (layoutXccCreado) {
+    // Clon dinámico de lo que el default tenga HOY, no hardcodea las 6
+    // solapas actuales — corre una sola vez (guardado por layoutXccCreado).
+    const solapasDefault = await db.select().from(layoutsLegajoSolapas).where(eq(layoutsLegajoSolapas.idLayout, layoutDefault.id));
+    for (const s of solapasDefault) {
+      if (s.orden === null) continue; // ORDEN es nullable en el schema pero siempre viene seteado en la práctica.
+      await ensureLayoutSolapa(layoutXcc.id, s.orden, s.nombre, s.idHerramienta, s.visible ?? true);
+    }
+  }
+  await ensureLayoutSolapa(layoutXcc.id, 7, "Cuenta Corriente", herramientaResumen.id, true);
+
+  // Mismos 7 filtros que la bandeja "legajos" del core (packages/core/src/seed-config.ts) —
+  // ensureFiltro es idempotente por código, así que esto resuelve a las
+  // MISMAS filas ya sembradas por el core, no las duplica.
+  const filtroNumero = await ensureFiltro("numero_legajo", "Nro. Legajo", "texto_like", null);
+  const filtroEstado = await ensureFiltro(
+    "select_estados_legajos",
+    "Estado (Legajo)",
+    "select",
+    `SELECT "ID" AS value, "NOMBRE" AS label FROM "ESTADOS" WHERE "ID_ESTRATEGIA" = (SELECT "ID" FROM "ESTRATEGIAS" WHERE "CODIGO" = 'STD_LEGAJO_1') ORDER BY "NOMBRE"`,
+  );
+  const filtroFechaAlta = await ensureFiltro("fecha_alta", "Fecha de Alta", "fecha_rango", null);
+  const filtroUsuarios = await ensureFiltro(
+    "select_usuarios",
+    "Usuario",
+    "select",
+    `SELECT "ID" AS value, "USERNAME" AS label FROM "USUARIOS" ORDER BY "USERNAME"`,
+  );
+  const filtroApellidoTitular = await ensureFiltro("apellido_titular", "Apellido del Titular (Legajo)", "texto_like", null);
+  const filtroNombreTitular = await ensureFiltro("nombre_titular", "Nombre del Titular (Legajo)", "texto_like", null);
+  const filtroDocumentoTitular = await ensureFiltro("documento_titular", "Nro. Documento del Titular (Legajo)", "texto_like", null);
+
+  const bandejaLegajosCc = await ensureBandeja("legajos_cc", "Legajos CC", BANDEJA_LEGAJOS_CC_QUERY, BANDEJA_LEGAJOS_CC_COLUMNAS);
+  await ensureBandejaFiltro(bandejaLegajosCc.id, filtroNumero.id, "numero", 1);
+  await ensureBandejaFiltro(bandejaLegajosCc.id, filtroEstado.id, "estado_id", 2);
+  await ensureBandejaFiltro(bandejaLegajosCc.id, filtroFechaAlta.id, "alta_fecha", 3);
+  await ensureBandejaFiltro(bandejaLegajosCc.id, filtroUsuarios.id, "alta_usuario_id", 4);
+  await ensureBandejaFiltro(bandejaLegajosCc.id, filtroApellidoTitular.id, "titular_apellido", 5);
+  await ensureBandejaFiltro(bandejaLegajosCc.id, filtroNombreTitular.id, "titular_nombre", 6);
+  await ensureBandejaFiltro(bandejaLegajosCc.id, filtroDocumentoTitular.id, "titular_documento", 7);
+  await ensureBandejaLayout(bandejaLegajosCc.id, layoutXcc.id);
+  await ensureBandejaPerfil(bandejaLegajosCc.id, perfilAdmin.id);
 
   console.log("Seed de cuenta-corriente aplicado (idempotente).");
 }
