@@ -33,7 +33,7 @@ export function PermisoDialog({ open, onOpenChange, permiso, perfiles, herramien
 
   const operacionesDeLaHerramienta = operaciones.filter((o) => o.idHerramienta === idHerramienta);
 
-  function handleHerramientaChange(v: string) {
+  function handleHerramientaChange(v: string | null) {
     setIdHerramienta(v);
     // Cambiar de herramienta invalida la operación elegida — las opciones son otras.
     setIdOperacion(null);
@@ -68,7 +68,7 @@ export function PermisoDialog({ open, onOpenChange, permiso, perfiles, herramien
             <Label className="text-xs uppercase tracking-wider text-muted-foreground">Perfil</Label>
             <Select
               items={Object.fromEntries(perfiles.map((p) => [p.id, `[${p.codigo}] ${p.nombre}`]))}
-              value={idPerfil ?? undefined}
+              value={idPerfil}
               onValueChange={(v) => setIdPerfil(v)}
               disabled={!!permiso}
             >
@@ -89,7 +89,7 @@ export function PermisoDialog({ open, onOpenChange, permiso, perfiles, herramien
             <Label className="text-xs uppercase tracking-wider text-muted-foreground">Herramienta</Label>
             <Select
               items={Object.fromEntries(herramientas.map((h) => [h.id, `[${h.codigo}] ${h.nombre}`]))}
-              value={idHerramienta ?? undefined}
+              value={idHerramienta}
               onValueChange={handleHerramientaChange}
             >
               <SelectTrigger className="w-full">
@@ -109,7 +109,7 @@ export function PermisoDialog({ open, onOpenChange, permiso, perfiles, herramien
             <Label className="text-xs uppercase tracking-wider text-muted-foreground">Operación</Label>
             <Select
               items={Object.fromEntries(operacionesDeLaHerramienta.map((o) => [o.id, `[${o.codigo}] ${o.nombre}`]))}
-              value={idOperacion ?? undefined}
+              value={idOperacion}
               onValueChange={(v) => setIdOperacion(v)}
               disabled={!idHerramienta}
             >

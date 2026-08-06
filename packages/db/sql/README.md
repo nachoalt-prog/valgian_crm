@@ -32,3 +32,4 @@ psql "$DATABASE_URL" -f sql/0001_trigger_clientes_titular.sql
 - `0018_sp_encolar_mensaje_sin_commit_placeholders_forzar_inmediato.sql`: mismos parámetros nuevos, en paridad, sobre `sp_encolar_mensaje_sin_commit`.
 - `0019_trigger_tramites_numero.sql`: trigger que genera `TRAMITES.NUMERO` automáticamente al crear un trámite (ver `domain/tramites.md`).
 - `0020_fn_es_dia_habil.sql`: función genérica "es día hábil" (ni fin de semana ni `FERIADOS`) — nació para el motor de Cuenta Corriente pero no es exclusiva de ningún módulo (ver `domain/core.md`, `domain/cuenta-corriente.md`).
+- `0021_trigger_historial_vincular_adjuntos_cuentas.sql`: amplía `fn_vincular_adjuntos_recientes_a_historial` (`0006_...`) para que también corra sobre movimientos de `'cuentas'`, no solo `'legajos'`/`'tramites'` (`CREATE OR REPLACE`, misma firma) — ver `domain/motor-de-estados.md`, sección "Adjuntos ↔ Historial".

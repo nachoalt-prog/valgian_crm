@@ -65,6 +65,12 @@ export function ArchivoAdjuntoDialog({
   const [error, setError] = useState<string | null>(null);
   const [confirmBorrar, setConfirmBorrar] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  // text/plain se lee y se renderiza acá (no en un <iframe>) — un iframe es un
+  // browsing context aparte, nuestro CSS no llega adentro, y el visor nativo
+  // del navegador puede heredar modo oscuro solo para el texto sin el fondo
+  // (bug real: texto blanco sobre fondo blanco, solo visible seleccionándolo).
+  const [textoStaged, setTextoStaged] = useState<string | null>(null);
+  const [textoArchivo, setTextoArchivo] = useState<string | null | undefined>(undefined);
 
   useEffect(() => {
     if (!idArchivoExistente) return;
@@ -81,6 +87,36 @@ export function ArchivoAdjuntoDialog({
     if (!previewStagedUrl) return;
     return () => URL.revokeObjectURL(previewStagedUrl);
   }, [previewStagedUrl]);
+
+  useEffect(() => {
+    if (staged?.type !== "text/plain") {
+      setTextoStaged(null);
+      return;
+    }
+    let cancelado = false;
+    staged.text().then((t) => {
+      if (!cancelado) setTextoStaged(t);
+    });
+    return () => {
+      cancelado = true;
+    };
+  }, [staged]);
+
+  useEffect(() => {
+    if (staged || !archivo?.renderizar || archivo.mimetype !== "text/plain") {
+      setTextoArchivo(undefined);
+      return;
+    }
+    let cancelado = false;
+    fetch(`/api/archivos-adjuntos/${archivo.id}?inline=1&herramientaCodigo=${encodeURIComponent(herramientaCodigo)}`)
+      .then((r) => r.text())
+      .then((t) => {
+        if (!cancelado) setTextoArchivo(t);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [staged, archivo, herramientaCodigo]);
 
   // Puede seleccionar/reemplazar un archivo: Crear si todavía no hay uno, Reemplazar si ya existe.
   const puedeStagear = archivo ? canReemplazar : canCrear;
@@ -170,12 +206,16 @@ export function ArchivoAdjuntoDialog({
               <embed src={previewStagedUrl} type="application/pdf" className="h-full w-full" />
             ) : previewStagedUrl && mimetypeStaged === "text/html" ? (
               <iframe src={previewStagedUrl} sandbox="" className="h-full w-full bg-white" title={nombreMostrado ?? "preview"} />
+            ) : mimetypeStaged === "text/plain" ? (
+              <pre className="h-full w-full overflow-auto p-4 text-xs whitespace-pre-wrap text-foreground">{textoStaged ?? "Cargando…"}</pre>
             ) : !staged && archivo?.renderizar && archivo.mimetype?.startsWith("image/") ? (
               <img src={urlInline!} alt={archivo.nombreOriginal ?? ""} className="max-h-full max-w-full object-contain" />
             ) : !staged && archivo?.renderizar && archivo.mimetype === "application/pdf" ? (
               <embed src={urlInline!} type="application/pdf" className="h-full w-full" />
             ) : !staged && archivo?.renderizar && archivo.mimetype === "text/html" ? (
               <iframe src={urlInline!} sandbox="" className="h-full w-full bg-white" title={archivo.nombreOriginal ?? "preview"} />
+            ) : !staged && archivo?.renderizar && archivo.mimetype === "text/plain" ? (
+              <pre className="h-full w-full overflow-auto p-4 text-xs whitespace-pre-wrap text-foreground">{textoArchivo ?? "Cargando…"}</pre>
             ) : archivo === undefined ? (
               <p className="text-sm text-muted-foreground">Cargando…</p>
             ) : (

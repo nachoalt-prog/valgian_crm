@@ -78,7 +78,7 @@ export function PerfilDialog({ open, onOpenChange, perfil, interfaces, onSave }:
             </Label>
             <Select
               items={Object.fromEntries(interfaces.map((i) => [i.id, `[${i.codigo}] ${i.nombre}`]))}
-              value={idInterfaz ?? undefined}
+              value={idInterfaz}
               onValueChange={(v) => setIdInterfaz(v)}
             >
               <SelectTrigger className="w-full">

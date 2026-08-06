@@ -65,13 +65,20 @@ export const xccClientes = pgTable(
   (table) => [uniqueIndex("XCC_CLIENTES_ID_CLIENTE_UNIQUE").on(table.idCliente)],
 );
 
-// Catálogo editable por ABM — reemplaza el FN_XU_RETENCION hardcodeado del legacy.
-export const xccCondicionesImpositivas = pgTable("XCC_CONDICIONES_IMPOSITIVAS", {
-  id: uuid("ID").primaryKey().defaultRandom(),
-  codigo: text("CODIGO").notNull(),
-  nombre: text("NOMBRE").notNull(),
-  alicuotaGanancias: doublePrecision("ALICUOTA_GANANCIAS"),
-});
+// Catálogo editable por ABM — reemplaza el FN_XU_RETENCION hardcodeado del
+// legacy. Las alícuotas por tipo de retención viven en
+// XCC_CONDICIONES_RETENCION (N:M — ver más abajo), no acá: esta tabla ya no
+// tiene ninguna columna de alícuota, antes tenía ALICUOTA_GANANCIAS
+// hardcodeada 1:1 solo para "Ganancias".
+export const xccCondicionesImpositivas = pgTable(
+  "XCC_CONDICIONES_IMPOSITIVAS",
+  {
+    id: uuid("ID").primaryKey().defaultRandom(),
+    codigo: text("CODIGO").notNull(),
+    nombre: text("NOMBRE").notNull(),
+  },
+  (table) => [uniqueIndex("XCC_CONDICIONES_IMPOSITIVAS_CODIGO_UNIQUE").on(table.codigo)],
+);
 
 // Condición impositiva efectiva de cada cliente a través del tiempo —
 // necesaria por la misma razón que XCC_CUENTAS_TASA_HISTORICO: si el motor
@@ -90,18 +97,25 @@ export const xccClientesCondicionHistorico = pgTable("XCC_CLIENTES_CONDICION_HIS
 // extracción...) Y asientos que genera el motor solo (apertura, devengamiento,
 // acreditación, cierre). GENERADO_POR_MOTOR distingue cuáles puede elegir un
 // usuario/API al cargar un XCC_MOVIMIENTOS manual (ver docs/domain/cuenta-corriente.md).
-export const xccTiposMovimientos = pgTable("XCC_TIPOS_MOVIMIENTOS", {
-  id: uuid("ID").primaryKey().defaultRandom(),
-  codigo: text("CODIGO").notNull(),
-  nombre: text("NOMBRE").notNull(),
-  signo: integer("SIGNO"),
-  afectaCapital: boolean("AFECTA_CAPITAL"),
-  afectaInteres: boolean("AFECTA_INTERES"),
-  esDevengamiento: boolean("ES_DEVENGAMIENTO"),
-  esAcreditacionInteres: boolean("ES_ACREDITACION_INTERES"),
-  orden: integer("ORDEN"),
-  generadoPorMotor: boolean("GENERADO_POR_MOTOR"),
-});
+export const xccTiposMovimientos = pgTable(
+  "XCC_TIPOS_MOVIMIENTOS",
+  {
+    id: uuid("ID").primaryKey().defaultRandom(),
+    codigo: text("CODIGO").notNull(),
+    nombre: text("NOMBRE").notNull(),
+    signo: integer("SIGNO"),
+    afectaCapital: boolean("AFECTA_CAPITAL"),
+    afectaInteres: boolean("AFECTA_INTERES"),
+    esDevengamiento: boolean("ES_DEVENGAMIENTO"),
+    esAcreditacionInteres: boolean("ES_ACREDITACION_INTERES"),
+    orden: integer("ORDEN"),
+    generadoPorMotor: boolean("GENERADO_POR_MOTOR"),
+  },
+  // Sin esto, dos filas con el mismo CODIGO (ej. dos "apertura") dejarían al
+  // motor (sql/0003_..., WHERE "CODIGO" = 'apertura') eligiendo una de forma
+  // no determinística — recién importa ahora que esto es editable por ABM.
+  (table) => [uniqueIndex("XCC_TIPOS_MOVIMIENTOS_CODIGO_UNIQUE").on(table.codigo)],
+);
 
 // El movimiento real — depósito, extracción, transferencia, embargo, ajuste.
 export const xccMovimientos = pgTable("XCC_MOVIMIENTOS", {
@@ -124,15 +138,41 @@ export const xccMovimientos = pgTable("XCC_MOVIMIENTOS", {
 // (salvo Ganancias, que resuelve contra XCC_CLIENTES_CONDICION_HISTORICO).
 // USA_CONDICION_IMPOSITIVA distingue ese caso como DATO, no comparando
 // CODIGO en el motor (ver docs/domain/cuenta-corriente.md).
-export const xccTiposRetencion = pgTable("XCC_TIPOS_RETENCION", {
-  id: uuid("ID").primaryKey().defaultRandom(),
-  codigo: text("CODIGO").notNull(),
-  nombre: text("NOMBRE").notNull(),
-  orden: integer("ORDEN"),
-  activa: boolean("ACTIVA"),
-  alicuota: doublePrecision("ALICUOTA"),
-  usaCondicionImpositiva: boolean("USA_CONDICION_IMPOSITIVA"),
-});
+export const xccTiposRetencion = pgTable(
+  "XCC_TIPOS_RETENCION",
+  {
+    id: uuid("ID").primaryKey().defaultRandom(),
+    codigo: text("CODIGO").notNull(),
+    nombre: text("NOMBRE").notNull(),
+    orden: integer("ORDEN"),
+    activa: boolean("ACTIVA"),
+    alicuota: doublePrecision("ALICUOTA"),
+    usaCondicionImpositiva: boolean("USA_CONDICION_IMPOSITIVA"),
+  },
+  (table) => [uniqueIndex("XCC_TIPOS_RETENCION_CODIGO_UNIQUE").on(table.codigo)],
+);
+
+// Override de alícuota por (condición impositiva, tipo de retención) — que
+// exista una fila ES el override; si no existe, se usa el default de
+// XCC_TIPOS_RETENCION.ALICUOTA (ver fn_xcc_aplicar_retenciones, sql/0007_...).
+// Reemplaza XCC_CONDICIONES_IMPOSITIVAS.ALICUOTA_GANANCIAS (1:1 con
+// "Ganancias" únicamente) por un modelo N:M — una condición puede tener
+// alícuotas distintas para cualquier cantidad de tipos de retención con
+// USA_CONDICION_IMPOSITIVA=true.
+export const xccCondicionesRetencion = pgTable(
+  "XCC_CONDICIONES_RETENCION",
+  {
+    id: uuid("ID").primaryKey().defaultRandom(),
+    idCondicionImpositiva: uuid("ID_CONDICION_IMPOSITIVA")
+      .notNull()
+      .references(() => xccCondicionesImpositivas.id),
+    idTipoRetencion: uuid("ID_TIPO_RETENCION")
+      .notNull()
+      .references(() => xccTiposRetencion.id),
+    alicuota: doublePrecision("ALICUOTA").notNull(),
+  },
+  (table) => [uniqueIndex("XCC_CONDICIONES_RETENCION_CONDICION_RETENCION_UNIQUE").on(table.idCondicionImpositiva, table.idTipoRetencion)],
+);
 
 // El libro mayor calculado — reemplaza XU_ACTUALIZACION_SALDOS del legacy,
 // sin cursor (ver docs/domain/cuenta-corriente.md: función de ventana + trigger).

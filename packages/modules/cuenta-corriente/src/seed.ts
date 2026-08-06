@@ -17,8 +17,10 @@ import {
   bandejas,
   bandejasFiltros,
   bandejasPerfiles,
+  menues,
+  menuesOpciones,
 } from "@valgian/db";
-import { xccProductos, xccTiposMovimientos, xccTiposRetencion, xccCondicionesImpositivas } from "./schema";
+import { xccProductos, xccTiposMovimientos, xccTiposRetencion, xccCondicionesImpositivas, xccCondicionesRetencion } from "./schema";
 
 /**
  * Seed del módulo Cuenta Corriente (XCC) — categoría/producto base (tablas
@@ -77,10 +79,20 @@ async function ensureTipoMovimiento(params: {
   return creado;
 }
 
-async function ensureCondicionImpositiva(codigo: string, nombre: string, alicuotaGanancias: number) {
+async function ensureCondicionImpositiva(codigo: string, nombre: string) {
   const [existente] = await db.select().from(xccCondicionesImpositivas).where(eq(xccCondicionesImpositivas.codigo, codigo));
   if (existente) return existente;
-  const [creada] = await db.insert(xccCondicionesImpositivas).values({ codigo, nombre, alicuotaGanancias }).returning();
+  const [creada] = await db.insert(xccCondicionesImpositivas).values({ codigo, nombre }).returning();
+  return creada;
+}
+
+async function ensureCondicionRetencionAlicuota(idCondicionImpositiva: string, idTipoRetencion: string, alicuota: number) {
+  const [existente] = await db
+    .select()
+    .from(xccCondicionesRetencion)
+    .where(and(eq(xccCondicionesRetencion.idCondicionImpositiva, idCondicionImpositiva), eq(xccCondicionesRetencion.idTipoRetencion, idTipoRetencion)));
+  if (existente) return existente;
+  const [creada] = await db.insert(xccCondicionesRetencion).values({ idCondicionImpositiva, idTipoRetencion, alicuota }).returning();
   return creada;
 }
 
@@ -230,6 +242,21 @@ async function ensureBandejaPerfil(idBandeja: string, idPerfil: string) {
 
 async function ensureBandejaLayout(idBandeja: string, idLayout: string) {
   await db.update(bandejas).set({ idLayout }).where(and(eq(bandejas.id, idBandeja), isNull(bandejas.idLayout)));
+}
+
+// El core siembra el menú "configuracion" (packages/core/src/seed.ts) — acá
+// solo se resuelve, nunca se crea, mismo criterio que getLayoutPorCodigo.
+async function getMenuPorCodigo(codigo: string) {
+  const [menu] = await db.select().from(menues).where(eq(menues.codigo, codigo));
+  if (!menu) throw new Error(`No existe MENUES.CODIGO = "${codigo}" — corré "pnpm db:seed" del core primero.`);
+  return menu;
+}
+
+async function ensureMenuOpcion(idMenu: string, idHerramienta: string, codigo: string, nombre: string, icono: string, orden: number) {
+  const [existente] = await db.select().from(menuesOpciones).where(eq(menuesOpciones.codigo, codigo));
+  if (existente) return existente;
+  const [creada] = await db.insert(menuesOpciones).values({ idMenu, idHerramienta, codigo, nombre, icono, orden }).returning();
+  return creada;
 }
 
 const BANDEJA_LEGAJOS_CC_QUERY = `
@@ -410,13 +437,19 @@ async function main() {
   });
 
   // Mismos 3 casos que el legacy (Responsable Inscripto / No Inscripto / Con certificado).
-  await ensureCondicionImpositiva("responsable_inscripto", "Responsable Inscripto", 3);
-  await ensureCondicionImpositiva("no_inscripto", "No Inscripto", 10);
-  await ensureCondicionImpositiva("con_certificado", "Con certificado", 0);
+  const condicionResponsableInscripto = await ensureCondicionImpositiva("responsable_inscripto", "Responsable Inscripto");
+  const condicionNoInscripto = await ensureCondicionImpositiva("no_inscripto", "No Inscripto");
+  const condicionConCertificado = await ensureCondicionImpositiva("con_certificado", "Con certificado");
 
   await ensureTipoRetencion("itf", "Impuesto a las Transacciones Financieras", 1, 0.6, false);
-  // La alícuota de Ganancias no se usa desde acá — se resuelve por XCC_CLIENTES_CONDICION_HISTORICO.
-  await ensureTipoRetencion("ganancias", "Impuesto a las Ganancias", 2, 0, true);
+  // ALICUOTA acá es el default cuando USA_CONDICION_IMPOSITIVA=true y no hay
+  // override en XCC_CONDICIONES_RETENCION para la condición del cliente — no
+  // hay una condición "por defecto" razonable para Ganancias, así que queda
+  // en 0 y las 3 condiciones reales tienen su propio override explícito abajo.
+  const tipoRetencionGanancias = await ensureTipoRetencion("ganancias", "Impuesto a las Ganancias", 2, 0, true);
+  await ensureCondicionRetencionAlicuota(condicionResponsableInscripto.id, tipoRetencionGanancias.id, 3);
+  await ensureCondicionRetencionAlicuota(condicionNoInscripto.id, tipoRetencionGanancias.id, 10);
+  await ensureCondicionRetencionAlicuota(condicionConCertificado.id, tipoRetencionGanancias.id, 0);
 
   // Cola de recálculo — ver docs/domain/cuenta-corriente.md. Los triggers y el
   // proceso xcc_consolidacion_saldos solo encolan en XCC_RECALCULO_PENDIENTE;
@@ -517,6 +550,61 @@ async function main() {
   await ensureBandejaFiltro(bandejaLegajosCc.id, filtroDocumentoTitular.id, "titular_documento", 7);
   await ensureBandejaLayout(bandejaLegajosCc.id, layoutXcc.id);
   await ensureBandejaPerfil(bandejaLegajosCc.id, perfilAdmin.id);
+
+  // --- Configuración y Gestión de cuenta (botones dentro de XCC_RESUMEN_1,
+  // no solapas propias) — lectura/escritura separadas por perfil, cada una
+  // con su propia HERRAMIENTA (no reusan GESTION_ENTIDAD_1: ese permiso es
+  // del legajo, no de la cuenta — ver docs/domain/cuenta-corriente.md).
+  const herramientaConfig = await ensureHerramienta("XCC_CUENTA_CONFIG_1", "Configuración de Cuenta (XCC)", "xcc_cuenta_config_1.ver");
+  const operacionAccesoConfig = await ensureOperacion(herramientaConfig.id, "acceso", "Acceso");
+  const operacionEditarConfig = await ensureOperacion(herramientaConfig.id, "editar", "Editar");
+  await ensurePermisoOperacion(perfilAdmin.id, operacionAccesoConfig.id);
+  await ensurePermisoOperacion(perfilAdmin.id, operacionEditarConfig.id);
+
+  const herramientaGestion = await ensureHerramienta("XCC_CUENTA_GESTION_1", "Gestión de Cuenta (XCC)", "xcc_cuenta_gestion_1.ver");
+  const operacionAccesoGestion = await ensureOperacion(herramientaGestion.id, "acceso", "Acceso");
+  const operacionGestionar = await ensureOperacion(herramientaGestion.id, "gestionar", "Gestionar");
+  await ensurePermisoOperacion(perfilAdmin.id, operacionAccesoGestion.id);
+  await ensurePermisoOperacion(perfilAdmin.id, operacionGestionar.id);
+
+  // --- Condición impositiva del titular (botón general del header del
+  // resumen, no por cuenta — es un dato del cliente, no de una cuenta
+  // puntual). Mismo split acceso/editar que XCC_CUENTA_CONFIG_1.
+  const herramientaCondicionCliente = await ensureHerramienta("XCC_CLIENTE_CONDICION_1", "Condición Impositiva del Cliente (XCC)", "xcc_cliente_condicion_1.ver");
+  const operacionAccesoCondicionCliente = await ensureOperacion(herramientaCondicionCliente.id, "acceso", "Acceso");
+  const operacionEditarCondicionCliente = await ensureOperacion(herramientaCondicionCliente.id, "editar", "Editar");
+  await ensurePermisoOperacion(perfilAdmin.id, operacionAccesoCondicionCliente.id);
+  await ensurePermisoOperacion(perfilAdmin.id, operacionEditarCondicionCliente.id);
+
+  // --- ABMs de catálogos (Tipos de Movimiento, Tipos de Retención,
+  // Condiciones Impositivas) — cuelgan del menú "Configuración" del core
+  // (nunca se crea acá, solo se resuelve — el módulo aporta filas a
+  // MENUES_OPCIONES, contemplado en docs/contracts/modulo.md). Una sola
+  // operación "acceso" cada una (mismo criterio simple que "Monedas" — no el
+  // split ver/editar de XCC_CUENTA_CONFIG_1).
+  const herramientaTiposMov = await ensureHerramienta("xcc_tipos_movimientos", "Tipos de Movimiento (XCC)", "xcc_tipos_movimientos.gestionar");
+  const operacionAccesoTiposMov = await ensureOperacion(herramientaTiposMov.id, "acceso", "Acceso");
+  await ensurePermisoOperacion(perfilAdmin.id, operacionAccesoTiposMov.id);
+
+  const herramientaTiposRet = await ensureHerramienta("xcc_tipos_retencion", "Tipos de Retención (XCC)", "xcc_tipos_retencion.gestionar");
+  const operacionAccesoTiposRet = await ensureOperacion(herramientaTiposRet.id, "acceso", "Acceso");
+  await ensurePermisoOperacion(perfilAdmin.id, operacionAccesoTiposRet.id);
+
+  const herramientaCondImp = await ensureHerramienta("xcc_condiciones_impositivas", "Condiciones Impositivas (XCC)", "xcc_condiciones_impositivas.gestionar");
+  const operacionAccesoCondImp = await ensureOperacion(herramientaCondImp.id, "acceso", "Acceso");
+  await ensurePermisoOperacion(perfilAdmin.id, operacionAccesoCondImp.id);
+
+  const menuConfiguracion = await getMenuPorCodigo("configuracion");
+  await ensureMenuOpcion(menuConfiguracion.id, herramientaTiposMov.id, "xcc_tipos_movimientos", "Tipos de Movimiento (XCC)", "icon.xccTiposMovimientos", 20);
+  await ensureMenuOpcion(menuConfiguracion.id, herramientaTiposRet.id, "xcc_tipos_retencion", "Tipos de Retención (XCC)", "icon.xccTiposRetencion", 21);
+  await ensureMenuOpcion(
+    menuConfiguracion.id,
+    herramientaCondImp.id,
+    "xcc_condiciones_impositivas",
+    "Condiciones Impositivas (XCC)",
+    "icon.xccCondicionesImpositivas",
+    22,
+  );
 
   console.log("Seed de cuenta-corriente aplicado (idempotente).");
 }

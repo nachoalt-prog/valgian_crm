@@ -59,7 +59,7 @@ export function BandejaFiltroDialog({ open, onOpenChange, vinculo, filtrosDispon
             <Label className="text-xs uppercase tracking-wider text-muted-foreground">Filtro</Label>
             <Select
               items={Object.fromEntries(filtrosDisponibles.map((f) => [f.id, `[${f.codigo}] ${f.nombre}`]))}
-              value={idFiltro ?? undefined}
+              value={idFiltro}
               onValueChange={(v) => setIdFiltro(v)}
             >
               <SelectTrigger className="w-full">

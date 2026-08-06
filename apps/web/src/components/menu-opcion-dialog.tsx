@@ -118,7 +118,7 @@ export function MenuOpcionDialog({ open, onOpenChange, opcion, menuId, herramien
             <Label className="text-xs uppercase tracking-wider text-muted-foreground">Herramienta</Label>
             <Select
               items={Object.fromEntries(herramientas.map((h) => [h.id, `[${h.codigo}] ${h.nombre}`]))}
-              value={idHerramienta ?? undefined}
+              value={idHerramienta}
               onValueChange={(v) => setIdHerramienta(v)}
             >
               <SelectTrigger className="w-full">
@@ -138,7 +138,7 @@ export function MenuOpcionDialog({ open, onOpenChange, opcion, menuId, herramien
             <Label className="text-xs uppercase tracking-wider text-muted-foreground">Ícono</Label>
             <Select
               items={Object.fromEntries(ICON_KEYS.map((key) => [key, key]))}
-              value={icono ?? undefined}
+              value={icono}
               onValueChange={(v) => setIcono(v)}
             >
               <SelectTrigger className="w-full">

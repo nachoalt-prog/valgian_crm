@@ -1,0 +1,166 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { PlusCircle, Pencil, Trash2, ArrowLeftRight, Lock } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { XccTipoMovimientoDialog } from "@/components/xcc-tipo-movimiento-dialog";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import type { TipoMovimientoCreateInput, TipoMovimientoUpdateInput } from "@valgian/module-cuenta-corriente";
+import { createTipoMovimientoAction, updateTipoMovimientoAction, deleteTipoMovimientoAction } from "@/app/dashboard/xcc-tipos-movimientos/actions";
+
+export interface TipoMovimientoRow {
+  id: string;
+  codigo: string;
+  nombre: string;
+  signo: number | null;
+  afectaCapital: boolean | null;
+  orden: number | null;
+  generadoPorMotor: boolean | null;
+}
+
+interface XccTiposMovimientoToolProps {
+  tiposIniciales: TipoMovimientoRow[];
+  canGestionar: boolean;
+}
+
+/**
+ * ABM de XCC_TIPOS_MOVIMIENTOS. Las filas con GENERADO_POR_MOTOR=true (los 6
+ * códigos que el motor busca hardcodeados — ver docs/domain/cuenta-corriente.md)
+ * no tienen botones de editar/borrar, solo el badge "Motor" — quedan
+ * visibles para contexto, nunca editables desde acá.
+ */
+export function XccTiposMovimientoTool({ tiposIniciales, canGestionar }: XccTiposMovimientoToolProps) {
+  const router = useRouter();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<TipoMovimientoRow | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<TipoMovimientoRow | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
+
+  function avisarSinPermiso() {
+    setAviso("No tenés permiso de gestión sobre esta herramienta.");
+    setTimeout(() => setAviso(null), 3500);
+  }
+
+  function abrirNuevo() {
+    if (!canGestionar) return avisarSinPermiso();
+    setEditing(null);
+    setDialogOpen(true);
+  }
+
+  function abrirEdicion(t: TipoMovimientoRow) {
+    if (!canGestionar) return avisarSinPermiso();
+    setEditing(t);
+    setDialogOpen(true);
+  }
+
+  function pedirBorrado(t: TipoMovimientoRow) {
+    if (!canGestionar) return avisarSinPermiso();
+    setDeleteError(null);
+    setDeleteConfirm(t);
+  }
+
+  async function handleSave(data: TipoMovimientoCreateInput | TipoMovimientoUpdateInput, id?: string) {
+    const result = id
+      ? await updateTipoMovimientoAction(id, data as TipoMovimientoUpdateInput)
+      : await createTipoMovimientoAction(data as TipoMovimientoCreateInput);
+    if (!result.error) router.refresh();
+    return result;
+  }
+
+  async function confirmarBorrado() {
+    if (!deleteConfirm) return;
+    const result = await deleteTipoMovimientoAction(deleteConfirm.id);
+    if (result?.error) {
+      setDeleteError(result.error);
+      return;
+    }
+    setDeleteConfirm(null);
+    router.refresh();
+  }
+
+  return (
+    <div className="h-full overflow-hidden rounded-xl border border-border">
+      {aviso && (
+        <div className="fixed top-20 right-4 z-50 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-2.5 text-sm text-destructive shadow-lg">
+          {aviso}
+        </div>
+      )}
+
+      <section className="flex h-full flex-col">
+        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+          <div className="flex items-center gap-2">
+            <ArrowLeftRight className="size-4 text-primary" />
+            <h2 className="text-sm font-semibold uppercase tracking-widest text-primary">Tipos de Movimiento (Cuenta Corriente)</h2>
+          </div>
+          <Button size="sm" onClick={abrirNuevo} className="h-8 gap-1.5 text-xs">
+            <PlusCircle className="size-3.5" />
+            Nuevo
+          </Button>
+        </div>
+
+        <div className="flex-1 overflow-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Código</TableHead>
+                <TableHead>Nombre</TableHead>
+                <TableHead>Signo</TableHead>
+                <TableHead>Afecta Capital</TableHead>
+                <TableHead>Orden</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {tiposIniciales.map((t) => (
+                <TableRow key={t.id} className="group">
+                  <TableCell className="font-mono text-xs text-primary">{t.codigo}</TableCell>
+                  <TableCell>{t.nombre}</TableCell>
+                  <TableCell className="font-mono text-xs">{t.signo !== null && t.signo > 0 ? "+1" : "−1"}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{t.afectaCapital ? "Sí" : "No"}</TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground">{t.orden ?? "—"}</TableCell>
+                  <TableCell className="text-right">
+                    {t.generadoPorMotor ? (
+                      <Badge variant="outline" className="gap-1">
+                        <Lock className="size-3" />
+                        Motor
+                      </Badge>
+                    ) : (
+                      <div className="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                        <Button variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-primary" onClick={() => abrirEdicion(t)}>
+                          <Pencil className="size-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-destructive" onClick={() => pedirBorrado(t)}>
+                          <Trash2 className="size-3.5" />
+                        </Button>
+                      </div>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </section>
+
+      <XccTipoMovimientoDialog key={editing?.id ?? "new"} open={dialogOpen} onOpenChange={setDialogOpen} tipo={editing} onSave={handleSave} />
+
+      <ConfirmDialog
+        open={!!deleteConfirm}
+        onOpenChange={(o) => {
+          if (!o) {
+            setDeleteConfirm(null);
+            setDeleteError(null);
+          }
+        }}
+        title="Eliminar Tipo de Movimiento"
+        description={deleteError ?? `¿Eliminás el tipo "${deleteConfirm?.nombre}"? Esta acción no se puede deshacer.`}
+        isError={!!deleteError}
+        onConfirm={confirmarBorrado}
+      />
+    </div>
+  );
+}

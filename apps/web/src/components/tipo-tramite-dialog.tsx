@@ -82,7 +82,7 @@ export function TipoTramiteDialog({ open, onOpenChange, tipo, categorias, estrat
             <Label className="text-xs uppercase tracking-wider text-muted-foreground">Categoría</Label>
             <Select
               items={Object.fromEntries(categorias.map((c) => [c.id, c.nombre]))}
-              value={idCategoria ?? undefined}
+              value={idCategoria}
               onValueChange={(v) => setIdCategoria(v ?? null)}
             >
               <SelectTrigger className="w-full">
@@ -103,7 +103,7 @@ export function TipoTramiteDialog({ open, onOpenChange, tipo, categorias, estrat
               <Label className="text-xs uppercase tracking-wider text-muted-foreground">Estrategia</Label>
               <Select
                 items={Object.fromEntries(estrategias.map((e) => [e.id, e.nombre]))}
-                value={idEstrategia ?? undefined}
+                value={idEstrategia}
                 onValueChange={(v) => setIdEstrategia(v ?? null)}
               >
                 <SelectTrigger className="w-full">
@@ -122,7 +122,7 @@ export function TipoTramiteDialog({ open, onOpenChange, tipo, categorias, estrat
               <Label className="text-xs uppercase tracking-wider text-muted-foreground">Entidad</Label>
               <Select
                 items={Object.fromEntries(entidades.map((e) => [e.id, e.nombre]))}
-                value={idEntidad ?? undefined}
+                value={idEntidad}
                 onValueChange={(v) => setIdEntidad(v ?? null)}
               >
                 <SelectTrigger className="w-full">

@@ -130,7 +130,7 @@ export function TipoTramiteCampoDialog({ open, onOpenChange, campo, estados, onS
               <Label className="text-xs uppercase tracking-wider text-muted-foreground">Tipo de campo</Label>
               <Select
                 items={Object.fromEntries(tiposCampos.map((t) => [t.id, t.nombre]))}
-                value={idTipoCampo ?? undefined}
+                value={idTipoCampo}
                 onValueChange={(v) => setIdTipoCampo(v ?? null)}
               >
                 <SelectTrigger className="w-full">

@@ -130,7 +130,7 @@ export function TramitesAbmTool({ idLegajo, canGestionar, revision, onCambio }: 
       <div className="grid grid-cols-4 items-end gap-3 rounded-lg border border-border p-4">
         <div className="space-y-1.5">
           <Label className="text-xs uppercase tracking-wider text-muted-foreground">Categoría</Label>
-          <Select items={Object.fromEntries(categorias.map((c) => [c.id, c.nombre]))} value={idCategoria ?? undefined} onValueChange={(v) => handleCategoriaChange(v ?? null)}>
+          <Select items={Object.fromEntries(categorias.map((c) => [c.id, c.nombre]))} value={idCategoria} onValueChange={(v) => handleCategoriaChange(v ?? null)}>
             <SelectTrigger className="w-full">
               <SelectValue placeholder="Seleccioná…" />
             </SelectTrigger>
@@ -148,7 +148,7 @@ export function TramitesAbmTool({ idLegajo, canGestionar, revision, onCambio }: 
           <Label className="text-xs uppercase tracking-wider text-muted-foreground">Tipo de Trámite</Label>
           <Select
             items={Object.fromEntries(tipos.map((t) => [t.id, t.nombre]))}
-            value={idTipoTramite ?? undefined}
+            value={idTipoTramite}
             onValueChange={(v) => handleTipoTramiteChange(v ?? null)}
             disabled={!idCategoria}
           >
@@ -169,7 +169,7 @@ export function TramitesAbmTool({ idLegajo, canGestionar, revision, onCambio }: 
           <Label className="text-xs uppercase tracking-wider text-muted-foreground">Aplicar a</Label>
           <Select
             items={Object.fromEntries(candidatos.map((c) => [c.id, c.nombre]))}
-            value={idRegistroSeleccionado ?? undefined}
+            value={idRegistroSeleccionado}
             onValueChange={(v) => setIdRegistroSeleccionado(v ?? null)}
             disabled={!idTipoTramite}
           >
@@ -258,7 +258,7 @@ export function TramitesAbmTool({ idLegajo, canGestionar, revision, onCambio }: 
               <Label className="text-xs uppercase tracking-wider text-muted-foreground">Tipo de Trámite</Label>
               <Select
                 items={Object.fromEntries(tiposFiltro.map((t) => [t.id, t.nombre]))}
-                value={formFiltros.idTipoTramite ?? undefined}
+                value={formFiltros.idTipoTramite ?? ""}
                 onValueChange={(v) => setFormFiltros((f) => ({ ...f, idTipoTramite: v ?? undefined }))}
               >
                 <SelectTrigger className="w-full">
@@ -278,7 +278,7 @@ export function TramitesAbmTool({ idLegajo, canGestionar, revision, onCambio }: 
               <Label className="text-xs uppercase tracking-wider text-muted-foreground">Usuario de Alta</Label>
               <Select
                 items={Object.fromEntries(usuariosFiltro.map((u) => [u.id, u.nombre]))}
-                value={formFiltros.altaUsuario ?? undefined}
+                value={formFiltros.altaUsuario ?? ""}
                 onValueChange={(v) => setFormFiltros((f) => ({ ...f, altaUsuario: v ?? undefined }))}
               >
                 <SelectTrigger className="w-full">
@@ -298,7 +298,7 @@ export function TramitesAbmTool({ idLegajo, canGestionar, revision, onCambio }: 
               <Label className="text-xs uppercase tracking-wider text-muted-foreground">Usuario de Gestión</Label>
               <Select
                 items={Object.fromEntries(usuariosFiltro.map((u) => [u.id, u.nombre]))}
-                value={formFiltros.auditUsuario ?? undefined}
+                value={formFiltros.auditUsuario ?? ""}
                 onValueChange={(v) => setFormFiltros((f) => ({ ...f, auditUsuario: v ?? undefined }))}
               >
                 <SelectTrigger className="w-full">

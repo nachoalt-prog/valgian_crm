@@ -82,7 +82,7 @@ export function GestionEntidadTool({ idLegajo, idEntidad, canGestionar, onCambio
         ) : (
           <Select
             items={Object.fromEntries(datos.estimulos.map((e) => [e.id, e.nombre]))}
-            value={idEstimulo ?? undefined}
+            value={idEstimulo}
             onValueChange={(v) => setIdEstimulo(v ?? null)}
             disabled={!canGestionar}
           >

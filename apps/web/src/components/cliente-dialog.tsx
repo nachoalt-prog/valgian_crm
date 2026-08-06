@@ -86,7 +86,7 @@ export function ClienteDialog({ open, onOpenChange, idLegajo, caracteres, tiposD
             <Label className="text-xs uppercase tracking-wider text-muted-foreground">Carácter</Label>
             <Select
               items={Object.fromEntries(caracteres.map((c) => [c.id, c.nombre]))}
-              value={idCaracter ?? undefined}
+              value={idCaracter}
               onValueChange={(v) => setIdCaracter(v ?? null)}
             >
               <SelectTrigger className="w-full">
@@ -107,7 +107,7 @@ export function ClienteDialog({ open, onOpenChange, idLegajo, caracteres, tiposD
               <Label className="text-xs uppercase tracking-wider text-muted-foreground">Tipo Documento</Label>
               <Select
                 items={Object.fromEntries(tiposDocumento.map((t) => [t.id, t.nombre]))}
-                value={idTipoDocumento ?? undefined}
+                value={idTipoDocumento}
                 onValueChange={(v) => setIdTipoDocumento(v ?? null)}
               >
                 <SelectTrigger className="w-full">
@@ -132,7 +132,7 @@ export function ClienteDialog({ open, onOpenChange, idLegajo, caracteres, tiposD
             <Label className="text-xs uppercase tracking-wider text-muted-foreground">Género</Label>
             <Select
               items={Object.fromEntries(generos.map((g) => [g.id, g.nombre]))}
-              value={idGenero ?? undefined}
+              value={idGenero}
               onValueChange={(v) => setIdGenero(v ?? null)}
             >
               <SelectTrigger className="w-full">

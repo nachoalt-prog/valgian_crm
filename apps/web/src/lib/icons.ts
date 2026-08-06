@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, ListTree, Palette, KeyRound, Package, Inbox, Filter, LayoutTemplate, Zap, Braces, FileCode, FileType, BarChart3, Coins, Mail, Cable, Timer, FolderTree, ClipboardList, type LucideIcon, Circle } from "lucide-react";
+import { LayoutDashboard, Users, ListTree, Palette, KeyRound, Package, Inbox, Filter, LayoutTemplate, Zap, Braces, FileCode, FileType, BarChart3, Coins, Mail, Cable, Timer, FolderTree, ClipboardList, ArrowLeftRight, Percent, Receipt, type LucideIcon, Circle } from "lucide-react";
 
 /**
  * MENUES_OPCIONES.ICONO guarda una clave propia y estable (no el nombre de un
@@ -26,6 +26,9 @@ const ICON_MAP: Record<string, LucideIcon> = {
   "icon.procesos": Timer,
   "icon.categoriasTiposTramite": FolderTree,
   "icon.tiposTramite": ClipboardList,
+  "icon.xccTiposMovimientos": ArrowLeftRight,
+  "icon.xccTiposRetencion": Percent,
+  "icon.xccCondicionesImpositivas": Receipt,
 };
 
 export const ICON_KEYS = Object.keys(ICON_MAP);

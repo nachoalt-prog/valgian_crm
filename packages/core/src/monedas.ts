@@ -7,7 +7,9 @@ interface Resultado<T> {
 }
 
 function esViolacionUnica(err: unknown): boolean {
-  return typeof err === "object" && err !== null && "code" in err && (err as { code: string }).code === "23505";
+  if (typeof err === "object" && err !== null && "code" in err && (err as { code: string }).code === "23505") return true;
+  if (typeof err === "object" && err !== null && "cause" in err) return esViolacionUnica((err as { cause: unknown }).cause);
+  return false;
 }
 
 /** ABM de MONEDAS — a diferencia de listMonedasConCodigoApi (usada por el handler de consulta). */

@@ -3,12 +3,12 @@
 import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import { listMovimientosXccAction, listAsientosXccAction } from "@/app/dashboard/cuenta-corriente/actions";
 import type { XccMovimientoFila, XccAsientoFila } from "@valgian/module-cuenta-corriente";
 
@@ -18,6 +18,10 @@ interface CuentaCorrienteDetalleDialogProps {
   idCuenta: string;
   numero: string;
 }
+
+const TABS = ["movimientos", "asientos"] as const;
+type Tab = (typeof TABS)[number];
+const TAB_LABEL: Record<Tab, string> = { movimientos: "Movimientos", asientos: "Asientos" };
 
 function formatearFecha(fecha: Date | string | null): string {
   if (!fecha) return "—";
@@ -32,39 +36,67 @@ function formatearMonto(n: number | null): string {
   return new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(n);
 }
 
-/** Solo lectura — detalle de una cuenta de Cuenta Corriente (movimientos manuales + libro mayor). Ver docs/domain/cuenta-corriente.md. */
+// Colores por SIGNO (XCC_TIPOS_MOVIMIENTOS.SIGNO), no por CODIGO/nombre — un
+// tipo de movimiento nuevo (ej. otra transferencia) hereda el color solo
+// respetando su signo en el seed, sin tocar este componente.
+function claseColorPorSigno(signo: number | null | undefined): string {
+  if (signo === null || signo === undefined) return "";
+  return signo > 0 ? "text-emerald-500" : "text-destructive";
+}
+
+function TipoMovimientoBadge({ nombre, signo }: { nombre: string | null; signo: number | null | undefined }) {
+  if (signo === null || signo === undefined) return <>{nombre ?? "—"}</>;
+  return (
+    <Badge
+      variant="outline"
+      className={signo > 0 ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-500" : "border-destructive/30 bg-destructive/10 text-destructive"}
+    >
+      {nombre ?? "—"}
+    </Badge>
+  );
+}
+
+/**
+ * Solo lectura — detalle de una cuenta de Cuenta Corriente (movimientos
+ * manuales + libro mayor). Ver docs/domain/cuenta-corriente.md.
+ * Tab-bar y montado "una sola vez, ocultas con CSS" calcado de
+ * tramite-modal.tsx/legajo-layout-modal.tsx — no el componente genérico
+ * ui/tabs.tsx, para tener la misma pinta Y el mismo comportamiento (cambiar
+ * de solapa no recarga la tabla ni resetea la paginación/filtro).
+ */
 export function CuentaCorrienteDetalleDialog({ open, onOpenChange, idCuenta, numero }: CuentaCorrienteDetalleDialogProps) {
+  const [activeTab, setActiveTab] = useState<Tab>("movimientos");
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl">
-        <DialogHeader>
+      <DialogContent className="flex h-[80vh] max-w-4xl! flex-col gap-0 p-0">
+        <DialogHeader className="border-b border-border px-5 py-4">
           <DialogTitle className="font-mono">{numero}</DialogTitle>
         </DialogHeader>
 
-        {/* Alto FIJO (h-, no max-h-) — con max-h el modal se achicaba en
-            Movimientos (listado corto) y se agrandaba en Asientos (listado
-            largo), dando un salto visual al cambiar de tab. overflow-y-auto
-            acá, no en DialogContent — así el botón de cerrar (posicionado
-            absoluto dentro del Popup) queda siempre visible en vez de
-            scrollear junto con la tabla. min-w-0 en cada TabsContent: son
-            flex items (Tabs es flex-col) que por default no se achican por
-            debajo del ancho de su contenido — sin esto, una tabla ancha
-            empuja el diálogo entero hacia afuera en vez de scrollear sola
-            (el overflow-x-auto propio de <Table> solo funciona si el
-            contenedor que lo envuelve puede achicarse). */}
-        <div className="h-[70vh] overflow-y-auto">
-          <Tabs defaultValue="movimientos">
-            <TabsList>
-              <TabsTrigger value="movimientos">Movimientos</TabsTrigger>
-              <TabsTrigger value="asientos">Asientos</TabsTrigger>
-            </TabsList>
-            <TabsContent value="movimientos" className="min-w-0">
-              <MovimientosTab idCuenta={idCuenta} activo={open} />
-            </TabsContent>
-            <TabsContent value="asientos" className="min-w-0">
-              <AsientosTab idCuenta={idCuenta} activo={open} />
-            </TabsContent>
-          </Tabs>
+        <div className="flex shrink-0 gap-1 border-b border-border px-5 pt-3">
+          {TABS.map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActiveTab(tab)}
+              className={cn(
+                "-mb-px rounded-t-lg border border-b-0 px-4 py-2 text-sm font-medium transition-colors",
+                activeTab === tab
+                  ? "border-border bg-popover text-foreground"
+                  : "border-transparent bg-muted/40 text-muted-foreground hover:bg-muted/60",
+              )}
+            >
+              {TAB_LABEL[tab]}
+            </button>
+          ))}
+        </div>
+
+        <div className={cn("flex-1 overflow-y-auto p-5", activeTab !== "movimientos" && "hidden")}>
+          <MovimientosTab idCuenta={idCuenta} />
+        </div>
+        <div className={cn("flex-1 overflow-y-auto p-5", activeTab !== "asientos" && "hidden")}>
+          <AsientosTab idCuenta={idCuenta} />
         </div>
       </DialogContent>
     </Dialog>
@@ -123,7 +155,7 @@ function PieDePagina({ pagina, hayMas, onPrev, onNext }: { pagina: number; hayMa
   );
 }
 
-function MovimientosTab({ idCuenta, activo }: { idCuenta: string; activo: boolean }) {
+function MovimientosTab({ idCuenta }: { idCuenta: string }) {
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
   const [desdeAplicado, setDesdeAplicado] = useState("");
@@ -133,7 +165,6 @@ function MovimientosTab({ idCuenta, activo }: { idCuenta: string; activo: boolea
   const [hayMas, setHayMas] = useState(false);
 
   useEffect(() => {
-    if (!activo) return;
     let cancelado = false;
     setRows(null);
     listMovimientosXccAction(idCuenta, desdeAplicado || undefined, hastaAplicado || undefined, pagina).then((res) => {
@@ -144,7 +175,7 @@ function MovimientosTab({ idCuenta, activo }: { idCuenta: string; activo: boolea
     return () => {
       cancelado = true;
     };
-  }, [activo, idCuenta, desdeAplicado, hastaAplicado, pagina]);
+  }, [idCuenta, desdeAplicado, hastaAplicado, pagina]);
 
   function buscar() {
     setPagina(0);
@@ -176,8 +207,10 @@ function MovimientosTab({ idCuenta, activo }: { idCuenta: string; activo: boolea
               {rows.map((r) => (
                 <TableRow key={r.id}>
                   <TableCell className="font-mono">{formatearFecha(r.fecha)}</TableCell>
-                  <TableCell>{r.tipoNombre ?? "—"}</TableCell>
-                  <TableCell className="text-right font-mono">{formatearMonto(r.monto)}</TableCell>
+                  <TableCell>
+                    <TipoMovimientoBadge nombre={r.tipoNombre} signo={r.signo} />
+                  </TableCell>
+                  <TableCell className={`text-right font-mono ${claseColorPorSigno(r.signo)}`}>{formatearMonto(r.monto)}</TableCell>
                   <TableCell>{r.nroRecibo ?? "—"}</TableCell>
                   <TableCell className="max-w-xs truncate">{r.observaciones ?? "—"}</TableCell>
                   <TableCell className="text-muted-foreground">{r.altaUsuarioNombre ?? "—"}</TableCell>
@@ -192,7 +225,7 @@ function MovimientosTab({ idCuenta, activo }: { idCuenta: string; activo: boolea
   );
 }
 
-function AsientosTab({ idCuenta, activo }: { idCuenta: string; activo: boolean }) {
+function AsientosTab({ idCuenta }: { idCuenta: string }) {
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
   const [desdeAplicado, setDesdeAplicado] = useState("");
@@ -202,7 +235,6 @@ function AsientosTab({ idCuenta, activo }: { idCuenta: string; activo: boolean }
   const [hayMas, setHayMas] = useState(false);
 
   useEffect(() => {
-    if (!activo) return;
     let cancelado = false;
     setRows(null);
     listAsientosXccAction(idCuenta, desdeAplicado || undefined, hastaAplicado || undefined, pagina).then((res) => {
@@ -213,7 +245,7 @@ function AsientosTab({ idCuenta, activo }: { idCuenta: string; activo: boolean }
     return () => {
       cancelado = true;
     };
-  }, [activo, idCuenta, desdeAplicado, hastaAplicado, pagina]);
+  }, [idCuenta, desdeAplicado, hastaAplicado, pagina]);
 
   function buscar() {
     setPagina(0);
@@ -253,10 +285,10 @@ function AsientosTab({ idCuenta, activo }: { idCuenta: string; activo: boolean }
                     ) : r.generadoPorMotor ? (
                       <Badge variant="outline">Motor</Badge>
                     ) : (
-                      (r.tipoNombre ?? "—")
+                      <TipoMovimientoBadge nombre={r.tipoNombre} signo={r.signo} />
                     )}
                   </TableCell>
-                  <TableCell className="text-right font-mono">{formatearMonto(r.monto)}</TableCell>
+                  <TableCell className={`text-right font-mono ${r.idTipoRetencion ? "text-destructive" : ""}`}>{formatearMonto(r.monto)}</TableCell>
                   <TableCell className="text-right font-mono">{formatearMonto(r.saldoCapital)}</TableCell>
                   <TableCell className="text-right font-mono">{formatearMonto(r.saldoInteres)}</TableCell>
                   <TableCell className="text-right font-mono text-muted-foreground">{r.tasaAplicada ?? "—"}%</TableCell>

@@ -104,7 +104,7 @@ export function ReporteDialog({ open, onOpenChange, reporte, categorias, onSave 
             <Label className="text-xs uppercase tracking-wider text-muted-foreground">Categoría</Label>
             <Select
               items={Object.fromEntries(categorias.map((c) => [c.id, c.nombre]))}
-              value={idCategoria ?? undefined}
+              value={idCategoria}
               onValueChange={(v) => setIdCategoria(v)}
             >
               <SelectTrigger className="w-full">

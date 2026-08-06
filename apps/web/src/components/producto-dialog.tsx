@@ -68,7 +68,7 @@ export function ProductoDialog({ open, onOpenChange, producto, categoriaId, mone
 
           <div className="space-y-1.5">
             <Label className="text-xs uppercase tracking-wider text-muted-foreground">Moneda</Label>
-            <Select items={Object.fromEntries(monedas.map((m) => [m.id, m.nombre]))} value={idMoneda ?? undefined} onValueChange={(v) => setIdMoneda(v ?? null)}>
+            <Select items={Object.fromEntries(monedas.map((m) => [m.id, m.nombre]))} value={idMoneda} onValueChange={(v) => setIdMoneda(v ?? null)}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Sin moneda…" />
               </SelectTrigger>

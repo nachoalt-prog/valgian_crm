@@ -272,7 +272,7 @@ export function TramiteModal({ open, onOpenChange, idTipoTramite, idRegistro, id
         return (
           <Select
             items={Object.fromEntries(opcionesCampo.map((o) => [o.value, o.label]))}
-            value={(valor as string) ?? undefined}
+            value={(valor as string) ?? null}
             onValueChange={(v) => setValor(campo.id, v ?? null)}
             disabled={disabled}
           >
@@ -401,7 +401,7 @@ export function TramiteModal({ open, onOpenChange, idTipoTramite, idRegistro, id
                 ) : (
                   <Select
                     items={Object.fromEntries(estimulos.map((e) => [e.id, e.nombre]))}
-                    value={idEstimulo ?? undefined}
+                    value={idEstimulo}
                     onValueChange={(v) => setIdEstimulo(v ?? null)}
                     disabled={!canGestionar}
                   >

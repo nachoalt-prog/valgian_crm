@@ -58,7 +58,7 @@ export function PerfilEstimuloDialog({ open, onOpenChange, perfiles, estimulos, 
             <Label className="text-xs uppercase tracking-wider text-muted-foreground">Perfil</Label>
             <Select
               items={Object.fromEntries(perfiles.map((p) => [p.id, `[${p.codigo}] ${p.nombre}`]))}
-              value={idPerfil ?? undefined}
+              value={idPerfil}
               onValueChange={(v) => setIdPerfil(v)}
             >
               <SelectTrigger className="w-full">
@@ -78,7 +78,7 @@ export function PerfilEstimuloDialog({ open, onOpenChange, perfiles, estimulos, 
             <Label className="text-xs uppercase tracking-wider text-muted-foreground">Estímulo</Label>
             <Select
               items={Object.fromEntries(estimulos.map((e) => [e.id, `${e.estrategiaNombre ?? "—"} - ${e.nombre}`]))}
-              value={idEstimulo ?? undefined}
+              value={idEstimulo}
               onValueChange={(v) => setIdEstimulo(v)}
             >
               <SelectTrigger className="w-full">
