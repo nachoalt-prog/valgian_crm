@@ -22,6 +22,8 @@ interface ReporteResultadosProps {
   onVerAdjuntos?: (valor: unknown) => void;
   /** Solo relevante si algún REPORTES.COLUMNAS tiene tipo:"pasos" (ver resultados-formato.tsx). */
   onVerPasos?: (valor: unknown) => void;
+  /** Solo relevante si algún REPORTES.COLUMNAS tiene tipo:"detalle_importacion" (ver resultados-formato.tsx). */
+  onVerDetalleImportacion?: (valor: unknown) => void;
 }
 
 export function ReporteResultados({
@@ -36,6 +38,7 @@ export function ReporteResultados({
   onExport,
   onVerAdjuntos,
   onVerPasos,
+  onVerDetalleImportacion,
 }: ReporteResultadosProps) {
   const [ordenCampo, setOrdenCampo] = useState<string | null>(null);
   const [ordenDireccion, setOrdenDireccion] = useState<Direccion | null>(null);
@@ -118,7 +121,7 @@ export function ReporteResultados({
             {filasOrdenadas.map((row, idx) => (
               <TableRow key={String(row.id ?? idx)}>
                 {columnas.map((c) => (
-                  <TableCell key={c.campo}>{formatearValor(row[c.campo], c.tipo, onVerAdjuntos, onVerPasos, c.colores)}</TableCell>
+                  <TableCell key={c.campo}>{formatearValor(row[c.campo], c.tipo, onVerAdjuntos, onVerPasos, c.colores, onVerDetalleImportacion)}</TableCell>
                 ))}
               </TableRow>
             ))}

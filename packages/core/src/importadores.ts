@@ -497,14 +497,42 @@ export interface ResultadosValidacion {
 }
 
 /**
- * Introspección genérica de la tabla de staging del importador vía
- * information_schema — el wizard no conoce de antemano su schema (mapeo fijo,
- * definido por cada importador), así que arma la tabla de resultados
- * dinámicamente en vez de necesitar código de UI específico por importador.
- * TABLA_STAGING se valida contra IDENTIFICADOR_SIMPLE antes de interpolarla
- * (mismo criterio que sp_importar_ejecutar); los nombres de columna vienen de
- * information_schema (catálogo real de Postgres), no de input arbitrario.
+ * Introspección genérica de una tabla de staging/histórico vía
+ * information_schema — ni el wizard ni el reporte de auditoría conocen de
+ * antemano el schema de cada importador (mapeo fijo, definido por cada
+ * importador), así que arman la tabla de resultados dinámicamente en vez de
+ * necesitar código de UI específico por importador. `tabla` se valida contra
+ * IDENTIFICADOR_SIMPLE antes de interpolarla (mismo criterio que
+ * sp_importar_ejecutar); los nombres de columna vienen de information_schema
+ * (catálogo real de Postgres), no de input arbitrario. Compartido entre
+ * getResultadosValidacion (wizard, siempre TABLA_STAGING) y
+ * getDetalleEjecucionImportador (reporte de auditoría, TABLA_STAGING o
+ * TABLA_HISTORICO según el estado — ver ahí).
  */
+async function consultarFilasEjecucion(tabla: string, idEjecucion: string, pagina: number): Promise<Resultado<ResultadosValidacion>> {
+  if (!IDENTIFICADOR_SIMPLE.test(tabla)) return { error: "Nombre de tabla inválido." };
+
+  const columnasInfo = await queryClient<{ column_name: string }[]>`
+    SELECT column_name FROM information_schema.columns
+    WHERE table_name = ${tabla} AND column_name NOT IN ('ID', 'ID_EJECUCION')
+    ORDER BY ordinal_position
+  `;
+  const columnas = columnasInfo.map((c) => c.column_name);
+  if (columnas.length === 0) return { error: `La tabla "${tabla}" no existe o no tiene columnas propias.` };
+
+  const [{ c: total }] = await queryClient.unsafe<{ c: number }[]>(`SELECT count(*)::int AS c FROM "${tabla}" WHERE "ID_EJECUCION" = $1`, [idEjecucion]);
+
+  const columnasSql = columnas.map((c) => `"${c}"`).join(", ");
+  const filasRaw = await queryClient.unsafe<Record<string, unknown>[]>(
+    `SELECT ${columnasSql} FROM "${tabla}" WHERE "ID_EJECUCION" = $1 ORDER BY "NRO_FILA" LIMIT $2 OFFSET $3`,
+    [idEjecucion, PAGE_SIZE_VALIDACION + 1, pagina * PAGE_SIZE_VALIDACION],
+  );
+  const hayMas = filasRaw.length > PAGE_SIZE_VALIDACION;
+  const filas = hayMas ? filasRaw.slice(0, PAGE_SIZE_VALIDACION) : filasRaw;
+
+  return { data: { columnas, filas, total, pagina, hayMas } };
+}
+
 export async function getResultadosValidacion(idEjecucion: string, pagina = 0): Promise<Resultado<ResultadosValidacion>> {
   const [fila] = await db
     .select({ tablaStaging: importadores.tablaStaging })
@@ -512,29 +540,33 @@ export async function getResultadosValidacion(idEjecucion: string, pagina = 0): 
     .innerJoin(importadores, eq(importadores.id, importadoresEjecuciones.idImportador))
     .where(eq(importadoresEjecuciones.id, idEjecucion));
   if (!fila) return { error: "No existe esa ejecución." };
-  if (!IDENTIFICADOR_SIMPLE.test(fila.tablaStaging)) return { error: "Nombre de tabla de staging inválido." };
+  return consultarFilasEjecucion(fila.tablaStaging, idEjecucion, pagina);
+}
 
-  const columnasInfo = await queryClient<{ column_name: string }[]>`
-    SELECT column_name FROM information_schema.columns
-    WHERE table_name = ${fila.tablaStaging} AND column_name NOT IN ('ID', 'ID_EJECUCION')
-    ORDER BY ordinal_position
-  `;
-  const columnas = columnasInfo.map((c) => c.column_name);
-  if (columnas.length === 0) return { error: `La tabla de staging "${fila.tablaStaging}" no existe o no tiene columnas propias.` };
+/**
+ * Nivel 2 del reporte de auditoría "Importaciones" — mismo mecanismo de
+ * introspección que getResultadosValidacion, pero elige la tabla según el
+ * estado de la ejecución en vez de asumir siempre TABLA_STAGING: una vez
+ * 'completado', sp_importar_ejecutar SIEMPRE borra el staging (con o sin
+ * histórico configurado, ver domain/importadores.md) y movió las filas a
+ * TABLA_HISTORICO si estaba seteada — cualquier otro estado (en curso, error,
+ * cancelada) todavía tiene sus filas en TABLA_STAGING, nunca las llegó a mover.
+ * Reusable para CUALQUIER importador nuevo sin código de UI/backend por caso
+ * (ni un dialog ni una query a mano) — ver docs/domain/reportes.md.
+ */
+export async function getDetalleEjecucionImportador(idEjecucion: string, pagina = 0): Promise<Resultado<ResultadosValidacion>> {
+  const [fila] = await db
+    .select({ estado: importadoresEjecuciones.estado, tablaStaging: importadores.tablaStaging, tablaHistorico: importadores.tablaHistorico })
+    .from(importadoresEjecuciones)
+    .innerJoin(importadores, eq(importadores.id, importadoresEjecuciones.idImportador))
+    .where(eq(importadoresEjecuciones.id, idEjecucion));
+  if (!fila) return { error: "No existe esa ejecución." };
 
-  const [{ c: total }] = await queryClient.unsafe<{ c: number }[]>(`SELECT count(*)::int AS c FROM "${fila.tablaStaging}" WHERE "ID_EJECUCION" = $1`, [
-    idEjecucion,
-  ]);
-
-  const columnasSql = columnas.map((c) => `"${c}"`).join(", ");
-  const filasRaw = await queryClient.unsafe<Record<string, unknown>[]>(
-    `SELECT ${columnasSql} FROM "${fila.tablaStaging}" WHERE "ID_EJECUCION" = $1 ORDER BY "NRO_FILA" LIMIT $2 OFFSET $3`,
-    [idEjecucion, PAGE_SIZE_VALIDACION + 1, pagina * PAGE_SIZE_VALIDACION],
-  );
-  const hayMas = filasRaw.length > PAGE_SIZE_VALIDACION;
-  const filas = hayMas ? filasRaw.slice(0, PAGE_SIZE_VALIDACION) : filasRaw;
-
-  return { data: { columnas, filas, total, pagina, hayMas } };
+  if (fila.estado === "completado") {
+    if (!fila.tablaHistorico) return { error: "Este importador no guarda histórico — no hay detalle disponible para ejecuciones completadas." };
+    return consultarFilasEjecucion(fila.tablaHistorico, idEjecucion, pagina);
+  }
+  return consultarFilasEjecucion(fila.tablaStaging, idEjecucion, pagina);
 }
 
 export async function cargarArchivoWizard(idImportador: string, idUsuario: string, buffer: Buffer, nombreArchivo: string): Promise<Resultado<{ idEjecucion: string }>> {

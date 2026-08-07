@@ -149,12 +149,25 @@ No hay nada mágico: es una ruta del filesystem del PROPIO SERVIDOR donde corre 
 
 En producción es el mismo mecanismo — el archivo tiene que estar en el disco del servidor cuando el motor lo busca. Hoy eso implica: (a) un volumen persistente montado en esa ruta (mismo requisito que ya tiene `UPLOADS_DIR`, ver ADR 0011 — sin volumen persistente, un redeploy/restart borra lo que haya ahí), y (b) algún mecanismo EXTERNO a esta app que efectivamente deje el archivo ahí (una carpeta compartida por SMB/NFS montada en esa ruta, un cron del lado del cliente que haga SFTP-a-local, o alguien copiándolo a mano) — el motor de importación no trae ningún cliente SFTP/FTP propio todavía (deliberadamente pospuesto, ver ADR 0021 y la entrada de SFTP en `docs/open-issues.md`). Sin eso, `RUTA_DIRECTORIO` solo sirve para instalaciones donde alguien (humano o proceso del cliente) puede dejar el archivo directamente en el disco del servidor.
 
+## Reporte de auditoría "Importaciones" (dos niveles)
+
+Reporte estándar `auditoria_importaciones` (categoría `auditoria`, `/dashboard/reportes`) sobre `IMPORTADORES_EJECUCIONES` — nivel 1: todas las corridas registradas (importador, usuario, estado, modo, archivo, contadores de `RESUMEN_VALIDACION`, `RESUMEN_IMPACTO` crudo, fechas). Nivel 2 (columna `tipo:"detalle_importacion"`, botón de ícono): abre un diálogo con el detalle registro-por-registro de ESA ejecución puntual.
+
+El motor de `REPORTES` es de un solo nivel por diseño (ver `domain/reportes.md`) — el nivel 2 no es un mecanismo genérico de "reporte hijo", es el mismo patrón ad-hoc que ya usaban `mensajeria_cola` (`tipo:"adjuntos"`) y `procesos_ejecuciones` (`tipo:"pasos"`). La diferencia con esos dos: `getDetalleEjecucionImportador` (`packages/core/src/importadores.ts`) es **genérico por introspección**, no atado a la forma fija de una tabla — reusa el mismo mecanismo de `information_schema` que `getResultadosValidacion` (wizard, paso de validación; ambos comparten el helper interno `consultarFilasEjecucion`), eligiendo `TABLA_STAGING` o `TABLA_HISTORICO` según el estado:
+
+- `completado` con `TABLA_HISTORICO` configurada → lee de ahí (`sp_importar_ejecutar` siempre mueve las filas antes de terminar).
+- `completado` SIN histórico configurado → no hay nada que mostrar (`sp_importar_ejecutar` borra el staging al terminar, tenga o no histórico) — el diálogo muestra un mensaje, no un error.
+- cualquier otro estado (`cargando`/`validando`/`esperando_confirmacion`/`impactando`/`error`/`cancelado`) → todavía tiene sus filas en `TABLA_STAGING`, nunca llegaron a moverse.
+
+Esto significa que **cualquier importador nuevo obtiene su nivel 2 gratis** apenas se siembra en `IMPORTADORES` — no hace falta un diálogo, action ni reporte nuevo por caso.
+
 ## Dónde vive cada pieza
 
 - Schema: `packages/db/src/schema.ts` (`importadores`, `importadoresEjecuciones`, `importLegajosClientesStg`, `importLegajosClientesHist`).
 - SQL manual: `packages/db/sql/0022_sp_importar_ejecutar.sql` (motor genérico), `0023_sp_import_legajos_clientes.sql` (primer importador real) — ver su `README.md`.
-- Motor + ABM + wizard (funciones de datos): `packages/core/src/importadores.ts`. Importador Legajos+Clientes: `packages/core/src/importador-legajos-clientes.ts`. Seed: `packages/core/src/seed.ts` (usuario `sistema`, fila de `ACCIONES_EXTERNAS`, herramientas/menú del ABM y del wizard, fila real de `IMPORTADORES` para `legajos_clientes`).
+- Motor + ABM + wizard + reporte (funciones de datos): `packages/core/src/importadores.ts` (incluye `getDetalleEjecucionImportador`, nivel 2 del reporte). Importador Legajos+Clientes: `packages/core/src/importador-legajos-clientes.ts`. Seed: `packages/core/src/seed.ts` (usuario `sistema`, fila de `ACCIONES_EXTERNAS`, herramientas/menú del ABM y del wizard, fila real de `IMPORTADORES` para `legajos_clientes`); `packages/core/src/seed-config.ts` (reporte `auditoria_importaciones` + sus filtros).
 - UI ABM: `apps/web/src/app/dashboard/importadores/{page,actions}.tsx`, `apps/web/src/components/importadores-tool.tsx` + `importador-dialog.tsx`.
 - UI wizard: `apps/web/src/app/dashboard/importar/{page,actions}.tsx`, `apps/web/src/components/importar-wizard.tsx`.
+- UI reporte (nivel 2): `apps/web/src/app/dashboard/reportes/importadores-detalle-actions.ts`, `apps/web/src/components/importador-ejecucion-detalle-dialog.tsx`, wireado en `apps/web/src/lib/resultados-formato.tsx` (`tipo:"detalle_importacion"`), `reporte-resultados.tsx` y `reportes-tool.tsx`.
 - Archivo modelo: `apps/web/src/app/api/importadores/[id]/modelo/route.ts`.
 - Registro explícito: `apps/web/src/instrumentation-node.ts` (`registrarMotorImportacion()` + `registrarImportadorLegajosClientes()`).

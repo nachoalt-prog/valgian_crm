@@ -6,6 +6,7 @@ import { BandejaFiltros } from "@/components/bandeja-filtros";
 import { ReporteResultados } from "@/components/reporte-resultados";
 import { MensajeriaColaAdjuntosDialog } from "@/components/mensajeria-cola-adjuntos-dialog";
 import { ProcesosEjecucionPasosDialog } from "@/components/procesos-ejecucion-pasos-dialog";
+import { ImportadorEjecucionDetalleDialog } from "@/components/importador-ejecucion-detalle-dialog";
 import { getReporteConfigAction, buscarReporteAction } from "@/app/dashboard/reportes/actions";
 import { cn } from "@/lib/utils";
 import type { ReporteResumen, ReporteConfig } from "@valgian/core";
@@ -19,6 +20,7 @@ export function ReportesTool({ reportesIniciales }: ReportesToolProps) {
   const [panelCollapsed, setPanelCollapsed] = useState(false);
   const [verAdjuntosId, setVerAdjuntosId] = useState<string | null>(null);
   const [verPasosId, setVerPasosId] = useState<string | null>(null);
+  const [verDetalleImportacionId, setVerDetalleImportacionId] = useState<string | null>(null);
   const [config, setConfig] = useState<ReporteConfig | null>(null);
   const [filterValues, setFilterValues] = useState<Record<string, string>>({});
   const [results, setResults] = useState<Record<string, unknown>[]>([]);
@@ -152,6 +154,7 @@ export function ReportesTool({ reportesIniciales }: ReportesToolProps) {
               onExport={handleExport}
               onVerAdjuntos={(valor) => setVerAdjuntosId(String(valor))}
               onVerPasos={(valor) => setVerPasosId(String(valor))}
+              onVerDetalleImportacion={(valor) => setVerDetalleImportacionId(String(valor))}
             />
           </>
         )}
@@ -163,6 +166,14 @@ export function ReportesTool({ reportesIniciales }: ReportesToolProps) {
 
       {verPasosId && (
         <ProcesosEjecucionPasosDialog open={!!verPasosId} onOpenChange={(o) => !o && setVerPasosId(null)} idEjecucion={verPasosId} />
+      )}
+
+      {verDetalleImportacionId && (
+        <ImportadorEjecucionDetalleDialog
+          open={!!verDetalleImportacionId}
+          onOpenChange={(o) => !o && setVerDetalleImportacionId(null)}
+          idEjecucion={verDetalleImportacionId}
+        />
       )}
     </div>
   );

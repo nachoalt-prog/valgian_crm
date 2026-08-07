@@ -812,6 +812,95 @@ ORDER BY PE."FECHA_PROGRAMADA" DESC
 
   await ensureReportePerfil(reporteProcesos.id, perfilAdmin.id);
 
+  // --- Reporte de Importaciones (IMPORTADORES_EJECUCIONES) — dos niveles ---
+  // Nivel 1: esta grilla. Nivel 2: tipo:"detalle_importacion" abre un dialog
+  // genérico (getDetalleEjecucionImportador, packages/core/src/importadores.ts)
+  // que arma la tabla por introspección de information_schema sobre la
+  // TABLA_STAGING/TABLA_HISTORICO del importador de esa fila — no hay un
+  // reporte/dialog nuevo por cada importador que se agregue. Ver domain/reportes.md.
+
+  const filtroImportador = await ensureFiltro(
+    "select_importadores",
+    "Importador",
+    "select",
+    `SELECT "ID" AS value, "NOMBRE" AS label FROM "IMPORTADORES" ORDER BY "NOMBRE"`,
+  );
+  const filtroEstadoImportacion = await ensureFiltro(
+    "select_estado_importadores_ejecucion",
+    "Estado (Importación)",
+    "select",
+    `SELECT DISTINCT "ESTADO" AS value, "ESTADO" AS label FROM "IMPORTADORES_EJECUCIONES" WHERE "ESTADO" IS NOT NULL ORDER BY 1`,
+  );
+  const filtroFechaImportacion = await ensureFiltro("fecha_importadores_ejecucion", "Fecha de Ejecución", "fecha_rango", null);
+
+  const REPORTE_IMPORTADORES_QUERY = `
+SELECT
+  IE."ID" AS id,
+  IE."ID" AS detalle_id,
+  I."NOMBRE" AS importador,
+  I."ID" AS importador_id,
+  U."USERNAME" AS usuario,
+  IE."ESTADO" AS estado,
+  IE."MODO_ARCHIVO" AS modo_archivo,
+  IE."ARCHIVO_NOMBRE" AS archivo_nombre,
+  (IE."RESUMEN_VALIDACION"->>'total')::int AS total_filas,
+  (IE."RESUMEN_VALIDACION"->>'ok')::int AS filas_ok,
+  (IE."RESUMEN_VALIDACION"->>'error')::int AS filas_error,
+  IE."RESUMEN_IMPACTO"::text AS resumen_impacto,
+  IE."ERROR" AS error,
+  IE."FECHA_INICIO" AS fecha_inicio,
+  IE."FECHA_FIN" AS fecha_fin
+FROM "IMPORTADORES_EJECUCIONES" IE
+JOIN "IMPORTADORES" I ON I."ID" = IE."ID_IMPORTADOR"
+JOIN "USUARIOS" U ON U."ID" = IE."ID_USUARIO_DISPARO"
+ORDER BY IE."FECHA_INICIO" DESC NULLS LAST
+`.trim();
+
+  const REPORTE_IMPORTADORES_COLUMNAS = [
+    { campo: "importador", label: "Importador" },
+    { campo: "usuario", label: "Usuario" },
+    {
+      campo: "estado",
+      label: "Estado",
+      tipo: "badge",
+      colores: {
+        pendiente: "warning",
+        cargando: "info",
+        validando: "info",
+        esperando_confirmacion: "warning",
+        impactando: "info",
+        completado: "success",
+        error: "error",
+        cancelado: "neutral",
+      },
+    },
+    { campo: "modo_archivo", label: "Modo" },
+    { campo: "archivo_nombre", label: "Archivo" },
+    { campo: "total_filas", label: "Filas" },
+    { campo: "filas_ok", label: "OK" },
+    { campo: "filas_error", label: "Con error" },
+    { campo: "resumen_impacto", label: "Impacto" },
+    { campo: "error", label: "Error" },
+    { campo: "fecha_inicio", label: "Inicio", tipo: "fecha_hora" },
+    { campo: "fecha_fin", label: "Fin", tipo: "fecha_hora" },
+    { campo: "detalle_id", label: "Detalle", tipo: "detalle_importacion" },
+  ];
+
+  const reporteImportadores = await ensureReporte(
+    "auditoria_importaciones",
+    "Importaciones",
+    "Todas las corridas del motor de importación (IMPORTADORES_EJECUCIONES) — automáticas y por wizard —, con el detalle de los registros de cada corrida.",
+    categoriaAuditoria.id,
+    REPORTE_IMPORTADORES_QUERY,
+    REPORTE_IMPORTADORES_COLUMNAS,
+  );
+
+  await ensureReporteFiltro(reporteImportadores.id, filtroImportador.id, "importador_id", 1);
+  await ensureReporteFiltro(reporteImportadores.id, filtroEstadoImportacion.id, "estado", 2);
+  await ensureReporteFiltro(reporteImportadores.id, filtroFechaImportacion.id, "fecha_inicio", 3);
+
+  await ensureReportePerfil(reporteImportadores.id, perfilAdmin.id);
+
   // --- Proceso de ejemplo (genérico, útil para cualquier instalación): ---
   // limpieza diaria de tokens de sesión vencidos. USUARIOS.TOKEN/TOKEN_EXPIRACION
   // ya se ignoran una vez vencidos (getSessionUser filtra por TOKEN_EXPIRACION

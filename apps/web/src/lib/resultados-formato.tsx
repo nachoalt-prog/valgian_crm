@@ -1,15 +1,17 @@
-import { Paperclip, ListOrdered } from "lucide-react";
+import { Paperclip, ListOrdered, FileSearch } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 // Formato/orden compartido entre BandejaResultados y ReporteResultados — mismo
-// vocabulario de "tipo" de columna (badge/fecha/fecha_hora/adjuntos/pasos/default),
-// se amplía cuando hace falta (ver ADR 0014) — "adjuntos" sumado para el reporte
-// de Mensajería (domain/acciones-externas.md), "pasos" para el reporte de
-// Procesos (domain/procesos.md): en ambos casos el valor de la columna es el ID
-// de la fila dueña del detalle (MENSAJERIA_COLA.ID / PROCESOS_EJECUCIONES.ID),
-// no un texto a mostrar.
+// vocabulario de "tipo" de columna (badge/fecha/fecha_hora/adjuntos/pasos/
+// detalle_importacion/default), se amplía cuando hace falta (ver ADR 0014) —
+// "adjuntos" sumado para el reporte de Mensajería (domain/acciones-externas.md),
+// "pasos" para el reporte de Procesos (domain/procesos.md), "detalle_importacion"
+// para el reporte de Importaciones (domain/reportes.md, nivel 2 genérico por
+// introspección): en los tres casos el valor de la columna es el ID de la fila
+// dueña del detalle (MENSAJERIA_COLA.ID / PROCESOS_EJECUCIONES.ID /
+// IMPORTADORES_EJECUCIONES.ID), no un texto a mostrar.
 export type Direccion = "asc" | "desc";
 
 // Tonos semánticos para tipo:"badge" — configurables por columna vía
@@ -39,6 +41,7 @@ export function formatearValor(
   onVerAdjuntos?: (valor: unknown) => void,
   onVerPasos?: (valor: unknown) => void,
   colores?: Record<string, string>,
+  onVerDetalleImportacion?: (valor: unknown) => void,
 ): React.ReactNode {
   if (tipo === "adjuntos") {
     if (valor === null || valor === undefined) return <span className="text-muted-foreground">—</span>;
@@ -53,6 +56,14 @@ export function formatearValor(
     return (
       <Button variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-primary" onClick={() => onVerPasos?.(valor)}>
         <ListOrdered className="size-3.5" />
+      </Button>
+    );
+  }
+  if (tipo === "detalle_importacion") {
+    if (valor === null || valor === undefined) return <span className="text-muted-foreground">—</span>;
+    return (
+      <Button variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-primary" onClick={() => onVerDetalleImportacion?.(valor)}>
+        <FileSearch className="size-3.5" />
       </Button>
     );
   }
