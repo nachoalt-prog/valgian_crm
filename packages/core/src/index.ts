@@ -41,3 +41,5 @@ export * from "./procesos";
 export * from "./monedas";
 export * from "./mensajeria";
 export * from "./mensajeria-plantillas";
+export * from "./importadores";
+export * from "./importador-legajos-clientes";

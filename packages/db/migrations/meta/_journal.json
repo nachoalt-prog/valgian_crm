@@ -267,6 +267,20 @@
       "when": 1785945300560,
       "tag": "0037_stale_red_ghost",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1786053981678,
+      "tag": "0038_chemical_unus",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1786061170530,
+      "tag": "0039_powerful_ben_urich",
+      "breakpoints": true
     }
   ]
 }

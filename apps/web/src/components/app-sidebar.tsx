@@ -48,6 +48,8 @@ const RUTA_POR_CODIGO: Record<string, string> = {
   procesos: "/dashboard/procesos",
   categorias_tipos_tramite: "/dashboard/categorias-tipos-tramite",
   tipos_tramite: "/dashboard/tipos-tramite",
+  importadores: "/dashboard/importadores",
+  importar: "/dashboard/importar",
   xcc_tipos_movimientos: "/dashboard/xcc-tipos-movimientos",
   xcc_tipos_retencion: "/dashboard/xcc-tipos-retencion",
   xcc_condiciones_impositivas: "/dashboard/xcc-condiciones-impositivas",

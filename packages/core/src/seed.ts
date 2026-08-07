@@ -18,6 +18,8 @@ import {
   tiposDocumento,
   entidades,
   tiposArchivosAdjuntos,
+  accionesExternas,
+  importadores,
 } from "@valgian/db";
 import { hashPassword } from "./auth/password";
 import { OPERACION_ACCESO } from "./permissions";
@@ -97,6 +99,37 @@ async function ensureUsuarioAdmin(idPerfil: string) {
   const passwordHash = await hashPassword(ADMIN_PASSWORD);
   const [creado] = await db.insert(usuarios).values({ idPerfil, username: ADMIN_USERNAME, passwordHash }).returning();
   return { usuario: creado, creado: true };
+}
+
+/**
+ * Usuario "sistema" — el que dejan las corridas del motor de importación
+ * (ADR 0021) disparadas sin humano presente (por PROCESO). Sin ID_PERFIL
+ * (cero permisos, no puede hacer nada aunque alguien lo intentara loguear) y
+ * con un hash de una contraseña aleatoria que nadie conoce ni se guarda.
+ */
+async function ensureUsuarioSistema() {
+  const [existente] = await db.select().from(usuarios).where(eq(usuarios.username, "sistema"));
+  if (existente) return existente;
+
+  const passwordHash = await hashPassword(crypto.randomUUID());
+  const [creado] = await db.insert(usuarios).values({ idPerfil: null, username: "sistema", passwordHash }).returning();
+  return creado;
+}
+
+async function ensureAccionExterna(codigo: string, nombre: string, componente: string) {
+  const [existente] = await db.select().from(accionesExternas).where(eq(accionesExternas.codigo, codigo));
+  if (existente) return existente;
+
+  const [creada] = await db.insert(accionesExternas).values({ codigo, nombre, componente }).returning();
+  return creada;
+}
+
+async function ensureImportador(data: typeof importadores.$inferInsert) {
+  const [existente] = await db.select().from(importadores).where(eq(importadores.codigo, data.codigo));
+  if (existente) return existente;
+
+  const [creado] = await db.insert(importadores).values(data).returning();
+  return creado;
 }
 
 async function ensureHerramienta(codigo: string, nombre: string, slug: string) {
@@ -292,6 +325,10 @@ async function main() {
   const herramientaMensajeriaPlantillas = await ensureHerramienta("mensajeria_plantillas", "Plantillas de Mensajería", "mensajeria_plantillas.gestionar");
   const herramientaAccionesExternas = await ensureHerramienta("acciones_externas", "Acciones Externas", "acciones_externas.gestionar");
   const herramientaProcesos = await ensureHerramienta("procesos", "Procesos", "procesos.gestionar");
+  const herramientaImportadores = await ensureHerramienta("importadores", "Importadores", "importadores.gestionar");
+  // Permiso separado del ABM a propósito: alguien puede necesitar correr
+  // importaciones vía wizard sin poder crear/editar/borrar importadores.
+  const herramientaImportarWizard = await ensureHerramienta("importar", "Asistente de Importación", "importar.usar");
   const herramientaCategoriasTiposTramite = await ensureHerramienta(
     "categorias_tipos_tramite",
     "Categorías de Tipos de Trámite",
@@ -331,6 +368,8 @@ async function main() {
     herramientaMensajeriaPlantillas,
     herramientaAccionesExternas,
     herramientaProcesos,
+    herramientaImportadores,
+    herramientaImportarWizard,
     herramientaCategoriasTiposTramite,
     herramientaTiposTramite,
     herramientaLegajoDatos,
@@ -422,6 +461,11 @@ async function main() {
   await ensureMenuOpcion(menuHerramientas.id, herramientaBandejas.id, "bandejas", "Bandejas", "icon.bandejas", 1);
   await ensureMenuOpcion(menuHerramientas.id, herramientaReportes.id, "reportes", "Reportes", "icon.reportes", 2);
   await ensureMenuOpcion(menuHerramientas.id, herramientaProcesos.id, "procesos", "Procesos", "icon.procesos", 3);
+  // El ABM va en Configuración (es config de catálogo, no una herramienta de
+  // uso diario) — el wizard sí queda en Herramientas, junto a Procesos, que
+  // es lo que se usa día a día.
+  await ensureMenuOpcion(menuConfiguracion.id, herramientaImportadores.id, "importadores", "Importadores", "icon.importadores", 19);
+  await ensureMenuOpcion(menuHerramientas.id, herramientaImportarWizard.id, "importar", "Asistente de Importación", "icon.importar", 4);
   await ensureMenuOpcion(
     menuConfiguracion.id,
     herramientaCategoriasTiposTramite.id,
@@ -504,6 +548,30 @@ async function main() {
   for (const tipo of TIPOS_ARCHIVO) {
     await ensureTipoArchivoAdjunto(tipo);
   }
+
+  // --- Motor de importación (ADR 0021, domain/importadores.md) — usuario
+  // "sistema" para las corridas sin humano presente + la única fila de
+  // ACCIONES_EXTERNAS que comparten todos los importadores.
+  await ensureUsuarioSistema();
+  await ensureAccionExterna("importacion_generica", "Importación de archivos (genérico)", "importacion");
+
+  // Primer importador real (Fase 3, ver domain/importadores.md) — se siembra
+  // inactivo para modo automático (DISPARO_AUTOMATICO_ACTIVO=false, sin
+  // RUTA_DIRECTORIO): cada instalación decide si/cómo lo prende, vía el ABM.
+  // Usable desde ya por el wizard (/dashboard/importar).
+  // Convención para todo importador "estándar" (ver ADR 0021): admite
+  // csv/xlsx/txt/tsv, y siempre lleva histórico con 30 días de retención por defecto.
+  await ensureImportador({
+    codigo: "legajos_clientes",
+    nombre: "Legajos y Clientes",
+    tablaStaging: "IMPORT_LEGAJOS_CLIENTES_STG",
+    spNombre: "sp_import_legajos_clientes",
+    extensionesPermitidas: "csv,xlsx,txt,tsv",
+    tablaHistorico: "IMPORT_LEGAJOS_CLIENTES_HIST",
+    diasRetencionHistorico: 30,
+    disparoAutomaticoActivo: false,
+    activo: true,
+  });
 
   console.log("Seed aplicado (idempotente).");
   if (usuarioCreado) {

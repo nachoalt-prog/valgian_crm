@@ -13,6 +13,8 @@ import {
   escucharGeneracionesPendientes,
   procesarAccionesExternasPendientes,
   escucharAccionesExternasPendientes,
+  registrarMotorImportacion,
+  registrarImportadorLegajosClientes,
 } from "@valgian/core";
 import { registrar as registrarCotizacionesArgentina } from "@valgian/module-cotizaciones-argentina";
 import { registrar as registrarMensajeriaSmtp } from "@valgian/module-mensajeria-smtp";
@@ -72,6 +74,12 @@ try {
   registrarCotizacionesArgentina();
   registrarMensajeriaSmtp();
   registrarCuentaCorriente();
+  // Motor de importación (ADR 0021) — infraestructura de core, no un módulo,
+  // pero registra su handler ('importacion') con el mismo mecanismo explícito.
+  registrarMotorImportacion();
+  // Primer importador real (Fase 3) — registro separado del motor genérico,
+  // mismo criterio que un módulo: cada cargador se registra por su cuenta.
+  registrarImportadorLegajosClientes();
 
   await escucharAccionesExternasPendientes(() => {
     void barrerAccionesExternas("notify");

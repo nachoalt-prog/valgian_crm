@@ -12,6 +12,14 @@ Todo lo que está identificado pero no resuelto todavía, sin importar de qué s
 - **Resuelto — permisos más granulares que VER/GESTIONAR**: `PERMISOS.GESTIONAR` fue reemplazado por `OPERACIONES` (acciones concretas por herramienta) + `PERMISOS.ID_OPERACION` — ver `domain/infraestructura.md`, "Modelo de permisos". De momento la mayoría de las herramientas siguen con una única operación `acceso` (equivalente al viejo `GESTIONAR`); `LEGAJO_ADJ_1` es el primer caso con operaciones realmente finas (crear/reemplazar/descargar/guardar/borrar). Migrar otra herramienta a este nivel de detalle no requiere cambio de schema, solo sumarle sus propias filas en `OPERACIONES`.
 - **Sesión única por usuario**: si se necesita soporte para múltiples sesiones simultáneas, hace falta introducir una tabla `SESIONES` — ver ADR 0010.
 
+## Motor de importación de archivos
+
+Implementado completo (motor, ABM de `IMPORTADORES`, wizard genérico, y el primer importador real — Legajos y Clientes) — ver ADR 0021, `domain/importadores.md`. Pendiente:
+
+- **UI (ABM y wizard) sin probar en browser real** — verificado a fondo del lado del servidor en las 3 fases (carga, validación, paginación, confirmación, guard de concurrencia, cancelación, upserts reales de `LEGAJOS`/`CLIENTES`), pero la interacción real en pantalla (`/dashboard/importadores`, `/dashboard/importar`) todavía no la probó nadie.
+- **SFTP como origen de archivo en modo automático**: deliberadamente pospuesto (ver ADR 0021) — no hay precedente de credenciales/secrets en el repo. Se engancharía como una etapa 0 que deja el archivo en el directorio local configurado, sin tocar el resto del motor.
+- **`legajos_clientes` se sembró sin `RUTA_DIRECTORIO`** (`DISPARO_AUTOMATICO_ACTIVO=false`) — cada instalación que quiera usarlo en modo automático tiene que configurar la ruta desde el ABM primero.
+
 ## Módulos
 
 - **Módulo de mensajería** (`MSJ_CANALES`, `MSJ_MODELOS`, `MSJ_TAGS`, `MSJ_COLA`): deliberadamente pospuesto hasta tener el core andando. Se retoma en una pasada posterior.

@@ -1091,3 +1091,145 @@ export const procesosEjecucionesPasos = pgTable("PROCESOS_EJECUCIONES_PASOS", {
   estado: text("ESTADO").notNull(),
   error: text("ERROR"),
 });
+
+/**
+ * Motor de importación de archivos — ver ADR 0021, domain/importadores.md.
+ * IMPORTADORES (catálogo) + IMPORTADORES_EJECUCIONES (auditoría Y cola a la
+ * vez, mismo rol que PROCESOS_EJECUCIONES) son infraestructura genérica; cada
+ * importador puntual trae su propia tabla de staging aparte (schema fijo,
+ * columna ID_EJECUCION), no generalizada acá.
+ */
+export const importadores = pgTable(
+  "IMPORTADORES",
+  {
+    id: uuid("ID").primaryKey().defaultRandom(),
+    codigo: text("CODIGO").notNull(),
+    nombre: text("NOMBRE").notNull(),
+    // Nombre de la tabla de staging propia de este importador (schema fijo,
+    // definido por quien lo construye — nunca mapeo de columnas dinámico).
+    tablaStaging: text("TABLA_STAGING").notNull(),
+    // Nombre de PROCEDURE resuelto dinámicamente por sp_importar_ejecutar,
+    // validado contra un patrón de identificador simple antes de EXECUTE
+    // (mismo criterio que sp_aplicar_estimulo, packages/db/sql/0002_...).
+    spNombre: text("SP_NOMBRE").notNull(),
+    // Lista separada por comas (ej. "csv,xlsx") — filtra qué acepta el wizard
+    // y qué extensiones mira la búsqueda en directorio del modo automático.
+    extensionesPermitidas: text("EXTENSIONES_PERMITIDAS").notNull(),
+    // Mínimo para poder disparar en modo automático (por proceso o por botón
+    // "Correr ahora" del ABM) — null = solo se puede usar por wizard.
+    rutaDirectorio: text("RUTA_DIRECTORIO"),
+    // LIKE; null = toma cualquier archivo del directorio que matchee la extensión.
+    patronNombreArchivo: text("PATRON_NOMBRE_ARCHIVO"),
+    // null = no se mueven registros a histórico, se borran directo del staging.
+    tablaHistorico: text("TABLA_HISTORICO"),
+    // null = el histórico no se limpia nunca automáticamente.
+    diasRetencionHistorico: integer("DIAS_RETENCION_HISTORICO"),
+    // null = el archivo procesado no se mueve, queda donde estaba.
+    carpetaDestinoProcesados: text("CARPETA_DESTINO_PROCESADOS"),
+    // Habilita el disparo en modo "buscar archivo en directorio" (por PROCESO
+    // o por botón del ABM) — false = solo utilizable desde el wizard.
+    disparoAutomaticoActivo: boolean("DISPARO_AUTOMATICO_ACTIVO").default(false),
+    // 'abortar' | 'importar_validas' — solo aplica si DISPARO_AUTOMATICO_ACTIVO.
+    modoErrorAutomatico: text("MODO_ERROR_AUTOMATICO"),
+    activo: boolean("ACTIVO").default(true),
+  },
+  (table) => [uniqueIndex("IMPORTADORES_CODIGO_UNIQUE").on(table.codigo)],
+);
+
+export const importadoresEjecuciones = pgTable(
+  "IMPORTADORES_EJECUCIONES",
+  {
+    id: uuid("ID").primaryKey().defaultRandom(),
+    idImportador: uuid("ID_IMPORTADOR")
+      .notNull()
+      .references(() => importadores.id),
+    // NUNCA null — el usuario "sistema" (sembrado en el core) es el que
+    // dejan las corridas sin humano presente (por PROCESO).
+    idUsuarioDisparo: uuid("ID_USUARIO_DISPARO")
+      .notNull()
+      .references(() => usuarios.id),
+    // 'buscar_directorio' (automático, por proceso o por botón del ABM) | 'subido_manual' (wizard).
+    modoArchivo: text("MODO_ARCHIVO").notNull(),
+    archivoNombre: text("ARCHIVO_NOMBRE"),
+    // pendiente/cargando/validando/esperando_confirmacion/impactando/completado/error/cancelado —
+    // esperando_confirmacion solo existe en modoArchivo='subido_manual' (wizard).
+    estado: text("ESTADO").notNull().default("pendiente"),
+    resumenValidacion: jsonb("RESUMEN_VALIDACION"),
+    resumenImpacto: jsonb("RESUMEN_IMPACTO"),
+    error: text("ERROR"),
+    // null si el disparo fue por wizard (no pasa por la cola, Node ya tiene el archivo en mano).
+    idAccionExternaCola: uuid("ID_ACCION_EXTERNA_COLA").references(() => accionesExternasCola.id),
+    fechaInicio: timestamp("FECHA_INICIO", { withTimezone: true }),
+    fechaFin: timestamp("FECHA_FIN", { withTimezone: true }),
+  },
+  (table) => [
+    // Guard de concurrencia real (no solo un chequeo en aplicación) — una
+    // ejecución activa por (importador, usuario). Sobrevive incluso al riesgo
+    // de doble-disparo ya aceptado en acciones-externas.ts (el barrido no usa
+    // FOR UPDATE SKIP LOCKED): la segunda inserción falla el índice, se trata
+    // como "ya hay una corriendo", no como error real.
+    uniqueIndex("IMPORTADORES_EJECUCIONES_ACTIVA_UNIQUE")
+      .on(table.idImportador, table.idUsuarioDisparo)
+      .where(sql`"ESTADO" NOT IN ('completado','error','cancelado')`),
+  ],
+);
+
+/**
+ * Tabla de staging del primer importador real (Fase 3, ver domain/importadores.md):
+ * una fila trae datos de un LEGAJO y/o un CLIENTE — mapeo fijo, resuelto por
+ * sp_import_legajos_clientes (packages/db/sql/0023_...). Todas las columnas
+ * de dominio son texto crudo (vienen de un CSV/XLSX) — vacío/NULL significa
+ * "no vino", nunca "borrar el valor existente" (upsert parcial).
+ *
+ * Convención de nombre para toda tabla de staging/histórico de un importador:
+ * `IMPORT_<algo descriptivo>_STG` / `IMPORT_<algo descriptivo>_HIST` — el
+ * sufijo va al final, no como prefijo (ver domain/importadores.md).
+ */
+export const importLegajosClientesStg = pgTable("IMPORT_LEGAJOS_CLIENTES_STG", {
+  id: uuid("ID").primaryKey().defaultRandom(),
+  idEjecucion: uuid("ID_EJECUCION")
+    .notNull()
+    .references(() => importadoresEjecuciones.id),
+  // Orden real dentro del archivo (1-based, sin contar el encabezado) — ID es
+  // un UUID aleatorio, no sirve para mostrar las filas en el mismo orden que
+  // el archivo de origen (ver getResultadosValidacion, domain/importadores.md).
+  nroFila: integer("NRO_FILA").notNull(),
+  legajoNumero: text("LEGAJO_NUMERO"),
+  clienteTipoDocumentoCodigo: text("CLIENTE_TIPO_DOCUMENTO_CODIGO"),
+  clienteNroDocumento: text("CLIENTE_NRO_DOCUMENTO"),
+  clienteEsTitular: text("CLIENTE_ES_TITULAR"),
+  clienteCaracterCodigo: text("CLIENTE_CARACTER_CODIGO"),
+  clienteApellido: text("CLIENTE_APELLIDO"),
+  clienteNombre: text("CLIENTE_NOMBRE"),
+  clienteGeneroCodigo: text("CLIENTE_GENERO_CODIGO"),
+  clienteProvinciaCodigo: text("CLIENTE_PROVINCIA_CODIGO"),
+  estadoValidacion: text("ESTADO_VALIDACION"),
+  mensajeValidacion: text("MENSAJE_VALIDACION"),
+});
+
+/**
+ * Histórico de legajos_clientes — MISMO CONJUNTO de columnas que
+ * IMPORT_LEGAJOS_CLIENTES_STG (mismos nombres; `sp_importar_ejecutar` arma la
+ * lista de columnas por NOMBRE al mover filas, no asume el mismo orden
+ * físico — ver el gotcha documentado en ese archivo). Convención para todo
+ * importador "estándar" (ver ADR 0021): siempre lleva histórico, con 30 días
+ * de retención por defecto.
+ */
+export const importLegajosClientesHist = pgTable("IMPORT_LEGAJOS_CLIENTES_HIST", {
+  id: uuid("ID").primaryKey().defaultRandom(),
+  idEjecucion: uuid("ID_EJECUCION")
+    .notNull()
+    .references(() => importadoresEjecuciones.id),
+  nroFila: integer("NRO_FILA").notNull(),
+  legajoNumero: text("LEGAJO_NUMERO"),
+  clienteTipoDocumentoCodigo: text("CLIENTE_TIPO_DOCUMENTO_CODIGO"),
+  clienteNroDocumento: text("CLIENTE_NRO_DOCUMENTO"),
+  clienteEsTitular: text("CLIENTE_ES_TITULAR"),
+  clienteCaracterCodigo: text("CLIENTE_CARACTER_CODIGO"),
+  clienteApellido: text("CLIENTE_APELLIDO"),
+  clienteNombre: text("CLIENTE_NOMBRE"),
+  clienteGeneroCodigo: text("CLIENTE_GENERO_CODIGO"),
+  clienteProvinciaCodigo: text("CLIENTE_PROVINCIA_CODIGO"),
+  estadoValidacion: text("ESTADO_VALIDACION"),
+  mensajeValidacion: text("MENSAJE_VALIDACION"),
+});
