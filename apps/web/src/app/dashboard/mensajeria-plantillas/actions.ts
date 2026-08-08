@@ -52,6 +52,7 @@ export async function crearMensajeriaPlantillaAction(formData: FormData) {
 
   const codigo = formData.get("codigo");
   const nombre = formData.get("nombre");
+  const canal = formData.get("canal");
   const descripcion = formData.get("descripcion");
   const asunto = formData.get("asunto");
   const idEstimuloOk = formData.get("idEstimuloOk");
@@ -60,7 +61,7 @@ export async function crearMensajeriaPlantillaAction(formData: FormData) {
   const observacionError = formData.get("observacionError");
   const file = formData.get("file");
 
-  if (typeof codigo !== "string" || typeof nombre !== "string" || !(file instanceof File)) {
+  if (typeof codigo !== "string" || typeof nombre !== "string" || typeof canal !== "string" || !(file instanceof File)) {
     return { error: "Faltan datos." };
   }
 
@@ -68,6 +69,7 @@ export async function crearMensajeriaPlantillaAction(formData: FormData) {
   const result = await crearMensajeriaPlantilla({
     codigo,
     nombre,
+    canal,
     descripcion: typeof descripcion === "string" && descripcion ? descripcion : null,
     asunto: typeof asunto === "string" && asunto ? asunto : null,
     idEstimuloOk: typeof idEstimuloOk === "string" && idEstimuloOk ? idEstimuloOk : null,
@@ -135,7 +137,7 @@ export interface EnviarMensajePruebaInput {
 export async function enviarMensajePruebaAction(input: EnviarMensajePruebaInput) {
   const check = await requireGestion();
   if (check.error) return { error: check.error };
-  if (!input.destino) return { error: "Falta el email destino." };
+  if (!input.destino) return { error: "Falta el destino." };
 
   const idsAdjuntos = input.idsPlantillasAdjunto?.length ? await resolverArchivosDePlantillas(input.idsPlantillasAdjunto) : [];
 

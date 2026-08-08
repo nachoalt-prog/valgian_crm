@@ -7,12 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { crearMensajeriaPlantillaAction, actualizarMensajeriaPlantillaAction } from "@/app/dashboard/mensajeria-plantillas/actions";
+import { CANALES_MENSAJERIA_PLANTILLA } from "@/lib/mensajeria-plantillas-const";
 import type { EstimuloConEstrategia } from "@valgian/core";
 
 interface PlantillaRow {
   id: string;
   codigo: string;
   nombre: string;
+  canal: string;
   descripcion: string | null;
   asunto: string | null;
   idEstimuloOk: string | null;
@@ -35,6 +37,7 @@ const SIN_ESTIMULO = "__sin_estimulo__";
 export function MensajeriaPlantillaDialog({ open, onOpenChange, plantilla, estimulosDisponibles, onGuardado }: MensajeriaPlantillaDialogProps) {
   const [codigo, setCodigo] = useState(plantilla?.codigo ?? "");
   const [nombre, setNombre] = useState(plantilla?.nombre ?? "");
+  const [canal, setCanal] = useState(plantilla?.canal ?? CANALES_MENSAJERIA_PLANTILLA[0].value);
   const [descripcion, setDescripcion] = useState(plantilla?.descripcion ?? "");
   const [asunto, setAsunto] = useState(plantilla?.asunto ?? "");
   const [idEstimuloOk, setIdEstimuloOk] = useState(plantilla?.idEstimuloOk ?? SIN_ESTIMULO);
@@ -58,6 +61,7 @@ export function MensajeriaPlantillaDialog({ open, onOpenChange, plantilla, estim
     const datosComunes = {
       codigo,
       nombre,
+      canal,
       descripcion: descripcion || null,
       asunto: asunto || null,
       idEstimuloOk: idEstimuloOk === SIN_ESTIMULO ? null : idEstimuloOk,
@@ -112,6 +116,27 @@ export function MensajeriaPlantillaDialog({ open, onOpenChange, plantilla, estim
           </div>
 
           <div className="space-y-1.5">
+            <Label className="text-xs uppercase tracking-wider text-muted-foreground">Canal</Label>
+            <Select
+              items={Object.fromEntries(CANALES_MENSAJERIA_PLANTILLA.map((c) => [c.value, c.label]))}
+              value={canal}
+              onValueChange={(v) => setCanal(v ?? CANALES_MENSAJERIA_PLANTILLA[0].value)}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {CANALES_MENSAJERIA_PLANTILLA.map((c) => (
+                  <SelectItem key={c.value} value={c.value}>
+                    {c.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">Solo a modo de referencia — no valida contra el archivo cargado.</p>
+          </div>
+
+          <div className="space-y-1.5">
             <Label htmlFor="descripcion" className="text-xs uppercase tracking-wider text-muted-foreground">
               Descripción
             </Label>
@@ -129,18 +154,18 @@ export function MensajeriaPlantillaDialog({ open, onOpenChange, plantilla, estim
           {!plantilla && (
             <div className="space-y-1.5">
               <Label htmlFor="file" className="text-xs uppercase tracking-wider text-muted-foreground">
-                Archivo HTML (cuerpo del mensaje)
+                Archivo HTML o TXT (cuerpo del mensaje)
               </Label>
               <input
                 id="file"
                 type="file"
-                accept=".html"
+                accept=".html,.txt"
                 required
                 onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                 className="w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm text-foreground file:mr-3 file:rounded-md file:border-0 file:bg-secondary file:px-3 file:py-1.5 file:text-xs file:font-medium"
               />
               <p className="text-xs text-muted-foreground">
-                Después de crearla, para reemplazar el archivo abrí la plantilla desde el listado.
+                HTML para canales como Email; TXT para canales de texto plano (ej. SMS). Después de crearla, para reemplazar el archivo abrí la plantilla desde el listado.
               </p>
             </div>
           )}

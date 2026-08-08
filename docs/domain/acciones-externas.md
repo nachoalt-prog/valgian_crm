@@ -13,7 +13,7 @@ Puente entre SQL de confianza (`ACCIONES.COMANDO`, o cualquier otro que lo neces
 | ID | UUID, PK |
 | CODIGO | string, unique |
 | NOMBRE | string |
-| COMPONENTE | string — cerrado, mapea a un handler Node registrado a mano (ver "Componentes" más abajo). Hoy `'consulta_cotizacion'` y `'mensajeria_smtp'` |
+| COMPONENTE | string — cerrado, mapea a un handler Node registrado a mano (ver "Componentes" más abajo). Hoy `'consulta_cotizacion'`, `'mensajeria_smtp'` y `'mensajeria_twilio'`, entre otros |
 | PARAMETROS | jsonb — parámetros FIJOS que el despachador le pasa al handler (credenciales, config propia del componente). Distinto de `ACCIONES_EXTERNAS_COLA.PARAMETROS` (dinámico, por llamada) |
 | TOKEN | string, nullable — sesión con el servicio externo, cuando el `COMPONENTE` la necesita (mismo patrón que `USUARIOS.TOKEN`) |
 | TOKEN_EXPIRACION | timestamp, nullable |
@@ -141,7 +141,7 @@ El `INSERT` es instantáneo — quien encola no espera respuesta, sigue de largo
 
 ## Mensajería
 
-Segundo nivel de cola, anidado bajo `ACCIONES_EXTERNAS`/`ACCIONES_EXTERNAS_COLA` — ver ADR 0018 para el razonamiento completo (por qué es un segundo nivel y no una fila más de `ACCIONES_EXTERNAS_COLA`). Un mismo proveedor (SMTP, a futuro SMS/WhatsApp) puede mandar muchos mensajes independientes, cada uno con su propio destino de reintento.
+Segundo nivel de cola, anidado bajo `ACCIONES_EXTERNAS`/`ACCIONES_EXTERNAS_COLA` — ver ADR 0018 para el razonamiento completo (por qué es un segundo nivel y no una fila más de `ACCIONES_EXTERNAS_COLA`). Un mismo proveedor (SMTP, SMS por Twilio, a futuro WhatsApp) puede mandar muchos mensajes independientes, cada uno con su propio destino de reintento.
 
 ### MENSAJERIA_PLANTILLAS (catálogo, `ABM /dashboard/mensajeria-plantillas`)
 
@@ -150,7 +150,8 @@ Segundo nivel de cola, anidado bajo `ACCIONES_EXTERNAS`/`ACCIONES_EXTERNAS_COLA`
 | ID | UUID, PK |
 | CODIGO | string, unique |
 | NOMBRE | string |
-| ID_ARCHIVO_ADJUNTO | FK → ARCHIVOS_ADJUNTOS — HTML del cuerpo, con `##CODIGO##` (mismo mecanismo que `PLANTILLAS_ADJUNTOS`) |
+| ID_ARCHIVO_ADJUNTO | FK → ARCHIVOS_ADJUNTOS — cuerpo del mensaje, con `##CODIGO##` (mismo mecanismo que `PLANTILLAS_ADJUNTOS`). HTML o TXT (`crearMensajeriaPlantilla` acepta `tiposPermitidos: ["html", "txt"]`) — TXT para canales de texto plano (SMS por Twilio), HTML para canales como Email (SMTP) |
+| CANAL | text, not null, default `'email'` — `'email' \| 'sms' \| 'whatsapp'` (`CANALES_MENSAJERIA_PLANTILLA`, `mensajeria-plantillas.ts`). **Solo a modo de referencia** para quien administra las plantillas — no valida contra `ID_ARCHIVO_ADJUNTO` ni contra ninguna `ACCIONES_EXTERNAS`, no bloquea nada. Texto simple en vez de tabla de catálogo a propósito: conjunto fijo y chico, sin FK entrante, sin CRUD propio — mismo criterio que un `ESTADO` (ej. `IMPORTADORES_EJECUCIONES.ESTADO`). No alcanza con inferirlo del mimetype del archivo (como sí se hace para decidir `escaparHtml`, ver más abajo) porque SMS y WhatsApp van a compartir `.txt` los dos. `whatsapp` es seleccionable aunque el módulo todavía no exista |
 | DESCRIPCION | string, nullable |
 | ASUNTO | string, nullable — también admite `##CODIGO##`, se resuelve con el mismo motor que el cuerpo |
 | COMODIN | jsonb, nullable |
@@ -161,7 +162,7 @@ Segundo nivel de cola, anidado bajo `ACCIONES_EXTERNAS`/`ACCIONES_EXTERNAS_COLA`
 
 Al mandar con éxito, si `ID_ESTIMULO_OK` está configurado, se aplica ese estímulo sobre `(MENSAJERIA_COLA.ID_ENTIDAD, MENSAJERIA_COLA.ID_REGISTRO)` vía `sp_aplicar_estimulo`, con `OBSERVACION_OK` como observación. `ID_ESTIMULO_ERROR` se aplica **recién cuando `MENSAJERIA_COLA.REINTENTOS_SUPERADOS` pasa a `true`** — nunca en cada intento fallido individual, solo cuando ya no se va a reintentar más. Sin usuario logueado detrás (`aplicarEstimulo` con `idUsuario=null` — mismo criterio que `guardarArchivo` en Generación de Documentos).
 
-ABM (`packages/core/src/mensajeria-plantillas.ts`, calcado de `plantillas-adjunto.ts`): CRUD estándar + carga del HTML (igual mecánica que Plantillas de Documento — el archivo se reemplaza abriendo la plantilla desde el listado, no desde el diálogo de alta/edición). El selector de Estímulo usa `listEstimulosConEstrategia()` (ya existía, de Perfiles-Estímulos) — lista TODOS los estímulos de TODAS las estrategias, porque una plantilla no está atada a una sola estrategia (se usa contra cualquier `ID_ENTIDAD`/`ID_REGISTRO` que le pase el que encola).
+ABM (`packages/core/src/mensajeria-plantillas.ts`, calcado de `plantillas-adjunto.ts`): CRUD estándar + carga del archivo (igual mecánica que Plantillas de Documento — el archivo se reemplaza abriendo la plantilla desde el listado, no desde el diálogo de alta/edición) + combo de `CANAL` (`CANALES_MENSAJERIA_PLANTILLA`). El listado (`MensajeriaPlantillasTool`) muestra `CANAL` como badge de color (Email/SMS/WhatsApp, un tono fijo por canal, sin relación con los tonos semánticos success/warning/error de `resultados-formato.tsx` — acá el color solo distingue, no juzga). El selector de Estímulo usa `listEstimulosConEstrategia()` (ya existía, de Perfiles-Estímulos) — lista TODOS los estímulos de TODAS las estrategias, porque una plantilla no está atada a una sola estrategia (se usa contra cualquier `ID_ENTIDAD`/`ID_REGISTRO` que le pase el que encola).
 
 ### MENSAJERIA_COLA (cada fila = un mensaje)
 
@@ -199,14 +200,16 @@ Wrapper Node: `encolarMensaje(input)` en `packages/core/src/mensajeria.ts` (acep
 
 ### Contrato compartido de componente (`packages/core/src/mensajeria.ts`)
 
-Cualquier proveedor de mensajería (SMTP, a futuro SMS/WhatsApp) llama a **una única función**, `procesarComponenteMensajeria(fila, enviarUno)`, pasándole solo su propia función de envío (`EnviarUnMensaje = (mensaje, parametrosAccion) => Promise<{exito, descripcion?}>`). Todo lo demás es compartido, una sola implementación:
+Cualquier proveedor de mensajería (SMTP, SMS por Twilio, a futuro WhatsApp) llama a **una única función**, `procesarComponenteMensajeria(fila, enviarUno)`, pasándole solo su propia función de envío (`EnviarUnMensaje = (mensaje, parametrosAccion) => Promise<{exito, descripcion?}>`). Todo lo demás es compartido, una sola implementación:
 
 1. **Modo de despacho**: si `fila.ID_ENTIDAD` es la entidad `mensajeria_cola` y `fila.ID_REGISTRO` es válido → procesa SOLO ese `MENSAJERIA_COLA`. Si no → barre TODOS los mensajes elegibles (`RESULTADO` null o != 0, no superados) de esa `ACCIONES_EXTERNAS`.
 2. Por cada mensaje: resuelve la plantilla (`leerArchivoCrudo` + `resolverPlaceholders`, mismo mecanismo que `GENERACIONES_DOCUMENTO`) para cuerpo Y asunto, carga los adjuntos (`MENSAJERIA_COLA_ADJUNTOS`), llama a `enviarUno(...)`.
 3. Escribe el resultado en `MENSAJERIA_COLA` (`finalizarIntentoMensaje` — misma aritmética de reintento que `finalizarIntentoAccionExterna`, pero usando `REINTENTOS_MAX`/`REINTENTOS_MARGEN` de la `ACCIONES_EXTERNAS` asociada) y aplica el estímulo OK/error correspondiente.
 4. Al terminar todos los mensajes de esta pasada, reporta un resultado agregado a `ACCIONES_EXTERNAS_COLA` vía `finalizarIntentoAccionExterna` (éxito solo si TODOS los mensajes de esta pasada salieron bien).
 
-Cada proveedor solo escribe la parte que lo distingue de los demás — hoy, `enviarPorSmtp` en `packages/modules/mensajeria-smtp`.
+Cada proveedor solo escribe la parte que lo distingue de los demás — `enviarPorSmtp` en `packages/modules/mensajeria-smtp`, `enviarPorTwilio` en `packages/modules/mensajeria-twilio`. `MensajeParaEnviar.CUERPO` (antes `CUERPO_HTML` — renombrado al sumar el canal SMS, ya no es necesariamente HTML) es el campo que cada proveedor efectivamente envía.
+
+**Texto plano vs HTML — escapado condicional**: `resolverPlaceholders(texto, datos, opciones?)` acepta `opciones.escaparHtml` (default `true`, sin cambiar el comportamiento de siempre). `procesarUnMensaje` decide el valor mirando el `mimetype` real del archivo de la plantilla (`leerArchivoCrudo`) — `"text/plain"` → `escaparHtml: false` (nada que proteger, y escapar igual metería entidades `&amp;`/`&#39;` literales en un SMS), cualquier otro mimetype (`"text/html"`) → `escaparHtml: true` (comportamiento sin cambios). Esto pisa el `PLACEHOLDERS.ESCAPAR` de cada placeholder individual para ESA resolución puntual — un mismo `##CODIGO##` puede usarse en una plantilla HTML (se escapa) y en una TXT (no se escapa) sin duplicar el placeholder.
 
 ### Componente `mensajeria_smtp` (`packages/modules/mensajeria-smtp`) — segundo módulo real
 
@@ -227,6 +230,24 @@ WHERE "CODIGO" = 'mensajeria_smtp';
 Verificado en vivo con un SMTP de prueba real (Ethereal, vía `nodemailer.createTestAccount()`) — encolar → despacho casi instantáneo vía `NOTIFY` → envío real exitoso → `PLACEHOLDERS` con el mapa resuelto → `DATOS_RAIZ` intacto. También se verificó el reintento: un mensaje con un placeholder roto falló, quedó elegible, y en la siguiente pasada del barrido (tras arreglar el placeholder) se reintentó y mandó bien — `REINTENTO` incrementado en la misma fila de `ACCIONES_EXTERNAS_COLA`, sin fila nueva.
 
 Se probó primero con Brevo real: dos rechazos consecutivos, ninguno relacionado con este código (`525 Unauthorized IP address`, después de autorizar la IP `502 Your SMTP account is not yet activated` — la cuenta en sí nunca llegó a activarse). Se cambió a **Resend** (`host: smtp.resend.com`, `port: 465`, `secure: true`, `usuario: 'resend'`, `contrasena: <API key>`, `remitente: 'onboarding@resend.dev'` — su dirección de sandbox, sin verificación de dominio, solo entrega a la casilla del dueño de la cuenta) — mismo mecanismo genérico SMTP, sin cambiar una línea de código del módulo, y **envío real exitoso confirmado** (`RESULTADO=0`, mail recibido). Prueba de que `mensajeria_smtp` es efectivamente agnóstico de proveedor: cambiar de Brevo a Resend fue estrictamente un cambio de datos en `PARAMETROS`.
+
+### Componente `mensajeria_twilio` (`packages/modules/mensajeria-twilio`) — tercer módulo real, canal SMS
+
+SDK oficial `twilio` sobre la API de Mensajes. Pensado como módulo opcional para un cliente con cuenta Twilio propia (paga) que use sus propias plantillas `.txt` — mismo patrón que las plantillas HTML de Email, análogo, no un mecanismo aparte (ver "Texto plano vs HTML" arriba).
+
+**Autenticación por API Key, no por Auth Token maestro** — decisión deliberada (Twilio la recomienda: una API Key se puede revocar sin rotar la cuenta entera). El SDK exige el Account SID como opción SEPARADA cuando el primer argumento del constructor es un API Key SID (empieza con `SK`, no `AC`) — sin eso tira un error explícito (`base/BaseTwilio.js` del paquete `twilio`: *"The given SID indicates an API Key which requires the accountSid to be passed as an additional option"*). `PARAMETROS` en `ACCIONES_EXTERNAS`: `{accountSid, apiKeySid, apiKeySecret, numeroOrigen}` — las tres credenciales se sacan de **Console → Account → API keys & tokens** en Twilio (Account SID empieza `AC...`, API Key SID `SK...`), `numeroOrigen` de **Phone Numbers** (tiene que ser un número de la cuenta, Twilio rechaza cualquier otro como remitente).
+
+Mismo criterio que `mensajeria_smtp` para credenciales: **no en `.env` ni en el seed** (`TWILIO_ACCOUNT_SID`/`TWILIO_API_KEY_SID`/`TWILIO_API_KEY_SECRET`/`TWILIO_FROM` si se quiere para desarrollo, sin esas variables la fila se crea con `PARAMETROS=null`), o un `UPDATE` directo por script descartable para cargar credenciales de prueba reales sin commitear nada:
+
+```sql
+UPDATE "ACCIONES_EXTERNAS"
+SET "PARAMETROS" = '{"accountSid":"AC...", "apiKeySid":"SK...", "apiKeySecret":"...", "numeroOrigen":"+1..."}'::jsonb
+WHERE "CODIGO" = 'mensajeria_twilio';
+```
+
+**SMS no soporta adjuntos** como SMTP — MMS necesita URLs públicas y los archivos de este proyecto viven detrás de una ruta autenticada. Si el mensaje trae adjuntos, `enviarPorTwilio` los ignora sin fallar el envío del texto, y lo deja anotado en `RESULTADO_DESC` ("N adjunto(s) ignorado(s) — SMS no los soporta").
+
+**Verificado con una cuenta Twilio trial real**: la autenticación funcionó a la primera (sin errores de credenciales), pero **las cuentas trial de Twilio rechazan texto libre** — exigen que el `BODY` matchee exacto uno de un set fijo de nombres de plantilla predefinidos (`Invalid template name. Trial accounts can only use predefined SMS templates.`), sea cual sea el contenido de `MENSAJERIA_PLANTILLAS`. Es una restricción de la cuenta de PRUEBA, no del código ni del diseño — con cuenta paga el `BODY` es libre (texto de la plantilla `.txt`, ya resuelto). Se confirmó el camino feliz completo usando `"sms_internal_alerts"` (uno de esos nombres fijos) como contenido de una plantilla TXT descartable: `RESULTADO=0`, SID real de Twilio devuelto, SMS recibido en un celular real.
 
 ### EMAILS — casillas de un cliente (core, no depende de ningún módulo de mensajería)
 
@@ -276,8 +297,8 @@ Ejemplo real: `envio_mensajes_pendientes` (proceso, `packages/core/src/seed-conf
 
 ## Pendiente
 
-- Bootstrap genérico de módulos (`registrarModulo`, `apps/<client>/src/modules.ts`) — ya hay DOS módulos reales (`cotizaciones-argentina`, `mensajeria-smtp`), ambos registrados a mano en `instrumentation-node.ts`. Sigue sin construirse el mecanismo genérico de ADR 0012 — no bloqueó a ninguno de los dos, pero con un tercero probablemente valga la pena.
-- Canales de mensajería adicionales (SMS, WhatsApp) — mismo contrato compartido (`procesarComponenteMensajeria`), solo falta el `EnviarUnMensaje` de cada proveedor.
+- Bootstrap genérico de módulos (`registrarModulo`, `apps/<client>/src/modules.ts`) — ya hay TRES módulos reales (`cotizaciones-argentina`, `mensajeria-smtp`, `mensajeria-twilio`), todos registrados a mano en `instrumentation-node.ts`. Sigue sin construirse el mecanismo genérico de ADR 0012 — no bloqueó a ninguno de los tres, pero cada módulo nuevo hace más evidente la falta.
+- Canal de mensajería WhatsApp — mismo contrato compartido (`procesarComponenteMensajeria`), pero a diferencia de SMS, WhatsApp Business exige plantillas PRE-APROBADAS por Meta para cualquier mensaje que arranque el CRM (fuera de una ventana de 24hs de conversación activa) — un `.txt` libre no alcanza como con SMS, hace falta un mecanismo de registro de plantillas distinto (Content API de Twilio, guardando un SID por plantilla en vez de un archivo).
 - Componente `webhook` genérico (ADR 0016 original) — todavía no se construyó, sigue siendo válido para cuando haga falta.
 
 Ver ADR 0016 y ADR 0018 para el razonamiento completo de las decisiones de diseño.

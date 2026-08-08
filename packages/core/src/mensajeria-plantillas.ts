@@ -8,11 +8,19 @@ interface Resultado<T> {
   error?: string;
 }
 
+// El set de valores válidos de CANAL (solo a modo de referencia, ver
+// MENSAJERIA_PLANTILLAS.CANAL en packages/db/src/schema.ts) vive en
+// apps/web/src/lib/mensajeria-plantillas-const.ts, NO acá — este archivo se
+// re-exporta entero desde @valgian/core (barrel único), y ese barrel incluye
+// auth/password.ts (@node-rs/argon2, nativo de Node). Cualquier valor real
+// exportado desde acá rompe el build en cuanto un Client Component lo importe.
+
 export interface MensajeriaPlantillaDetalle {
   id: string;
   idArchivoAdjunto: string | null;
   codigo: string;
   nombre: string;
+  canal: string;
   descripcion: string | null;
   asunto: string | null;
   idEstimuloOk: string | null;
@@ -38,6 +46,7 @@ export async function listMensajeriaPlantillas(): Promise<MensajeriaPlantillaDet
 export interface CrearMensajeriaPlantillaInput {
   codigo: string;
   nombre: string;
+  canal: string;
   descripcion?: string | null;
   asunto?: string | null;
   idEstimuloOk?: string | null;
@@ -62,7 +71,10 @@ export async function crearMensajeriaPlantilla(input: CrearMensajeriaPlantillaIn
     nombreOriginal: input.nombreOriginal,
     mimetype: input.mimetype,
     idUsuario: input.idUsuario,
-    tiposPermitidos: ["html"],
+    // "txt" habilita plantillas de texto plano (ej. SMS por Twilio) — ver
+    // mensajeria.ts, procesarUnMensaje decide si escapar HTML según el
+    // mimetype real del archivo, no hace falta una columna de "tipo" acá.
+    tiposPermitidos: ["html", "txt"],
   });
   if (archivo.error || !archivo.data) return { error: archivo.error ?? "Error guardando el archivo de la plantilla." };
 
@@ -72,6 +84,7 @@ export async function crearMensajeriaPlantilla(input: CrearMensajeriaPlantillaIn
       idArchivoAdjunto: archivo.data.id,
       codigo: input.codigo,
       nombre: input.nombre,
+      canal: input.canal,
       descripcion: input.descripcion ?? null,
       asunto: input.asunto ?? null,
       idEstimuloOk: input.idEstimuloOk ?? null,
@@ -87,6 +100,7 @@ export async function crearMensajeriaPlantilla(input: CrearMensajeriaPlantillaIn
 export interface ActualizarMensajeriaPlantillaInput {
   codigo: string;
   nombre: string;
+  canal: string;
   descripcion?: string | null;
   asunto?: string | null;
   idEstimuloOk?: string | null;
@@ -105,6 +119,7 @@ export async function actualizarMensajeriaPlantilla(id: string, input: Actualiza
     .set({
       codigo: input.codigo,
       nombre: input.nombre,
+      canal: input.canal,
       descripcion: input.descripcion ?? null,
       asunto: input.asunto ?? null,
       idEstimuloOk: input.idEstimuloOk ?? null,

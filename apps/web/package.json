@@ -14,6 +14,7 @@
     "@valgian/module-cotizaciones-argentina": "workspace:*",
     "@valgian/module-cuenta-corriente": "workspace:*",
     "@valgian/module-mensajeria-smtp": "workspace:*",
+    "@valgian/module-mensajeria-twilio": "workspace:*",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "dotenv": "^17.4.2",

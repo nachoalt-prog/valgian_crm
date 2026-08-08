@@ -18,6 +18,7 @@ import {
 } from "@valgian/core";
 import { registrar as registrarCotizacionesArgentina } from "@valgian/module-cotizaciones-argentina";
 import { registrar as registrarMensajeriaSmtp } from "@valgian/module-mensajeria-smtp";
+import { registrar as registrarMensajeriaTwilio } from "@valgian/module-mensajeria-twilio";
 import { registrar as registrarCuentaCorriente } from "@valgian/module-cuenta-corriente";
 
 const SEGUNDOS_BARRIDO_SEGURIDAD = 15 * 60;
@@ -73,6 +74,7 @@ try {
   // Registro explícito de módulos opcionales (ver docs/contracts/modulo.md) — nada de autodescubrimiento.
   registrarCotizacionesArgentina();
   registrarMensajeriaSmtp();
+  registrarMensajeriaTwilio();
   registrarCuentaCorriente();
   // Motor de importación (ADR 0021) — infraestructura de core, no un módulo,
   // pero registra su handler ('importacion') con el mismo mecanismo explícito.

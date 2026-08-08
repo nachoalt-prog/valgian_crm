@@ -231,6 +231,7 @@ async function ensureMensajeriaPlantillaDemo(params: { codigo: string; nombre: s
   const resultado = await crearMensajeriaPlantilla({
     codigo: params.codigo,
     nombre: params.nombre,
+    canal: "email",
     descripcion: params.descripcion ?? null,
     asunto: params.asunto,
     buffer: Buffer.from(params.html, "utf-8"),

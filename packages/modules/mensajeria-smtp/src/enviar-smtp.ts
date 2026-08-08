@@ -47,7 +47,7 @@ export async function enviarPorSmtp(mensaje: MensajeParaEnviar, parametrosAccion
       from: parametrosAccion.remitente,
       to: destinatario,
       subject: mensaje.asunto ?? "(sin asunto)",
-      html: mensaje.cuerpoHtml,
+      html: mensaje.cuerpo,
       attachments: mensaje.adjuntos.map((a) => ({ filename: a.nombreOriginal, content: a.buffer, contentType: a.mimetype ?? undefined })),
     });
     return { exito: true, descripcion: `Enviado a ${destinatario}.` };

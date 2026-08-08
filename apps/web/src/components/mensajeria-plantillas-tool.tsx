@@ -11,8 +11,18 @@ import { MensajeriaPlantillaProbarDialog } from "@/components/mensajeria-plantil
 import { ArchivoAdjuntoDialog } from "@/components/archivo-adjunto-dialog";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { HERRAMIENTA_MENSAJERIA_PLANTILLAS_CODIGO } from "@/lib/archivos-adjuntos-const";
+import { CANALES_MENSAJERIA_PLANTILLA } from "@/lib/mensajeria-plantillas-const";
 import { borrarMensajeriaPlantillaAction } from "@/app/dashboard/mensajeria-plantillas/actions";
 import type { MensajeriaPlantillaDetalle, EstimuloConEstrategia } from "@valgian/core";
+
+function badgeCanal(canal: string) {
+  const info = CANALES_MENSAJERIA_PLANTILLA.find((c) => c.value === canal);
+  return (
+    <Badge variant="outline" className={info?.clase ?? "text-muted-foreground"}>
+      {info?.label ?? canal}
+    </Badge>
+  );
+}
 
 interface MensajeriaPlantillasToolProps {
   plantillasIniciales: MensajeriaPlantillaDetalle[];
@@ -101,6 +111,7 @@ export function MensajeriaPlantillasTool({ plantillasIniciales, estimulosDisponi
                 <TableRow>
                   <TableHead>Código</TableHead>
                   <TableHead>Nombre</TableHead>
+                  <TableHead>Canal</TableHead>
                   <TableHead>Asunto</TableHead>
                   <TableHead>Archivo</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
@@ -111,6 +122,7 @@ export function MensajeriaPlantillasTool({ plantillasIniciales, estimulosDisponi
                   <TableRow key={p.id} className="group cursor-pointer" onClick={() => setArchivoTarget(p)}>
                     <TableCell className="font-mono text-xs text-primary">{p.codigo}</TableCell>
                     <TableCell>{p.nombre}</TableCell>
+                    <TableCell>{badgeCanal(p.canal)}</TableCell>
                     <TableCell className="text-muted-foreground">{p.asunto ?? "—"}</TableCell>
                     <TableCell>
                       {p.idArchivoAdjunto ? (
@@ -192,7 +204,7 @@ export function MensajeriaPlantillasTool({ plantillasIniciales, estimulosDisponi
           canDescargar={canGestionar}
           canGuardar={canGestionar}
           onGuardado={() => router.refresh()}
-          tiposPermitidos={["html"]}
+          tiposPermitidos={["html", "txt"]}
         />
       )}
 

@@ -8,8 +8,8 @@ import { finalizarIntentoAccionExterna, type FilaAccionExternaCola } from "./acc
 
 /**
  * Mensajería — ver domain/acciones-externas.md, sección Mensajería. Contrato
- * compartido para TODOS los componentes de mensajería (SMTP, a futuro
- * SMS/WhatsApp): cada proveedor solo implementa `EnviarUnMensaje` (cómo
+ * compartido para TODOS los componentes de mensajería (SMTP, SMS por Twilio,
+ * a futuro WhatsApp): cada proveedor solo implementa `EnviarUnMensaje` (cómo
  * mandar UN mensaje ya resuelto); todo lo demás (modo de despacho, resolución
  * de plantilla/placeholders/adjuntos, bookkeeping de reintento, aplicación de
  * estímulos) lo resuelve `procesarComponenteMensajeria` una única vez.
@@ -146,7 +146,8 @@ async function cargarAdjuntosMensaje(idMensajeriaCola: string): Promise<AdjuntoM
 export interface MensajeParaEnviar {
   id: string;
   asunto: string | null;
-  cuerpoHtml: string;
+  /** Cuerpo ya resuelto — HTML o texto plano según el archivo de la plantilla (ver procesarUnMensaje). */
+  cuerpo: string;
   /** A dónde mandarlo — MENSAJERIA_COLA.DESTINO, ya resuelto por SP_MENSAJERIA_ENCOLAR. */
   destino: string | null;
   /** Datos raíz crudos, por si el proveedor necesita algo más que el destino. */
@@ -235,22 +236,26 @@ async function procesarUnMensaje(fila: FilaMensajeCola, parametrosAccion: unknow
 
   const [plantilla] = await db.select().from(mensajeriaPlantillas).where(eq(mensajeriaPlantillas.id, fila.idMensajeriaPlantilla));
   if (!plantilla?.idArchivoAdjunto) {
-    await finalizarIntentoMensaje(fila, { resultado: 1, resultadoDesc: "La plantilla no tiene un archivo HTML configurado.", placeholders: null });
+    await finalizarIntentoMensaje(fila, { resultado: 1, resultadoDesc: "La plantilla no tiene un archivo configurado.", placeholders: null });
     return false;
   }
 
-  const htmlCrudo = await leerArchivoCrudo(plantilla.idArchivoAdjunto);
-  if (htmlCrudo.error || !htmlCrudo.data) {
-    await finalizarIntentoMensaje(fila, { resultado: 1, resultadoDesc: htmlCrudo.error ?? "No se pudo leer el HTML de la plantilla.", placeholders: null });
+  const archivoCrudo = await leerArchivoCrudo(plantilla.idArchivoAdjunto);
+  if (archivoCrudo.error || !archivoCrudo.data) {
+    await finalizarIntentoMensaje(fila, { resultado: 1, resultadoDesc: archivoCrudo.error ?? "No se pudo leer el archivo de la plantilla.", placeholders: null });
     return false;
   }
 
-  const htmlCrudoTexto = htmlCrudo.data.buffer.toString("utf-8");
+  // "text/plain" (ej. plantilla .txt para SMS por Twilio) no tiene sintaxis
+  // HTML que proteger — escaparla igual metería entidades (&amp;) literales
+  // en el mensaje final. Ver ResolverPlaceholdersOpciones en placeholders.ts.
+  const esTextoPlano = archivoCrudo.data.mimetype === "text/plain";
+  const cuerpoCrudoTexto = archivoCrudo.data.buffer.toString("utf-8");
   const placeholdersPrecargados = fila.placeholders;
 
   const cuerpoResuelto: ResolverPlaceholdersResult = placeholdersPrecargados
-    ? { html: sustituirPlaceholdersDesdeMapa(htmlCrudoTexto, placeholdersPrecargados) }
-    : await resolverPlaceholders(htmlCrudoTexto, fila.placeholdersDatosRaiz);
+    ? { html: sustituirPlaceholdersDesdeMapa(cuerpoCrudoTexto, placeholdersPrecargados) }
+    : await resolverPlaceholders(cuerpoCrudoTexto, fila.placeholdersDatosRaiz, { escaparHtml: !esTextoPlano });
   if (cuerpoResuelto.error || cuerpoResuelto.html === undefined) {
     await finalizarIntentoMensaje(fila, { resultado: 1, resultadoDesc: cuerpoResuelto.error ?? "Error resolviendo el cuerpo del mensaje.", placeholders: null });
     return false;
@@ -259,7 +264,7 @@ async function procesarUnMensaje(fila: FilaMensajeCola, parametrosAccion: unknow
   const asuntoResuelto: ResolverPlaceholdersResult = fila.asunto
     ? placeholdersPrecargados
       ? { html: sustituirPlaceholdersDesdeMapa(fila.asunto, placeholdersPrecargados) }
-      : await resolverPlaceholders(fila.asunto, fila.placeholdersDatosRaiz)
+      : await resolverPlaceholders(fila.asunto, fila.placeholdersDatosRaiz, { escaparHtml: !esTextoPlano })
     : { html: undefined, valores: {} };
   if (asuntoResuelto.error) {
     await finalizarIntentoMensaje(fila, { resultado: 1, resultadoDesc: asuntoResuelto.error, placeholders: null });
@@ -272,7 +277,7 @@ async function procesarUnMensaje(fila: FilaMensajeCola, parametrosAccion: unknow
   const mensaje: MensajeParaEnviar = {
     id: fila.id,
     asunto: asuntoResuelto.html ?? fila.asunto,
-    cuerpoHtml: cuerpoResuelto.html,
+    cuerpo: cuerpoResuelto.html,
     destino: fila.destino,
     datosRaiz: fila.placeholdersDatosRaiz,
     adjuntos,

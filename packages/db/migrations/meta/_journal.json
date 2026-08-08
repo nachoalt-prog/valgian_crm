@@ -281,6 +281,13 @@
       "when": 1786061170530,
       "tag": "0039_powerful_ben_urich",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1786199842397,
+      "tag": "0040_rare_avengers",
+      "breakpoints": true
     }
   ]
 }

@@ -156,9 +156,17 @@ export function MensajeriaPlantillaProbarDialog({ open, onOpenChange, plantilla 
           <div className="max-h-[70vh] space-y-4 overflow-y-auto py-2 pr-1">
             <div className="space-y-1.5">
               <Label htmlFor="destino" className="text-xs uppercase tracking-wider text-muted-foreground">
-                Email destino
+                Destino
               </Label>
-              <Input id="destino" type="email" value={destino} onChange={(e) => setDestino(e.target.value)} required disabled={enviando} />
+              <Input
+                id="destino"
+                type="text"
+                placeholder="Email o teléfono, según la acción externa elegida"
+                value={destino}
+                onChange={(e) => setDestino(e.target.value)}
+                required
+                disabled={enviando}
+              />
             </div>
 
             {codigos.map((codigo) => (

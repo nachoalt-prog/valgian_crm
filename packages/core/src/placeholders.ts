@@ -118,12 +118,25 @@ async function ejecutarQueryPlaceholder(query: string, datos: unknown): Promise<
   return valor === null || valor === undefined ? "" : String(valor);
 }
 
-export async function resolverPlaceholders(htmlTemplate: string, datos: unknown): Promise<ResolverPlaceholdersResult> {
+export interface ResolverPlaceholdersOpciones {
+  /**
+   * Si es `false`, ningún placeholder se escapa en esta resolución, sin
+   * importar su propio `PLACEHOLDERS.ESCAPAR` — para texto plano (ej. SMS por
+   * Twilio) no hay sintaxis HTML que proteger, y escapar igual metería
+   * entidades (`&amp;`, `&#39;`) literales en el mensaje. Default (omitido)
+   * `true` — el comportamiento de siempre para HTML (Documentos, Mensajería
+   * por SMTP) no cambia.
+   */
+  escaparHtml?: boolean;
+}
+
+export async function resolverPlaceholders(htmlTemplate: string, datos: unknown, opciones?: ResolverPlaceholdersOpciones): Promise<ResolverPlaceholdersResult> {
   const codigos = extraerCodigosPlaceholders(htmlTemplate);
   if (codigos.length === 0) return { html: htmlTemplate };
 
   const filas = await db.select().from(placeholders).where(inArray(placeholders.codigo, codigos));
   const porCodigo = new Map(filas.map((f) => [f.codigo, f]));
+  const escaparHtml = opciones?.escaparHtml ?? true;
 
   let html = htmlTemplate;
   const valores: Record<string, string> = {};
@@ -139,8 +152,10 @@ export async function resolverPlaceholders(htmlTemplate: string, datos: unknown)
       return { error: `Error resolviendo el placeholder "${codigo}": ${message}` };
     }
     // NULL trata como "escapar" — un flag sin setear tiene que quedar seguro
-    // por default, nunca inseguro por default.
-    const valorFinal = placeholder.escapar !== false ? escapeHtml(valor) : valor;
+    // por default, nunca inseguro por default. Pero si el LLAMADOR ya dijo que
+    // esta resolución es para texto plano (escaparHtml:false), eso pisa el
+    // flag individual del placeholder — no hay HTML que proteger acá.
+    const valorFinal = escaparHtml && placeholder.escapar !== false ? escapeHtml(valor) : valor;
     html = html.replaceAll(`##${codigo}##`, valorFinal);
     valores[codigo] = valorFinal;
   }

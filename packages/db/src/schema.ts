@@ -938,8 +938,15 @@ export const mensajeriaPlantillas = pgTable(
     id: uuid("ID").primaryKey().defaultRandom(),
     codigo: text("CODIGO").notNull(),
     nombre: text("NOMBRE").notNull(),
-    // HTML del cuerpo del mensaje, con ##CODIGO## — mismo mecanismo que PLANTILLAS_ADJUNTOS.
+    // Cuerpo del mensaje con ##CODIGO## — HTML o TXT según CANAL (mismo mecanismo
+    // que PLANTILLAS_ADJUNTOS, ver mensajeria-plantillas.ts).
     idArchivoAdjunto: uuid("ID_ARCHIVO_ADJUNTO").references(() => archivosAdjuntos.id),
+    // 'email' | 'sms' | 'whatsapp' — solo a modo de referencia para quien
+    // administra las plantillas, no valida contra el archivo cargado ni
+    // contra ninguna ACCIONES_EXTERNAS (mismo criterio que un ESTADO de texto
+    // simple, ej. IMPORTADORES_EJECUCIONES.ESTADO — no amerita tabla de
+    // catálogo propia: sin FK entrante, sin CRUD propio, conjunto fijo y chico).
+    canal: text("CANAL").notNull().default("email"),
     descripcion: text("DESCRIPCION"),
     // También admite ##CODIGO## — se resuelve con el mismo motor que el cuerpo.
     asunto: text("ASUNTO"),
